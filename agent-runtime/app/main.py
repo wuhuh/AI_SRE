@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from app.agent.runner import AgentRunner
 from app.checkpoint import FileCheckpointStore
-from app.consumer import consumer_loop
+from app.consumer import agent_headers, consumer_loop
 from app.llm.mock import MockLLMProvider
 from app.llm.openai_compatible import OpenAICompatibleLLMProvider
 from app.models import AgentState
@@ -100,6 +100,7 @@ def _submit_diagnosis(incident_id: int, diagnosis) -> None:
             f"{_control_plane_url()}/api/v1/incidents/{incident_id}/diagnosis",
             json=payload,
             timeout=10,
+            headers=agent_headers(),
         )
     except Exception:
         # Callback is best-effort; the caller still receives the diagnosis directly.
@@ -118,6 +119,7 @@ def _submit_verification(incident_id: int, verification) -> None:
             f"{_control_plane_url()}/api/v1/incidents/{incident_id}/verification",
             json=payload,
             timeout=10,
+            headers=agent_headers(),
         )
     except Exception:
         pass

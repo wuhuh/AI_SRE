@@ -27,6 +27,12 @@ spec:
               value: http://loki:3100
             - name: TEMPO_URL
               value: http://jaeger:16686
+            # P0-05: 与 control-plane 的 AISRE_AGENT_TOKEN 同值
+            - name: AGENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: agentToken
           readinessProbe:
             httpGet:
               path: /health

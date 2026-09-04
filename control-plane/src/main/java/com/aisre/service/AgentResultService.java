@@ -64,6 +64,11 @@ public class AgentResultService {
     @Transactional
     public Incident saveDiagnosis(Long incidentId, DiagnosisRequest request) {
         Incident incident = getIncident(incidentId);
+        // P0-05: 幂等 —— 诊断结果只允许写入一次（DIAGNOSING → ROOT_CAUSE_FOUND）。
+        // 重复回调（网络重试/多副本竞态/重放）直接返回现状，不再追加重复证据与审计。
+        if (incident.getStatus().ordinal() >= IncidentStatus.ROOT_CAUSE_FOUND.ordinal()) {
+            return incident;
+        }
         if (incident.getStatus() == IncidentStatus.DETECTED || incident.getStatus() == IncidentStatus.TRIAGING) {
             incident.setStatus(IncidentStatus.DIAGNOSING);
         }
@@ -106,7 +111,7 @@ public class AgentResultService {
         }
 
         agentStepRepository.save(new AgentStep(
-                0L,
+                request.taskId() == null ? 0L : request.taskId(),
                 incidentId,
                 1,
                 "DIAGNOSIS",

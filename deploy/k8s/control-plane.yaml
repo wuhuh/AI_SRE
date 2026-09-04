@@ -60,6 +60,12 @@ spec:
                 secretKeyRef:
                   name: db-secret
                   key: viewerPassword
+            # P0-05: Agent 回调共享 token
+            - name: AISRE_AGENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: agentToken
           readinessProbe:
             httpGet:
               path: /actuator/health
@@ -118,3 +124,5 @@ stringData:
   adminPassword: REPLACE_WITH_ADMIN_PASSWORD
   operatorPassword: REPLACE_WITH_OPERATOR_PASSWORD
   viewerPassword: REPLACE_WITH_VIEWER_PASSWORD
+  # P0-05: Agent 回调共享 token
+  agentToken: REPLACE_WITH_AGENT_TOKEN
