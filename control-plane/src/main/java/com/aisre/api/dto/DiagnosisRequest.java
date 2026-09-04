@@ -7,6 +7,7 @@ public record DiagnosisRequest(
         Double confidence,
         List<EvidenceDTO> evidence,
         List<String> recommendedActions,
-        List<ToolCallDTO> toolCalls
+        List<ToolCallDTO> toolCalls,
+        Long taskId
 ) {
 }

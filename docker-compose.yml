@@ -130,6 +130,8 @@ services:
       AISRE_ADMIN_PASSWORD: ${AISRE_ADMIN_PASSWORD:-aisre-dev-admin-pw}
       AISRE_OPERATOR_PASSWORD: ${AISRE_OPERATOR_PASSWORD:-aisre-dev-operator-pw}
       AISRE_VIEWER_PASSWORD: ${AISRE_VIEWER_PASSWORD:-aisre-dev-viewer-pw}
+      # P0-05: Agent 回调共享 token（agent-runtime 的 AGENT_TOKEN 必须同值）
+      AISRE_AGENT_TOKEN: ${AISRE_AGENT_TOKEN:-local-dev-agent-token}
     ports:
       - "8080:8080"
     depends_on:
@@ -151,6 +153,7 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-deepseek-v4-flash}
       AUTO_CONSUME: ${AUTO_CONSUME:-true}
       CONTROL_PLANE_URL: http://control-plane:8080
+      AGENT_TOKEN: ${AISRE_AGENT_TOKEN:-local-dev-agent-token}
       PROMETHEUS_URL: http://prometheus:9090
       LOKI_URL: http://loki:3100
       TEMPO_URL: http://jaeger:16686
