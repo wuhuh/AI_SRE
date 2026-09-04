@@ -6,6 +6,8 @@ import com.aisre.domain.IncidentStatus;
 import com.aisre.domain.RemediationAction;
 import com.aisre.repo.IncidentRepository;
 import com.aisre.repo.RemediationActionRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -15,12 +17,18 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class RemediationExecutor {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     private final RemediationActionRepository remediationActionRepository;
     private final IncidentRepository incidentRepository;
+    private final AuditService auditService;
     private final String toolServerUrl;
     private final String approvalToken;
     private final String agentRuntimeUrl;
@@ -30,11 +38,13 @@ public class RemediationExecutor {
 
     public RemediationExecutor(RemediationActionRepository remediationActionRepository,
                                IncidentRepository incidentRepository,
+                               AuditService auditService,
                                @Value("${aisre.tool-server.url:http://tool-server:8081}") String toolServerUrl,
-                               @Value("${aisre.tool-server.approval-token:change-me-in-production}") String approvalToken,
+                               @Value("${AISRE_TOOL_SERVER_TOKEN:local-dev-token}") String approvalToken,
                                @Value("${aisre.agent-runtime.url:http://agent-runtime:8080}") String agentRuntimeUrl) {
         this.remediationActionRepository = remediationActionRepository;
         this.incidentRepository = incidentRepository;
+        this.auditService = auditService;
         this.toolServerUrl = toolServerUrl;
         this.approvalToken = approvalToken;
         this.agentRuntimeUrl = agentRuntimeUrl;
@@ -42,7 +52,7 @@ public class RemediationExecutor {
 
     public RemediationAction execute(Long incidentId, Approval approval) {
         String action = approval.getActionType();
-        String url = buildUrl(action, approval);
+        Incident incident = incidentRepository.findById(incidentId).orElse(null);
         RemediationAction remediation = new RemediationAction(
                 incidentId,
                 action,
@@ -54,10 +64,24 @@ public class RemediationExecutor {
         );
         remediation = remediationActionRepository.save(remediation);
         try {
+            // P0-04: 参数化 body（从审批 payload 构造）；未知动作 fail-closed，不发任何请求
+            Optional<String> body = buildExecutionBody(action, approval, incident);
+            if (body.isEmpty()) {
+                remediation.setStatus("FAILED");
+                remediation.setResultSummary("refused: unknown action not in fail-closed policy");
+                remediation.setExecutedAt(Instant.now());
+                remediation = remediationActionRepository.save(remediation);
+                auditService.record(incidentId, "remediation-executor", "UNKNOWN_ACTION_REFUSED", action);
+                return remediation;
+            }
+            String executionToken = approval.getExecutionToken() != null ? approval.getExecutionToken() : approvalToken;
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
+                    .uri(URI.create(toolServerUrl.replaceAll("/+$", "") + "/api/k8s"))
                     .timeout(Duration.ofSeconds(30))
-                    .GET()
+                    .header("Content-Type", "application/json")
+                    // P0-04: token 走 header，不再拼进 URL（避免进日志/审计泄漏）
+                    .header("X-Execution-Token", executionToken)
+                    .POST(HttpRequest.BodyPublishers.ofString(body.get()))
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             boolean success = response.statusCode() >= 200 && response.statusCode() < 300;
@@ -66,13 +90,11 @@ public class RemediationExecutor {
             remediation.setExecutedAt(Instant.now());
             remediation = remediationActionRepository.save(remediation);
 
-            if (success) {
-                Incident incident = incidentRepository.findById(incidentId).orElse(null);
-                if (incident != null && IncidentStateMachineSafe.canTransition(incident.getStatus(), IncidentStatus.VERIFYING)) {
-                    incident.setStatus(IncidentStatus.VERIFYING);
-                    incidentRepository.save(incident);
-                    triggerVerification(incident);
-                }
+            if (success && incident != null
+                    && IncidentStateMachineSafe.canTransition(incident.getStatus(), IncidentStatus.VERIFYING)) {
+                incident.setStatus(IncidentStatus.VERIFYING);
+                incidentRepository.save(incident);
+                triggerVerification(incident);
             }
         } catch (Exception e) {
             remediation.setStatus("FAILED");
@@ -81,6 +103,66 @@ public class RemediationExecutor {
             remediation = remediationActionRepository.save(remediation);
         }
         return remediation;
+    }
+
+    /**
+     * P0-04: 从审批 payload 构造 tool-server 请求 body。
+     * payload 缺字段时回退到 incident.service（payload 由 AgentResultService 在
+     * 创建审批时写入真实参数）。未知动作返回 empty —— 调用方必须 fail-closed。
+     */
+    static Optional<String> buildExecutionBody(String action, Approval approval, Incident incident) {
+        String normalized = action == null ? "" : action.trim().toLowerCase();
+        JsonNode p = parsePayload(approval == null ? null : approval.getActionPayload());
+        String service = incident == null || incident.getService() == null ? "unknown" : incident.getService();
+        Map<String, Object> body = new LinkedHashMap<>();
+        switch (normalized) {
+            case "scale_deployment" -> {
+                body.put("action", "scale_deployment");
+                body.put("namespace", text(p, "namespace", "default"));
+                body.put("deployment", text(p, "deployment", service));
+                body.put("replicas", intOr(p, "replicas", 3));
+            }
+            case "restart_pod", "restart_service" -> {
+                body.put("action", "restart_pod");
+                body.put("namespace", text(p, "namespace", "default"));
+                body.put("pod", text(p, "pod", service));
+            }
+            case "delete_pod" -> {
+                body.put("action", "delete_pod");
+                body.put("namespace", text(p, "namespace", "default"));
+                body.put("pod", text(p, "pod", service));
+            }
+            case "rollback_deployment" -> {
+                body.put("action", "rollback_deployment");
+                body.put("namespace", text(p, "namespace", "default"));
+                body.put("deployment", text(p, "deployment", service));
+            }
+            default -> {
+                return Optional.empty();
+            }
+        }
+        try {
+            return Optional.of(MAPPER.writeValueAsString(body));
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    private static JsonNode parsePayload(String payload) {
+        try {
+            return MAPPER.readTree(payload == null || payload.isBlank() ? "{}" : payload);
+        } catch (Exception e) {
+            return MAPPER.createObjectNode();
+        }
+    }
+
+    private static String text(JsonNode node, String field, String fallback) {
+        return node != null && node.hasNonNull(field) && !node.get(field).asText().isBlank()
+                ? node.get(field).asText() : fallback;
+    }
+
+    private static int intOr(JsonNode node, String field, int fallback) {
+        return node != null && node.has(field) && node.get(field).isInt() ? node.get(field).asInt() : fallback;
     }
 
     private void triggerVerification(Incident incident) {
@@ -99,22 +181,6 @@ public class RemediationExecutor {
         } catch (Exception e) {
             // Verification is best-effort; the incident remains in VERIFYING for manual retry.
         }
-    }
-
-    private String buildUrl(String action, Approval approval) {
-        String normalized = action == null ? "" : action.trim().toLowerCase();
-        String base = toolServerUrl.replaceAll("/+$", "");
-        String executionToken = approval.getExecutionToken() != null ? approval.getExecutionToken() : approvalToken;
-        String tokenParam = "x-approval-token=" + executionToken;
-        return switch (normalized) {
-            case "scale_deployment" -> base + "/api/k8s?action=scale_deployment&namespace=default&deployment=default&replicas=3&" + tokenParam;
-            case "restart_pod", "restart_service" -> base + "/api/k8s?action=restart_pod&namespace=default&pod=default&" + tokenParam;
-            case "delete_pod" -> base + "/api/k8s?action=delete_pod&namespace=default&pod=default&" + tokenParam;
-            case "rollback_deployment" -> base + "/api/k8s?action=rollback_deployment&namespace=default&deployment=default&" + tokenParam;
-            case "increase_redis_maxclients", "clear_redis_cache" -> base + "/api/redis?command=info";
-            case "increase_db_pool_size" -> base + "/api/db?command=health";
-            default -> base + "/api/k8s?action=restart_pod&namespace=default&pod=default&" + tokenParam;
-        };
     }
 
     // small helper to avoid direct dependency on state machine class in this context

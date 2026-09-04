@@ -124,12 +124,14 @@ public class AgentResultService {
         boolean hasHighRisk = false;
         if (request.recommendedActions() != null) {
             for (String action : request.recommendedActions()) {
+                // P0-04: 审批携带真实参数（服务名驱动），不再写死 "{}"/"default"
+                String payload = buildActionPayload(action, incident.getService());
                 if (RiskPolicy.requiresApproval(action)) {
                     hasHighRisk = true;
                     approvalRepository.save(new Approval(
                             incidentId,
                             action,
-                            "{}",
+                            payload,
                             "PENDING",
                             "agent",
                             Instant.now()
@@ -138,7 +140,7 @@ public class AgentResultService {
                     Approval autoApproval = new Approval(
                             incidentId,
                             action,
-                            "{}",
+                            payload,
                             "APPROVED",
                             "auto-policy",
                             Instant.now()
@@ -228,6 +230,39 @@ public class AgentResultService {
     private Incident getIncident(Long incidentId) {
         return incidentRepository.findById(incidentId)
                 .orElseThrow(() -> new IllegalArgumentException("Incident not found: " + incidentId));
+    }
+
+    /**
+     * P0-04: 审批创建时写入真实执行参数（与 RemediationExecutor.buildExecutionBody
+     * 的字段约定一致）。未知/无参数动作写 "{}"，执行端 fail-closed 拒绝。
+     */
+    private String buildActionPayload(String action, String service) {
+        String target = service == null || service.isBlank() ? "unknown" : service;
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        String normalized = action == null ? "" : action.trim().toLowerCase();
+        switch (normalized) {
+            case "scale_deployment" -> {
+                payload.put("namespace", "default");
+                payload.put("deployment", target);
+                payload.put("replicas", 3);
+            }
+            case "restart_pod", "restart_service", "delete_pod" -> {
+                payload.put("namespace", "default");
+                payload.put("pod", target);
+            }
+            case "rollback_deployment" -> {
+                payload.put("namespace", "default");
+                payload.put("deployment", target);
+            }
+            default -> {
+                return "{}";
+            }
+        }
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(payload);
+        } catch (Exception e) {
+            return "{}";
+        }
     }
 
     private void transitionIfAllowed(Incident incident, IncidentStatus target) {

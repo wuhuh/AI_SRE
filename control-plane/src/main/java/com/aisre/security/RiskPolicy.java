@@ -36,7 +36,9 @@ public final class RiskPolicy {
             return RiskLevel.HIGH_RISK;
         }
         String normalized = action.trim().toLowerCase();
-        return ACTION_RISK.getOrDefault(normalized, RiskLevel.LOW_RISK);
+        // P0-04: fail-closed —— 策略表之外的未知动作一律按 HIGH_RISK 处理，
+        // 走人工审批而不是自动执行（旧实现 getOrDefault(LOW_RISK) 是放水）。
+        return ACTION_RISK.getOrDefault(normalized, RiskLevel.HIGH_RISK);
     }
 
     public static boolean requiresApproval(String action) {

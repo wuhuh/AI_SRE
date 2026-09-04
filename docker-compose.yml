@@ -132,6 +132,8 @@ services:
       AISRE_VIEWER_PASSWORD: ${AISRE_VIEWER_PASSWORD:-aisre-dev-viewer-pw}
       # P0-05: Agent 回调共享 token（agent-runtime 的 AGENT_TOKEN 必须同值）
       AISRE_AGENT_TOKEN: ${AISRE_AGENT_TOKEN:-local-dev-agent-token}
+      # P0-04: 审批执行 token（tool-server 的 APPROVAL_TOKEN 必须同值）
+      AISRE_TOOL_SERVER_TOKEN: ${AISRE_TOOL_SERVER_TOKEN:-local-dev-token}
     ports:
       - "8080:8080"
     depends_on:
@@ -170,7 +172,8 @@ services:
       context: ./tool-server
     environment:
       REDIS_URL: redis://redis:6379/0
-      APPROVAL_TOKEN: local-dev-token
+      # P0-04: 与 control-plane 的 AISRE_TOOL_SERVER_TOKEN 同值（统一 fallback）
+      APPROVAL_TOKEN: ${AISRE_TOOL_SERVER_TOKEN:-local-dev-token}
     ports:
       - "8082:8081"
     depends_on:
