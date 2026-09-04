@@ -30,19 +30,20 @@
   `python3 -m unittest discover -s evaluation/tests`（11 离线用例，含泄漏防护）。
   Effort: M（2-3 天）
 
-- [ ] **P0-04 (CP-01+CP-02+CP-13) 审批参数绑定 + fail-closed + token 强化**：
-  1. `Approval.actionPayload` 存真实参数（namespace/deployment/pod/replicas 从 incident.service 推导）；
-  2. `RemediationExecutor.buildUrl` 从 payload 构造；删除 default 兜底分支（未知动作 → FAILED + 审计）；
-  3. `RiskPolicy.classify` 未知动作默认 HIGH_RISK；
-  4. token 移入 header；tool-server 校验与签发绑定（回查 CP 或 HMAC）；统一 fallback token 值。
-  验证：单测（幻觉动作不执行/参数一致性）；集成测试 POST decision → MockWebServer 断言发出的 URL/参数/header。
+- [x] **P0-04 (CP-01+CP-02+CP-13) 审批参数绑定 + fail-closed + token 强化**：
+  ✅ 已完成（commit a3cd2c8）：payload 由 incident.service 驱动（namespace/deployment/pod/replicas）；
+  执行改 POST+JSON body+X-Execution-Token header（token 不再进 URL）；删 default 兜底 ——
+  未知动作不发请求，FAILED + UNKNOWN_ACTION_REFUSED 审计；RiskPolicy 未知→HIGH_RISK；
+  redis/db 占位假执行（command=info）一并 refuse；tool-server 删 len≥8 放行、写操作仅 POST+精确匹配。
+  测试：RiskPolicyTest(2) + RemediationExecutorBodyTest(4) + tool-server 6 用例（Java 27 OK）。
+  遗留：真实 K8s 执行（dryRun→真调用）在 P0-10/P0-11 范围。
   Effort: M
 
-- [ ] **P0-05 (CP-05) Agent 回调鉴权 + saveDiagnosis 幂等**：
-  1. agent 专用 token（env 注入，回调带 header），`AuthInterceptor` 校验；
-  2. `DiagnosisRequest` 增加 `taskId`；saveDiagnosis 以 (incidentId, taskId) 幂等（存在即返回原结果）；仅允许 DIAGNOSING→ROOT_CAUSE_FOUND 推进一次；
-  3. `POST /tasks/{id}/complete` 加同 token。
-  验证：重放同一 diagnosis 两次 → evidence/tool_calls/approval 数量不变；无 token 回调 401；伪造 verification 的负向测试。
+- [x] **P0-05 (CP-05) Agent 回调鉴权 + saveDiagnosis 幂等**：
+  ✅ 已完成（commit 3c21bb8）：X-Agent-Token 常量时间比较（未配置 token 时 fail-closed 503）；
+  DiagnosisRequest+taskId 且 AgentStep 记录真实 taskId；saveDiagnosis 幂等 —— 状态已到
+  ROOT_CAUSE_FOUND 及之后的重复回调直接返回现状，不再追加重复 evidence/审计；
+  /tasks/* 全部纳入 agent 回调面。测试：AuthInterceptorTest(5)。Java 21 OK / Python 265 OK。
   Effort: M
 
 - [x] **P0-06 (CP-03+CP-04) 认证修复**：JWT exp 用 Jackson 解析（数字）；启动时 strict 模式校验 `aisre.jwt.secret` 非默认且 ≥32B、口令非默认（否则 fail-fast）；口令支持 BCrypt（$2 开头）+ 明文兼容；登录失败限速（10min 内 5 次锁定）。
@@ -149,7 +150,10 @@
   验证：(a) 文档与架构图一致；(b) kill 消费者 → 消息重投 → 处理成功（幂等）。
   Effort: S(a)/L(b)
 
-- [ ] **P1-MQ-02** 任务 claim/lease：`UPDATE ... SET status='RUNNING', claimed_by, claimed_at WHERE status='QUEUED'` 条件更新 + 超时回收扫描；消费端带 taskId。
+- [x] **P1-MQ-02** 任务 claim/lease：`UPDATE ... SET status='RUNNING', claimed_by, claimed_at WHERE status='QUEUED'` 条件更新 + 超时回收扫描；消费端带 taskId。
+  ✅ 已完成（commit 51d4413）：claimTask 原子抢占 + reclaimExpiredLeases 定时回收（lease 600s 可配）
+  + /tasks/{id}/claim|complete|fail 三端点 + V3 迁移；Python 消费端先 claim 再诊断、失败上报 fail；
+  e2e fake CP 同步实现。测试：test_claim_prevents_duplicate_consumption。
   验证：两消费者并发领取同一任务仅一成功；租约超时被回收重发。
   Effort: M
 
