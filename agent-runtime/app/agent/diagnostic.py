@@ -25,8 +25,9 @@ class DiagnosticAgent:
         pending = list(state.plan)
         while state.step < self.max_steps:
             if time.monotonic() - start_time > self.max_duration_seconds:
+                state.error = "diagnosis_timeout"
                 return self._finalize(state, {
-                    "rootCause": "diagnosis_timeout",
+                    "rootCause": "unknown",
                     "confidence": 0.0,
                     "evidence": [],
                     "recommendedActions": [],
@@ -50,8 +51,9 @@ class DiagnosticAgent:
         if time.monotonic() - start_time <= self.max_duration_seconds:
             decision = self._ask_llm(state)
             return self._finalize(state, decision)
+        state.error = "diagnosis_timeout"
         return self._finalize(state, {
-            "rootCause": "diagnosis_timeout",
+            "rootCause": "unknown",
             "confidence": 0.0,
             "evidence": [],
             "recommendedActions": [],
@@ -142,29 +144,31 @@ class DiagnosticAgent:
                     key=e.get("key", "llm_evidence"),
                     content=e.get("content", ""),
                 ))
-        root_cause = decision.get("rootCause", "unknown")
+        root_cause = str(decision.get("rootCause") or "unknown").strip() or "unknown"
         recommended = list(decision.get("recommendedActions", []) or [])
-        rule_root, rule_actions = self._rule_based_diagnosis(state)
-        if not root_cause or root_cause == "unknown":
-            root_cause = rule_root
-        if not recommended:
-            recommended = rule_actions
         confidence = float(decision.get("confidence", 0.0))
-        if confidence <= 0.0:
-            confidence = 0.8
-        if not evidence:
-            evidence.append(Evidence(
-                source="rule",
-                key="rule_based_diagnosis",
-                content=f"根据告警内容规则推断：{root_cause}",
-            ))
+        fallback_used = False
+        heuristic_candidate = None
+        status = "ROOT_CAUSE_FOUND"
+        if root_cause == "unknown":
+            # P0-01(ponytail): 规则兜底只作降级提示，不冒充根因、不改写置信度、不伪造证据。
+            # 未知根因也不给修复建议，避免在不确定结论上触发自动修复。
+            # 启发式何时可删：评测重做(P0-03)且真实 LLM 路径稳定后整体移除。
+            rule_root, _ = self._rule_based_diagnosis(state)
+            fallback_used = True
+            heuristic_candidate = rule_root
+            confidence = min(confidence, 0.3)
+            recommended = []
+            status = "UNKNOWN"
         result = DiagnosisResult(
             root_cause=root_cause,
             confidence=confidence,
             evidence=evidence,
             recommended_actions=recommended,
             tool_calls=state.tool_calls,
-            status="ROOT_CAUSE_FOUND",
+            status=status,
+            fallback_used=fallback_used,
+            heuristic_candidate=heuristic_candidate,
         )
         state.diagnosis = result
         state.status = "DIAGNOSED"
