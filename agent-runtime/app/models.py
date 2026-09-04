@@ -34,6 +34,9 @@ class DiagnosisResult:
     recommended_actions: list[str] = field(default_factory=list)
     tool_calls: list[ToolCall] = field(default_factory=list)
     status: str = "ROOT_CAUSE_FOUND"
+    # P0-01: 规则兜底不再冒充结论，仅作为降级提示随结果透出
+    fallback_used: bool = False
+    heuristic_candidate: str | None = None
 
 
 @dataclass
