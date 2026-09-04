@@ -2,6 +2,12 @@
 
 This script is runnable without Docker. It uses the actual Agent Runtime core with
 a controlled evidence-aware LLM so the comparison is reproducible.
+
+P0-03 注意：这是 **3 个手写 case 的机制示意（sanity check），不是能力测量**——
+"LLM" 是本脚本自写的 EvidenceAwareLLM 关键词映射，final 组把含答案的文本注入
+tool_hint，因此 0%/33%/100% 是构造出来的演示数字，不得在文档/简历中作为
+准确率引用。真实评测一律以 run_evaluation.py 的结果为准
+（evaluation/results/，provider/split/输入模式见报告元数据）。
 """
 from __future__ import annotations
 

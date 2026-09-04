@@ -145,3 +145,26 @@ python benchmark/agent-benchmark.py --concurrency 1 --requests 20
 ```
 
 该部分尚未有真实 Docker 运行数据。
+## Root Cause 诊断评测（2026-09 重测，P0-03 修复后）
+
+> ⚠️ 本节取代上方 "Baseline 对比（本地可复现）" 的结论地位：那份 0%/33.3%/100%
+> 来自 `run_baseline.py` 的 3 个手写 case + 自写关键词 LLM + 把答案注入 tool_hint，
+> 属于机制示意（sanity check），**不是能力测量**，不得作为准确率引用。
+
+修复后的正式评测（`evaluation/runner/run_evaluation.py`）：
+
+- 输入无泄漏：alert 由中性 symptom 档案构造，fault_type（答案标签）绝不进入输入
+- 打分：canonical 标签精确匹配；Top-3 基于 agent 真实 alternatives 候选
+- 数据集：test split（20/200，`evaluation/splits/test.json`）
+- 原始结果：`evaluation/results/eval_20260904T183015Z_test_mock.json`、
+  `evaluation/results/eval_20260904T182953Z_test_openai.json`
+
+| Provider | Top-1 | Top-3 | Unknown Rate | Evidence Recall | 备注 |
+|---|---|---|---|---|---|
+| mock | 0.05 | 0.05 | 0.00 | 0.07 | mock 恒答 redis 的机率基线（诚实值） |
+| openai (deepseek-v4-flash) | **0.70** | 0.70 | 0.30 | 0.00 | 14/20 命中；6/20 降级为 unknown（无自信错答） |
+
+已知短板（后续改进方向）：① 6 个 unknown 全部集中在 cache/db 层类故障
+（redis/slow_sql/mq_backlog），为 LLM 循环超步/解析失败，非错误结论；
+② Evidence Recall 0.0 —— LLM 声明的证据 key 与期望 key 零交集；
+③ Top-3 ≡ Top-1：alternatives 从未救回 miss。
