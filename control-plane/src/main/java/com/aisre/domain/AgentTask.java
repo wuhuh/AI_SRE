@@ -54,6 +54,12 @@ public class AgentTask {
     @Column(length = 4096)
     private String error;
 
+    // P1-MQ-02: claim/lease —— 多副本消费时条件更新抢占，防止重复诊断/重复修复
+    @Column(length = 64)
+    private String claimedBy;
+
+    private Instant claimedAt;
+
     public AgentTask() {
     }
 
@@ -143,5 +149,21 @@ public class AgentTask {
 
     public void setError(String error) {
         this.error = error;
+    }
+
+    public String getClaimedBy() {
+        return claimedBy;
+    }
+
+    public void setClaimedBy(String claimedBy) {
+        this.claimedBy = claimedBy;
+    }
+
+    public Instant getClaimedAt() {
+        return claimedAt;
+    }
+
+    public void setClaimedAt(Instant claimedAt) {
+        this.claimedAt = claimedAt;
     }
 }
