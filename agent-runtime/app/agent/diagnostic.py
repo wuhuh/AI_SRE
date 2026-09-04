@@ -9,6 +9,30 @@ from app.tools.registry import ToolRegistry
 
 MAX_STEPS = 12
 
+# P0-02(ponytail): 查询模板与 demo 实际暴露的指标对齐
+# （demo-services/shared/observability.py: http_requests_total / http_request_duration_seconds）。
+# 旧代码写死 payment-service + 一个 demo 里根本不存在的 Spring 指标名。
+# 注意：PromQL 自带花括号，不能用 str.format —— 用 f-string 构造函数。
+# 更多故障类别模板：评测重做(P0-03)后按 runbook 归类补充。
+def prom_error_query(service: str) -> str:
+    return f'rate(http_requests_total{{service="{service}",status=~"5.."}}[5m])'
+
+
+def prom_latency_query(service: str) -> str:
+    return (
+        'histogram_quantile(0.95, sum by (le) (rate('
+        f'http_request_duration_seconds_bucket{{service="{service}"}}[5m])))'
+    )
+
+
+def prom_query_for(alert: dict) -> str:
+    service = str(alert.get("service") or "unknown-service")
+    text = f"{alert.get('alertName', '')} {alert.get('summary', '')}".lower()
+    latency_hints = ("latency", "p99", "p95", "slow", "timeout", "延迟")
+    if any(hint in text for hint in latency_hints):
+        return prom_latency_query(service)
+    return prom_error_query(service)
+
 
 class DiagnosticAgent:
     def __init__(self, llm: LLMProvider, registry: ToolRegistry, retriever=None,
@@ -91,7 +115,7 @@ class DiagnosticAgent:
             state.tool_calls.append(call)
             state.step += 1
             return call
-        args = self._tool_arguments(tool_name)
+        args = self._tool_arguments(state, tool_name)
         call = self.registry.call(tool_name, args)
         state.tool_calls.append(call)
         state.tool_results[tool_name] = call.result_summary or call.error or ""
@@ -220,18 +244,15 @@ class DiagnosticAgent:
             "如果无法定位，建议升级人工介入"
         ]
 
-    def _tool_arguments(self, tool_name: str) -> dict:
-        """Default arguments selected from the alert for demo/tools."""
-        alert = {
-            "service": "payment-service",
-            "query": 'rate(http_server_requests_seconds_count{status=~"5.."}[5m])',
-        }
+    def _tool_arguments(self, state: AgentState, tool_name: str) -> dict:
+        """P0-02: 工具参数来自告警对象（此前硬编码 payment-service + 固定 PromQL）。"""
+        service = str(state.alert.get("service") or "unknown-service")
         if tool_name == "query_logs":
-            return {"service": alert["service"], "limit": 100}
+            return {"service": service, "limit": 100}
         if tool_name in ("query_prometheus", "prometheus"):
-            return {"query": alert["query"]}
+            return {"query": prom_query_for(state.alert)}
         if tool_name == "query_trace":
-            return {"service": alert["service"], "limit": 20}
+            return {"service": service, "limit": 20}
         if tool_name == "kubernetes":
             return {"action": "list_pods", "namespace": "default"}
         if tool_name == "redis":

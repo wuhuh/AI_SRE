@@ -87,10 +87,10 @@ def evaluate(registry, retriever, use_rag: bool, use_tools: bool) -> dict:
             state.alert["tool_hint"] = case["tool"]
         # DiagnosticAgent._tool_arguments does not know evidence_tool; adapt by patching arguments.
         original = agent._tool_arguments
-        def args_for(name, _orig=original, hint=case["tool"]):
+        def args_for(state, name, _orig=original, hint=case["tool"]):
             if name == "evidence_tool":
                 return {"query": hint}
-            return _orig(name)
+            return _orig(state, name)
         agent._tool_arguments = args_for
         result = agent.run(state)
         agent._tool_arguments = original

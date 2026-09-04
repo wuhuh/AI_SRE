@@ -25,7 +25,7 @@ class VerificationAgent:
                 break
             if time.monotonic() - start_time > self.max_duration_seconds:
                 break
-            call = self.registry.call(tool_name, self._args(tool_name))
+            call = self.registry.call(tool_name, self._args(state, tool_name))
             state.tool_calls.append(call)
             state.tool_results[tool_name] = call.result_summary or call.error or ""
             state.step += 1
@@ -55,11 +55,15 @@ class VerificationAgent:
         state.status = "VERIFIED"
         return verification
 
-    def _args(self, tool_name: str) -> dict:
+    def _args(self, state, tool_name: str) -> dict:
+        """P0-02: 验证阶段查询对准告警服务（此前硬编码 payment-service）。"""
+        from app.agent.diagnostic import prom_error_query
+
+        service = str(state.alert.get("service") or "unknown-service")
         if tool_name == "query_logs":
-            return {"service": "payment-service", "limit": 50}
+            return {"service": service, "limit": 50}
         if tool_name in ("query_prometheus", "prometheus"):
-            return {"query": 'rate(http_server_requests_seconds_count{status=~"5.."}[5m])'}
+            return {"query": prom_error_query(service)}
         if tool_name == "query_trace":
-            return {"service": "payment-service", "limit": 10}
+            return {"service": service, "limit": 10}
         return {}
