@@ -1,9 +1,11 @@
 package com.aisre.api.dto;
 
+import jakarta.validation.constraints.NotNull;
+
 import java.util.List;
 
 public record DiagnosisRequest(
-        String rootCause,
+        @NotNull String rootCause,
         Double confidence,
         List<EvidenceDTO> evidence,
         List<String> recommendedActions,
