@@ -1,5 +1,7 @@
 package com.aisre.security;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -14,10 +16,28 @@ import java.util.Map;
 @Service
 public class AuthService {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String DEFAULT_SECRET = "dev-secret-change-me";
+
     private final byte[] secret;
 
-    public AuthService(@Value("${aisre.jwt.secret:dev-secret-change-me}") String secret) {
+    /**
+     * P0-06: strict 模式下拒绝默认/过短密钥启动（compose 与 K8s 开启 AISRE_SECURITY_STRICT=true）。
+     */
+    public AuthService(@Value("${aisre.jwt.secret:dev-secret-change-me}") String secret,
+                       @Value("${aisre.security.strict:false}") boolean strict) {
+        if (strict && (secret == null || secret.isBlank() || DEFAULT_SECRET.equals(secret)
+                || secret.getBytes(StandardCharsets.UTF_8).length < 32)) {
+            throw new IllegalStateException(
+                    "Refusing to start: aisre.jwt.secret is missing/default/too short (<32 bytes). "
+                            + "Set AISRE_JWT_SECRET (>=32 bytes) before enabling AISRE_SECURITY_STRICT.");
+        }
         this.secret = secret.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** 测试与本地便捷构造（非 strict）。 */
+    public AuthService(String secret) {
+        this(secret, false);
     }
 
     public String issueToken(String username, String role) {
@@ -40,15 +60,20 @@ public class AuthService {
             throw new IllegalArgumentException("Invalid signature");
         }
         String payloadJson = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
-        String sub = extract(payloadJson, "sub");
-        String role = extract(payloadJson, "role");
-        String exp = extract(payloadJson, "exp");
-        if (exp != null && Long.parseLong(exp) < Instant.now().getEpochSecond()) {
+        JsonNode payload;
+        try {
+            payload = MAPPER.readTree(payloadJson);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid payload", e);
+        }
+        // P0-06: exp 为数字，旧 extract() 只找带引号的字符串值，导致过期校验从不生效
+        long exp = payload.path("exp").asLong(0L);
+        if (exp <= 0 || exp < Instant.now().getEpochSecond()) {
             throw new IllegalArgumentException("Token expired");
         }
         Map<String, String> map = new HashMap<>();
-        map.put("username", sub);
-        map.put("role", role);
+        map.put("username", payload.path("sub").asText(null));
+        map.put("role", payload.path("role").asText(null));
         return map;
     }
 
@@ -68,17 +93,6 @@ public class AuthService {
 
     private static String base64Url(String value) {
         return base64Url(value.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static String extract(String json, String key) {
-        String token = "\"" + key + "\":\"";
-        int start = json.indexOf(token);
-        if (start < 0) {
-            return null;
-        }
-        start += token.length();
-        int end = json.indexOf('"', start);
-        return json.substring(start, end);
     }
 
     private static boolean constantTimeEquals(String a, String b) {
