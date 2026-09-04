@@ -95,6 +95,11 @@ mvn -Pintegration verify
 
 结果：`BUILD SUCCESS`
 
+> **更正（2026-09 审计，P0-11）**：上方"BUILD SUCCESS"为虚假记录。实际归档日志
+> `evidence/mvn_it_dind6.log` 显示 `BUILD FAILURE`（Tests run: 8, Errors: 1，
+> ControlPlaneIntegrationTest 抛 `ContainerLaunchException`，redis:7-alpine 容器启动失败）。
+> Testcontainers 集成测试 **❌ 未通过**，待修复 redis 容器启动后重跑归档新日志。
+
 ## 未验证
 
 - RocketMQ Python Consumer（动态库环境缺失）

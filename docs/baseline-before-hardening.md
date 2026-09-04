@@ -23,7 +23,7 @@
 | Local Contract Test | Passed |
 | Local E2E | 3 passed |
 | Docker E2E | 3 passed |
-| Testcontainers | Passed |
+| Testcontainers | ❌ 未通过（BUILD FAILURE，redis 容器启动失败；P0-11 更正，见 `evidence/mvn_it_dind6.log`） |
 | pgvector Real Integration | Passed |
 | RocketMQ Topic/Producer | Passed |
 | React Docker Build | Passed（此前验证） |

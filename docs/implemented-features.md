@@ -404,7 +404,7 @@ Incident Query：
 - React Docker 构建：通过
 - pgvector 真实联调：通过
 - RocketMQ Topic/Producer：通过
-- Testcontainers：通过
+- Testcontainers：❌ 未通过（`evidence/mvn_it_dind6.log` BUILD FAILURE，redis:7-alpine 启动失败；此前"通过"为虚假记录，P0-11 更正）
 
 ---
 
