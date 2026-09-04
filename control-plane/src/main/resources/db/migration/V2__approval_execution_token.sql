@@ -1,0 +1,1 @@
+ALTER TABLE approval ADD COLUMN IF NOT EXISTS execution_token VARCHAR(64);

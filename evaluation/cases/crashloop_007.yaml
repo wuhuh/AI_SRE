@@ -1,0 +1,8 @@
+id: crashloop_007
+fault_type: pod_crashloopbackoff
+service: inventory-service
+expected_root_cause: Pod is crashing repeatedly
+expected_evidence:
+  - pod_restarts
+  - crashloop_event
+  - startup_error_log

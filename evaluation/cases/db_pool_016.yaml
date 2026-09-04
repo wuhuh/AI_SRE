@@ -1,0 +1,8 @@
+id: db_pool_016
+fault_type: database_connection_pool_exhausted
+service: order-service
+expected_root_cause: Database connection pool is exhausted causing order delays
+expected_evidence:
+  - db_active_connections_high
+  - db_pool_timeout_log
+  - db_span_latency_high

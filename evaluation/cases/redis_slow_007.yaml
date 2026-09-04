@@ -1,0 +1,8 @@
+id: redis_slow_007
+fault_type: redis_slow_command
+service: payment-service
+expected_root_cause: Redis slow commands are causing high latency
+expected_evidence:
+  - redis_slowlog
+  - redis_latency_high
+  - redis_span_latency_high

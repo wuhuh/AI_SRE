@@ -1,0 +1,8 @@
+id: redis_pool_019
+fault_type: redis_connection_pool_exhausted
+service: payment-service
+expected_root_cause: Redis connection pool is exhausted causing payment timeouts
+expected_evidence:
+  - redis_connection_usage_high
+  - redis_timeout_log
+  - redis_span_latency_high

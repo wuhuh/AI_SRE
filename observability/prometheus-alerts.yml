@@ -1,0 +1,92 @@
+groups:
+  - name: ai-sre-demo
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
+          / clamp_min(sum by (service) (rate(http_requests_total[5m])), 1)
+          > 0.01
+        for: 2m
+        labels:
+          severity: P1
+          alertName: high_error_rate
+          resource: demo-service
+        annotations:
+          summary: "{{ $labels.service }} high error rate"
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket[5m])))
+          > 0.5
+        for: 2m
+        labels:
+          severity: P2
+          alertName: high_latency
+          resource: demo-service
+        annotations:
+          summary: "{{ $labels.service }} p95 latency too high"
+
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: P1
+          alertName: service_down
+          resource: "{{ $labels.instance }}"
+        annotations:
+          summary: "{{ $labels.job }} is down"
+
+      - alert: HighCPU
+        expr: |
+          avg by (instance) (rate(process_cpu_seconds_total[5m])) > 0.8
+        for: 5m
+        labels:
+          severity: P2
+          alertName: high_cpu
+          resource: "{{ $labels.instance }}"
+        annotations:
+          summary: "{{ $labels.instance }} CPU usage high"
+
+      - alert: HighMemory
+        expr: |
+          process_resident_memory_bytes > 500 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: P2
+          alertName: high_memory
+          resource: "{{ $labels.instance }}"
+        annotations:
+          summary: "{{ $labels.instance }} memory usage high"
+
+      - alert: RedisPoolHigh
+        expr: |
+          redis_connected_clients > 100
+        for: 2m
+        labels:
+          severity: P2
+          alertName: redis_pool_high
+          resource: redis
+        annotations:
+          summary: "Redis connection pool usage high"
+
+      - alert: DatabasePoolHigh
+        expr: |
+          db_active_connections > 50
+        for: 2m
+        labels:
+          severity: P2
+          alertName: database_pool_high
+          resource: postgres
+        annotations:
+          summary: "Database connection pool usage high"
+
+      - alert: RocketMQLagHigh
+        expr: |
+          rocketmq_consumer_lag > 1000
+        for: 2m
+        labels:
+          severity: P2
+          alertName: rocketmq_lag_high
+          resource: rocketmq
+        annotations:
+          summary: "RocketMQ consumer lag high"
