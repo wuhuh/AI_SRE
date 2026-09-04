@@ -1,0 +1,8 @@
+id: cpu_sat_002
+fault_type: cpu_saturation
+service: worker-service
+expected_root_cause: Container CPU is saturated causing request latency
+expected_evidence:
+  - container_cpu_high
+  - load_average_high
+  - request_latency_high

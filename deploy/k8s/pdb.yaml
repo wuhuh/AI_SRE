@@ -1,0 +1,32 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: control-plane-pdb
+  namespace: ai-sre
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: control-plane
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agent-runtime-pdb
+  namespace: ai-sre
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: agent-runtime
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: tool-server-pdb
+  namespace: ai-sre
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: tool-server

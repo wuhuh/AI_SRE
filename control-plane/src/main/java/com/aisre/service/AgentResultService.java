@@ -1,0 +1,233 @@
+package com.aisre.service;
+
+import com.aisre.api.dto.DiagnosisRequest;
+import com.aisre.api.dto.EvidenceDTO;
+import com.aisre.api.dto.RemediationRequest;
+import com.aisre.api.dto.ToolCallDTO;
+import com.aisre.api.dto.VerificationRequest;
+import com.aisre.domain.AgentStep;
+import com.aisre.domain.Approval;
+import com.aisre.domain.Evidence;
+import com.aisre.domain.Incident;
+import com.aisre.domain.IncidentStatus;
+import com.aisre.domain.RemediationAction;
+import com.aisre.domain.ToolCall;
+import com.aisre.repo.AgentStepRepository;
+import com.aisre.repo.ApprovalRepository;
+import com.aisre.repo.EvidenceRepository;
+import com.aisre.repo.IncidentRepository;
+import com.aisre.repo.RemediationActionRepository;
+import com.aisre.repo.ToolCallRepository;
+import com.aisre.security.RiskPolicy;
+import com.aisre.state.IncidentStateMachine;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+@Service
+public class AgentResultService {
+
+    private final IncidentRepository incidentRepository;
+    private final EvidenceRepository evidenceRepository;
+    private final ToolCallRepository toolCallRepository;
+    private final AgentStepRepository agentStepRepository;
+    private final RemediationActionRepository remediationActionRepository;
+    private final AuditService auditService;
+    private final IncidentEventService eventService;
+    private final ApprovalRepository approvalRepository;
+    private final RemediationExecutor remediationExecutor;
+
+    public AgentResultService(IncidentRepository incidentRepository,
+                              EvidenceRepository evidenceRepository,
+                              ToolCallRepository toolCallRepository,
+                              AgentStepRepository agentStepRepository,
+                              RemediationActionRepository remediationActionRepository,
+                              AuditService auditService,
+                              IncidentEventService eventService,
+                              ApprovalRepository approvalRepository,
+                              RemediationExecutor remediationExecutor) {
+        this.incidentRepository = incidentRepository;
+        this.evidenceRepository = evidenceRepository;
+        this.toolCallRepository = toolCallRepository;
+        this.agentStepRepository = agentStepRepository;
+        this.remediationActionRepository = remediationActionRepository;
+        this.auditService = auditService;
+        this.eventService = eventService;
+        this.approvalRepository = approvalRepository;
+        this.remediationExecutor = remediationExecutor;
+    }
+
+    @Transactional
+    public Incident saveDiagnosis(Long incidentId, DiagnosisRequest request) {
+        Incident incident = getIncident(incidentId);
+        if (incident.getStatus() == IncidentStatus.DETECTED || incident.getStatus() == IncidentStatus.TRIAGING) {
+            incident.setStatus(IncidentStatus.DIAGNOSING);
+        }
+        transitionIfAllowed(incident, IncidentStatus.ROOT_CAUSE_FOUND);
+        incident.setRootCause(request.rootCause());
+        incident.setConfidence(request.confidence());
+        if (request.recommendedActions() != null) {
+            incident.setRecommendedActions(String.join(", ", request.recommendedActions()));
+        }
+        incidentRepository.save(incident);
+
+        if (request.evidence() != null) {
+            for (EvidenceDTO dto : request.evidence()) {
+                evidenceRepository.save(new Evidence(
+                        incidentId,
+                        null,
+                        dto.source(),
+                        dto.key(),
+                        dto.content(),
+                        Instant.now()
+                ));
+            }
+        }
+
+        if (request.toolCalls() != null) {
+            for (ToolCallDTO dto : request.toolCalls()) {
+                toolCallRepository.save(new ToolCall(
+                        incidentId,
+                        null,
+                        dto.toolName(),
+                        "READ_ONLY",
+                        dto.status() != null ? dto.status() : "SUCCESS",
+                        dto.argumentsJson() != null ? dto.argumentsJson() : "{}",
+                        dto.resultSummary(),
+                        dto.durationMs(),
+                        dto.error(),
+                        dto.createdAt() != null ? dto.createdAt() : Instant.now()
+                ));
+            }
+        }
+
+        agentStepRepository.save(new AgentStep(
+                0L,
+                incidentId,
+                1,
+                "DIAGNOSIS",
+                "SUCCESS",
+                "Agent diagnosis completed",
+                request.rootCause(),
+                Instant.now()
+        ));
+
+        boolean hasHighRisk = false;
+        if (request.recommendedActions() != null) {
+            for (String action : request.recommendedActions()) {
+                if (RiskPolicy.requiresApproval(action)) {
+                    hasHighRisk = true;
+                    approvalRepository.save(new Approval(
+                            incidentId,
+                            action,
+                            "{}",
+                            "PENDING",
+                            "agent",
+                            Instant.now()
+                    ));
+                } else {
+                    Approval autoApproval = new Approval(
+                            incidentId,
+                            action,
+                            "{}",
+                            "APPROVED",
+                            "auto-policy",
+                            Instant.now()
+                    );
+                    autoApproval.setDecidedBy("auto-policy");
+                    autoApproval.setDecidedAt(Instant.now());
+                    autoApproval = approvalRepository.save(autoApproval);
+                    remediationExecutor.execute(incidentId, autoApproval);
+                }
+            }
+        }
+        if (hasHighRisk) {
+            transitionIfAllowed(incident, IncidentStatus.WAITING_APPROVAL);
+        }
+
+        auditService.record(incidentId, "agent", "DIAGNOSIS_SAVED", request.rootCause());
+        eventService.publish(incidentId, "DIAGNOSIS_SAVED", Map.of("rootCause", request.rootCause()));
+        return incident;
+    }
+
+    @Transactional
+    public Incident saveVerification(Long incidentId, VerificationRequest request) {
+        Incident incident = getIncident(incidentId);
+        if (incident.getStatus() == IncidentStatus.DETECTED || incident.getStatus() == IncidentStatus.TRIAGING) {
+            incident.setStatus(IncidentStatus.DIAGNOSING);
+        }
+        if (incident.getStatus() == IncidentStatus.DIAGNOSING) {
+            incident.setStatus(IncidentStatus.ROOT_CAUSE_FOUND);
+        }
+        transitionIfAllowed(incident, IncidentStatus.VERIFYING);
+
+        if (request.evidence() != null) {
+            for (EvidenceDTO dto : request.evidence()) {
+                evidenceRepository.save(new Evidence(
+                        incidentId,
+                        null,
+                        dto.source(),
+                        dto.key(),
+                        dto.content(),
+                        Instant.now()
+                ));
+            }
+        }
+
+        IncidentStatus resultStatus;
+        String status = request.status() == null ? "UNKNOWN" : request.status().toUpperCase(Locale.ROOT);
+        switch (status) {
+            case "RECOVERED" -> resultStatus = IncidentStatus.RESOLVED;
+            case "NOT_RECOVERED" -> resultStatus = IncidentStatus.DIAGNOSING;
+            default -> resultStatus = IncidentStatus.FAILED;
+        }
+        transitionIfAllowed(incident, resultStatus);
+        incidentRepository.save(incident);
+
+        agentStepRepository.save(new AgentStep(
+                0L,
+                incidentId,
+                2,
+                "VERIFICATION",
+                status,
+                "Verification result: " + status,
+                request.detail(),
+                Instant.now()
+        ));
+        auditService.record(incidentId, "agent", "VERIFICATION_SAVED", status);
+        eventService.publish(incidentId, "VERIFICATION_SAVED", Map.of("status", status));
+        return incident;
+    }
+
+    @Transactional
+    public RemediationAction createRemediation(Long incidentId, RemediationRequest request) {
+        RemediationAction action = new RemediationAction(
+                incidentId,
+                request.toolName(),
+                request.argumentsJson() != null ? request.argumentsJson() : "{}",
+                request.status() != null ? request.status() : "PENDING",
+                request.approvalId(),
+                request.resultSummary() != null ? request.resultSummary() : "",
+                Instant.now()
+        );
+        RemediationAction saved = remediationActionRepository.save(action);
+        auditService.record(incidentId, "agent", "REMEDIATION_CREATED", request.toolName());
+        eventService.publish(incidentId, "REMEDIATION_CREATED", Map.of("toolName", request.toolName()));
+        return saved;
+    }
+
+    private Incident getIncident(Long incidentId) {
+        return incidentRepository.findById(incidentId)
+                .orElseThrow(() -> new IllegalArgumentException("Incident not found: " + incidentId));
+    }
+
+    private void transitionIfAllowed(Incident incident, IncidentStatus target) {
+        if (IncidentStateMachine.canTransition(incident.getStatus(), target)) {
+            incident.setStatus(target);
+        }
+    }
+}

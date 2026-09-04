@@ -1,0 +1,206 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: aisre
+      POSTGRES_USER: aisre
+      POSTGRES_PASSWORD: aisre
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aisre -d aisre"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.2
+    command: sh mqnamesrv
+    ports:
+      - "9876:9876"
+    healthcheck:
+      test: ["CMD-SHELL", "command -v bash >/dev/null 2>&1 && bash -c 'echo > /dev/tcp/127.0.0.1/9876' || cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | grep -q 2694"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.2
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_healthy
+    command: sh mqbroker -n rocketmq-namesrv:9876
+    ports:
+      - "10911:10911"
+      - "10909:10909"
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
+    depends_on:
+      - alertmanager
+      - gateway
+      - order-service
+      - inventory-service
+      - payment-service
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./observability/grafana-provisioning:/etc/grafana/provisioning:ro
+
+  loki:
+    image: grafana/loki:3.0.0
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./observability/loki-config.yml:/etc/loki/local-config.yaml:ro
+
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "8083:80"
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+      - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - control-plane
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.102.0
+    ports:
+      - "4318:4318"
+    volumes:
+      - ./observability/otel-collector.yml:/etc/otelcol/config.yml:ro
+    command: ["--config", "/etc/otelcol/config.yml"]
+    depends_on:
+      - jaeger
+      - loki
+      - prometheus
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    ports:
+      - "16686:16686"
+
+  control-plane:
+    build:
+      context: ./control-plane
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/aisre
+      DB_USERNAME: aisre
+      DB_PASSWORD: aisre
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ROCKETMQ_NAME_SERVER: rocketmq-namesrv:9876
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rocketmq-namesrv:
+        condition: service_healthy
+
+  agent-runtime:
+    build:
+      context: .
+      dockerfile: agent-runtime/Dockerfile
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://opencode.ai/zen/go/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-deepseek-v4-flash}
+      AUTO_CONSUME: ${AUTO_CONSUME:-true}
+      CONTROL_PLANE_URL: http://control-plane:8080
+      PROMETHEUS_URL: http://prometheus:9090
+      LOKI_URL: http://loki:3100
+      TEMPO_URL: http://jaeger:16686
+    ports:
+      - "8081:8080"
+    depends_on:
+      - control-plane
+      - prometheus
+      - loki
+      - jaeger
+
+  tool-server:
+    build:
+      context: ./tool-server
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      APPROVAL_TOKEN: local-dev-token
+    ports:
+      - "8082:8081"
+    depends_on:
+      - redis
+
+  gateway:
+    build:
+      context: ./demo-services
+      dockerfile: gateway/Dockerfile
+    environment:
+      ORDER_URL: http://order-service:8002
+    ports:
+      - "8000:8000"
+
+  order-service:
+    build:
+      context: ./demo-services
+      dockerfile: order-service/Dockerfile
+    environment:
+      INVENTORY_URL: http://inventory-service:8003
+      PAYMENT_URL: http://payment-service:8001
+    ports:
+      - "8002:8002"
+
+  inventory-service:
+    build:
+      context: ./demo-services
+      dockerfile: inventory-service/Dockerfile
+    ports:
+      - "8003:8003"
+
+  payment-service:
+    build:
+      context: ./demo-services
+      dockerfile: payment-service/Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8001:8001"
+
+volumes:
+  pgdata:

@@ -1,0 +1,8 @@
+id: slow_sql_011
+fault_type: slow_sql
+service: report-service
+expected_root_cause: Slow SQL query is causing database latency
+expected_evidence:
+  - db_slow_query
+  - db_cpu_high
+  - db_span_latency_high

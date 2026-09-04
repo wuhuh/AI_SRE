@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Java
+control-plane/target/
+*.class
+
+# Node / frontend
+node_modules/
+
+# Env / secrets
+.env
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# 运行期临时状态（agent-runtime）
+checkpoints/
+idempotency/
+
+# 调试/验证产物（勿提交；被文档引用的证据已归档至 docs/evidence/）
+.docker_*
+.k6_*
+.mvn_*
+.dind*
+.pgvector_*
+.rocketmq_*
+.alert_status*
+.docker_check*
+.docker_ctx*
+.docker_inv*
+.docker_net*
+.docker_sock*
+.docker_ver*
+.docker_fix*
+.docker_exec*
+.docker_debug*
+.docker_mock*
+.docker_cp*
+.docker_react*
+.docker_images*
+.docker_e2e.log
+.docker_compose_up.log
+.docker_inventory.log
+.dockeragent*
+.tmp/
+.conda-cache/
+.agents/
+hello.cpp

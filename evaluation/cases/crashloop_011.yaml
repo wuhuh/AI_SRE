@@ -1,0 +1,8 @@
+id: crashloop_011
+fault_type: pod_crashloopbackoff
+service: auth-service
+expected_root_cause: Pod is crashing repeatedly
+expected_evidence:
+  - pod_restarts
+  - crashloop_event
+  - startup_error_log

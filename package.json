@@ -1,0 +1,9 @@
+{
+  "name": "ai-sre-root",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix web run build",
+    "dev": "npm --prefix web run dev",
+    "install:web": "npm --prefix web install"
+  }
+}

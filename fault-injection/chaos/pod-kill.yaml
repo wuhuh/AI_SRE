@@ -1,0 +1,14 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: payment-pod-kill
+  namespace: ai-sre
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    namespaces:
+      - ai-sre
+    labelSelectors:
+      app: payment-service
+  duration: "30s"

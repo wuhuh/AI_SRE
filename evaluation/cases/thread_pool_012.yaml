@@ -1,0 +1,8 @@
+id: thread_pool_012
+fault_type: thread_pool_exhausted
+service: webhook-service
+expected_root_cause: Application thread pool is exhausted
+expected_evidence:
+  - thread_pool_busy_high
+  - thread_pool_exhausted_log
+  - request_queue_growth

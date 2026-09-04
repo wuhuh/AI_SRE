@@ -1,0 +1,8 @@
+id: mem_leak_014
+fault_type: memory_leak
+service: session-service
+expected_root_cause: Memory usage grows until OOM
+expected_evidence:
+  - memory_rss_growing
+  - oomkilled_event
+  - pod_restarts

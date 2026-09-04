@@ -1,0 +1,8 @@
+id: http_timeout_017
+fault_type: downstream_http_timeout
+service: gateway
+expected_root_cause: Downstream service is timing out
+expected_evidence:
+  - http_client_timeout_log
+  - downstream_latency_high
+  - error_span

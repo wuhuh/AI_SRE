@@ -1,0 +1,8 @@
+id: mq_backlog_010
+fault_type: rocketmq_message_backlog
+service: order-service
+expected_root_cause: RocketMQ consumer cannot keep up with message backlog
+expected_evidence:
+  - consumer_lag_high
+  - message_backlog
+  - consumer_error_log

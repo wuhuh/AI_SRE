@@ -1,0 +1,7 @@
+**/__pycache__
+**/*.pyc
+**/target
+.git
+.venv
+venv
+node_modules

@@ -1,0 +1,95 @@
+"""Background consumer for automatic diagnosis tasks.
+
+In a production environment this would be a RocketMQ consumer. For local/demo
+and environments where the RocketMQ Python client is not installed, this module
+polls the Control Plane pending-task API. Both paths drive the same diagnosis
+pipeline.
+"""
+from __future__ import annotations
+
+import json
+import os
+import time
+import urllib.request
+from typing import Any
+
+from app.agent.runner import AgentRunner
+from app.idempotency import FileIdempotencyStore
+
+
+def _request_json(method: str, url: str, payload: dict | None = None, timeout: float = 10) -> Any:
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    req = urllib.request.Request(
+        url,
+        data=data,
+        method=method,
+        headers={"Content-Type": "application/json"} if data else {},
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        body = resp.read().decode("utf-8")
+        return json.loads(body) if body else None
+
+
+def submit_diagnosis(cp_url: str, incident_id: int, diagnosis) -> None:
+    evidence = [{"source": e.source, "key": e.key, "content": e.content} for e in diagnosis.evidence]
+    tool_calls = [{
+        "toolName": t.name,
+        "argumentsJson": json.dumps(t.arguments, ensure_ascii=False),
+        "status": t.status,
+        "resultSummary": t.result_summary,
+        "durationMs": t.duration_ms,
+        "error": t.error,
+        "createdAt": None,
+    } for t in diagnosis.tool_calls]
+    payload = {
+        "rootCause": diagnosis.root_cause,
+        "confidence": diagnosis.confidence,
+        "evidence": evidence,
+        "recommendedActions": diagnosis.recommended_actions,
+        "toolCalls": tool_calls,
+    }
+    try:
+        _request_json("POST", f"{cp_url}/api/v1/incidents/{incident_id}/diagnosis", payload, timeout=10)
+    except Exception:
+        pass
+
+
+def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> int:
+    tasks = _request_json("GET", f"{cp_url}/api/v1/tasks/pending", timeout=10) or []
+    processed = 0
+    for task in tasks:
+        incident_id = task.get("incidentId")
+        task_id = task.get("id")
+        if incident_id is None:
+            continue
+        key = f"{task_id}:{task.get('type', 'DIAGNOSIS')}" if task_id else None
+        if idempotency_store is not None and key and idempotency_store.is_processed(key):
+            continue
+        try:
+            incident = _request_json("GET", f"{cp_url}/api/v1/incidents/{incident_id}", timeout=10) or {}
+            alert = {
+                "service": incident.get("service", "unknown"),
+                "alertName": "auto-consumed",
+                "severity": incident.get("severity", "P1"),
+                "summary": incident.get("summary", ""),
+            }
+            result = runner.run_diagnosis(incident_id, alert)
+            submit_diagnosis(cp_url, incident_id, result.diagnosis)
+            if task_id is not None:
+                _request_json("POST", f"{cp_url}/api/v1/tasks/{task_id}/complete", {}, timeout=10)
+            if idempotency_store is not None and key:
+                idempotency_store.mark_processed(key)
+            processed += 1
+        except Exception:
+            continue
+    return processed
+
+
+def consumer_loop(runner: AgentRunner, cp_url: str, interval: float = 3.0, idempotency_store=None) -> None:
+    store = idempotency_store or FileIdempotencyStore()
+    while True:
+        try:
+            consume_once(runner, cp_url, store)
+        except Exception:
+            pass
+        time.sleep(interval)
