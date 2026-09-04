@@ -1,10 +1,12 @@
 """Tool Gateway.
 
 Exposes safe, read-mostly tool endpoints for the agent runtime. Write tools are
-only exposed after an approval token has been verified by the control plane.
+only exposed to the control plane with the exact shared execution token
+(X-Execution-Token header); token-in-URL and length-based bypasses are gone.
 """
 from __future__ import annotations
 
+import hmac
 import os
 from typing import Any
 
@@ -13,7 +15,13 @@ from fastapi import FastAPI, Header, HTTPException
 
 app = FastAPI(title="AI SRE Tool Gateway", version="0.1.0")
 
-APPROVAL_TOKEN = os.getenv("APPROVAL_TOKEN", "change-me-in-production")
+APPROVAL_TOKEN = os.getenv("APPROVAL_TOKEN", "local-dev-token")
+WRITE_ACTIONS = ("restart_pod", "scale_deployment", "delete_pod", "rollback_deployment")
+
+
+def _token_ok(provided: str | None) -> bool:
+    # P0-04: 精确匹配 + 常量时间比较（旧实现 len>=8 即放行等于没有校验）
+    return bool(provided) and hmac.compare_digest(provided.encode(), APPROVAL_TOKEN.encode())
 
 
 @app.get("/health")
@@ -74,16 +82,25 @@ def redis_info(command: str = "info") -> dict[str, Any]:
 
 
 @app.get("/api/k8s")
-def kubernetes(action: str = "list_pods", namespace: str = "default",
-               x_approval: str | None = Header(default=None),
-               x_approval_token: str | None = Header(default=None)) -> dict[str, Any]:
-    if action in ("restart_pod", "scale_deployment", "delete_pod", "rollback_deployment"):
-        valid = (x_approval is not None and x_approval == APPROVAL_TOKEN) or \
-                (x_approval_token is not None and len(x_approval_token) >= 8)
-        if not valid:
-            raise HTTPException(status_code=403, detail="approval required")
-    # In a real deployment this calls the Kubernetes API server.
+def kubernetes_read(action: str = "list_pods", namespace: str = "default") -> dict[str, Any]:
+    # P0-04: GET 只保留只读 dryRun 操作；写操作必须走 POST + X-Execution-Token
+    if action in WRITE_ACTIONS:
+        raise HTTPException(status_code=405, detail="write actions require POST with X-Execution-Token")
     return {"action": action, "namespace": namespace, "dryRun": True}
+
+
+@app.post("/api/k8s")
+def kubernetes_write(payload: dict[str, Any],
+                     x_execution_token: str | None = Header(default=None)) -> dict[str, Any]:
+    action = str(payload.get("action", ""))
+    if action not in WRITE_ACTIONS:
+        raise HTTPException(status_code=400, detail=f"unknown or read-only action: {action}")
+    if not _token_ok(x_execution_token):
+        raise HTTPException(status_code=403, detail="invalid execution token")
+    # In a real deployment this calls the Kubernetes API server.
+    return {"action": action, "namespace": payload.get("namespace", "default"),
+            "params": {k: v for k, v in payload.items() if k not in ("action", "namespace")},
+            "dryRun": True}
 
 
 @app.get("/api/db")
