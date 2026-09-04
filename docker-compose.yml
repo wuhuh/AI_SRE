@@ -124,6 +124,12 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       ROCKETMQ_NAME_SERVER: rocketmq-namesrv:9876
+      # P0-06: strict 模式拒绝默认密钥/口令启动；值可用 .env 覆盖
+      AISRE_SECURITY_STRICT: "true"
+      AISRE_JWT_SECRET: ${AISRE_JWT_SECRET:-local-dev-jwt-secret-0123456789abcdef0123456789}
+      AISRE_ADMIN_PASSWORD: ${AISRE_ADMIN_PASSWORD:-aisre-dev-admin-pw}
+      AISRE_OPERATOR_PASSWORD: ${AISRE_OPERATOR_PASSWORD:-aisre-dev-operator-pw}
+      AISRE_VIEWER_PASSWORD: ${AISRE_VIEWER_PASSWORD:-aisre-dev-viewer-pw}
     ports:
       - "8080:8080"
     depends_on:

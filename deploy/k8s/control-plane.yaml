@@ -37,17 +37,40 @@ spec:
               value: "6379"
             - name: ROCKETMQ_NAME_SERVER
               value: rocketmq-namesrv:9876
-            readinessProbe:
-              httpGet:
-                path: /actuator/health
-                port: 8080
-            resources:
-              requests:
-                cpu: 250m
-                memory: 512Mi
-              limits:
-                cpu: "1"
-                memory: 1Gi
+            # P0-06: 认证凭据来自 Secret，strict 模式拒绝默认值启动
+            - name: AISRE_SECURITY_STRICT
+              value: "true"
+            - name: AISRE_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: jwtSecret
+            - name: AISRE_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: adminPassword
+            - name: AISRE_OPERATOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: operatorPassword
+            - name: AISRE_VIEWER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: viewerPassword
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
 ---
 apiVersion: v1
 kind: Service
@@ -90,3 +113,8 @@ type: Opaque
 stringData:
   username: REPLACE_WITH_DB_USER
   password: REPLACE_WITH_DB_PASSWORD
+  # P0-06: 认证凭据（jwtSecret 必须 >=32 字节；口令支持明文或 BCrypt 哈希）
+  jwtSecret: REPLACE_WITH_JWT_SECRET_MIN_32_BYTES
+  adminPassword: REPLACE_WITH_ADMIN_PASSWORD
+  operatorPassword: REPLACE_WITH_OPERATOR_PASSWORD
+  viewerPassword: REPLACE_WITH_VIEWER_PASSWORD
