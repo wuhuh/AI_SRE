@@ -6,6 +6,8 @@ import com.aisre.domain.Incident;
 import com.aisre.domain.IncidentStatus;
 import com.aisre.repo.AlertRepository;
 import com.aisre.repo.IncidentRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +18,8 @@ import java.util.Optional;
 
 @Service
 public class AlertService {
+
+    private static final Logger log = LoggerFactory.getLogger(AlertService.class);
 
     private static final Duration DEDUP_TTL = Duration.ofMinutes(5);
     private static final Duration AGGREGATION_WINDOW = Duration.ofMinutes(10);
@@ -76,6 +80,8 @@ public class AlertService {
 
         alert.setIncidentId(incident.getId());
         alertRepository.save(alert);
+        log.info("alert ingested: fingerprint={}, duplicate={}, incidentId={}, alertName={}",
+                fingerprint, !firstSeen, incident.getId(), request.alertName());
         auditService.record(incident.getId(), "alertmanager", "ALERT_INGESTED",
                 "fingerprint=" + fingerprint + ", duplicate=" + !firstSeen);
         eventService.publish(incident.getId(), "ALERT_INGESTED", new AlertResult(incident.getId(), !firstSeen));

@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -21,7 +22,7 @@ public class AlertController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public AlertService.AlertResult ingest(@RequestBody AlertRequest request) {
+    public AlertService.AlertResult ingest(@Valid @RequestBody AlertRequest request) {
         return alertService.ingest(request);
     }
 }

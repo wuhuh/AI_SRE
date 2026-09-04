@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -57,25 +58,25 @@ public class IncidentController {
 
     @PostMapping("/{id}/transition")
     public IncidentResponse transition(@PathVariable Long id,
-                                       @RequestBody IncidentTransitionRequest request) {
+                                       @Valid @RequestBody IncidentTransitionRequest request) {
         return IncidentResponse.from(incidentService.transition(id, request.status()));
     }
 
     @PostMapping("/{id}/diagnosis")
     public IncidentResponse saveDiagnosis(@PathVariable Long id,
-                                          @RequestBody DiagnosisRequest request) {
+                                          @Valid @RequestBody DiagnosisRequest request) {
         return IncidentResponse.from(agentResultService.saveDiagnosis(id, request));
     }
 
     @PostMapping("/{id}/verification")
     public IncidentResponse saveVerification(@PathVariable Long id,
-                                             @RequestBody VerificationRequest request) {
+                                             @Valid @RequestBody VerificationRequest request) {
         return IncidentResponse.from(agentResultService.saveVerification(id, request));
     }
 
     @PostMapping("/{id}/remediations")
     public RemediationAction createRemediation(@PathVariable Long id,
-                                               @RequestBody RemediationRequest request) {
+                                               @Valid @RequestBody RemediationRequest request) {
         return agentResultService.createRemediation(id, request);
     }
 

@@ -8,6 +8,8 @@ import com.aisre.repo.IncidentRepository;
 import com.aisre.repo.RemediationActionRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +26,7 @@ import java.util.Optional;
 @Service
 public class RemediationExecutor {
 
+    private static final Logger log = LoggerFactory.getLogger(RemediationExecutor.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final RemediationActionRepository remediationActionRepository;
@@ -71,6 +74,7 @@ public class RemediationExecutor {
                 remediation.setResultSummary("refused: unknown action not in fail-closed policy");
                 remediation.setExecutedAt(Instant.now());
                 remediation = remediationActionRepository.save(remediation);
+                log.warn("refused unknown remediation action '{}' for incident {}", action, incidentId);
                 auditService.record(incidentId, "remediation-executor", "UNKNOWN_ACTION_REFUSED", action);
                 return remediation;
             }
@@ -85,6 +89,7 @@ public class RemediationExecutor {
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             boolean success = response.statusCode() >= 200 && response.statusCode() < 300;
+            log.info("remediation {} for incident {}: HTTP {}", action, incidentId, response.statusCode());
             remediation.setStatus(success ? "SUCCESS" : "FAILED");
             remediation.setResultSummary(response.body().length() > 2000 ? response.body().substring(0, 2000) : response.body());
             remediation.setExecutedAt(Instant.now());
@@ -97,6 +102,7 @@ public class RemediationExecutor {
                 triggerVerification(incident);
             }
         } catch (Exception e) {
+            log.warn("remediation {} for incident {} failed: {}", action, incidentId, e.getMessage());
             remediation.setStatus("FAILED");
             remediation.setResultSummary("remediation execution failed: " + e.getMessage());
             remediation.setExecutedAt(Instant.now());

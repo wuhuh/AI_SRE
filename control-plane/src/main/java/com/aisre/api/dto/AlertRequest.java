@@ -1,11 +1,13 @@
 package com.aisre.api.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 import java.time.Instant;
 import java.util.Map;
 
 public record AlertRequest(
-        String service,
-        String alertName,
+        @NotBlank String service,
+        @NotBlank String alertName,
         String resource,
         String severity,
         String summary,

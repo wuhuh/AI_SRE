@@ -2,6 +2,8 @@ package com.aisre.service;
 
 import com.aisre.domain.AgentTask;
 import com.aisre.repo.AgentTaskRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,8 @@ import java.util.Optional;
 @Service
 public class AgentTaskService {
 
+    private static final Logger log = LoggerFactory.getLogger(AgentTaskService.class);
+
     private final AgentTaskRepository agentTaskRepository;
     private final long leaseSeconds;
 
@@ -32,8 +36,10 @@ public class AgentTaskService {
     public Optional<AgentTask> claim(Long taskId, String worker) {
         int claimed = agentTaskRepository.claimTask(taskId, worker, Instant.now());
         if (claimed == 0) {
+            log.debug("task {} claim missed by {} (already claimed)", taskId, worker);
             return Optional.empty();
         }
+        log.info("task {} claimed by {}", taskId, worker);
         return agentTaskRepository.findById(taskId);
     }
 
@@ -51,13 +57,17 @@ public class AgentTaskService {
         task.setStatus("FAILED");
         task.setError(error == null ? "unknown error" : error.substring(0, Math.min(error.length(), 4000)));
         task.setFinishedAt(Instant.now());
+        log.warn("task {} failed: {}", taskId, task.getError());
         return agentTaskRepository.save(task);
     }
 
     @Scheduled(fixedDelayString = "${aisre.task.lease-reclaim-interval-ms:60000}")
     @Transactional
     public void reclaimExpiredLeases() {
-        agentTaskRepository.reclaimExpiredLeases(Instant.now().minusSeconds(leaseSeconds));
+        int reclaimed = agentTaskRepository.reclaimExpiredLeases(Instant.now().minusSeconds(leaseSeconds));
+        if (reclaimed > 0) {
+            log.warn("reclaimed {} expired diagnosis task lease(s)", reclaimed);
+        }
     }
 
     private AgentTask getTask(Long taskId) {

@@ -20,6 +20,8 @@ import com.aisre.repo.RemediationActionRepository;
 import com.aisre.repo.ToolCallRepository;
 import com.aisre.security.RiskPolicy;
 import com.aisre.state.IncidentStateMachine;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +32,8 @@ import java.util.Map;
 
 @Service
 public class AgentResultService {
+
+    private static final Logger log = LoggerFactory.getLogger(AgentResultService.class);
 
     private final IncidentRepository incidentRepository;
     private final EvidenceRepository evidenceRepository;
@@ -67,6 +71,7 @@ public class AgentResultService {
         // P0-05: 幂等 —— 诊断结果只允许写入一次（DIAGNOSING → ROOT_CAUSE_FOUND）。
         // 重复回调（网络重试/多副本竞态/重放）直接返回现状，不再追加重复证据与审计。
         if (incident.getStatus().ordinal() >= IncidentStatus.ROOT_CAUSE_FOUND.ordinal()) {
+            log.info("diagnosis callback ignored (incident {} already {}, idempotent replay)", incidentId, incident.getStatus());
             return incident;
         }
         if (incident.getStatus() == IncidentStatus.DETECTED || incident.getStatus() == IncidentStatus.TRIAGING) {
@@ -156,6 +161,7 @@ public class AgentResultService {
             transitionIfAllowed(incident, IncidentStatus.WAITING_APPROVAL);
         }
 
+        log.info("diagnosis saved: incidentId={}, rootCause={}, taskId={}", incidentId, request.rootCause(), request.taskId());
         auditService.record(incidentId, "agent", "DIAGNOSIS_SAVED", request.rootCause());
         eventService.publish(incidentId, "DIAGNOSIS_SAVED", Map.of("rootCause", request.rootCause()));
         return incident;
