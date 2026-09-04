@@ -1,0 +1,424 @@
+{
+  "report": {
+    "total_cases": 20,
+    "http_errors": 0,
+    "root_cause_top1_accuracy": 0.05,
+    "root_cause_top3_accuracy": 0.05,
+    "unknown_rate": 0.0,
+    "fallback_rate": 0.0,
+    "evidence_precision_avg": 0.05,
+    "evidence_recall_avg": 0.0667,
+    "tool_success_rate": 0.3333,
+    "average_tool_calls": 3.0,
+    "average_diagnosis_time_s": 0.077,
+    "p95_diagnosis_time_s": 0.116,
+    "average_input_tokens": 120.0,
+    "average_output_tokens": 80.0,
+    "provider": "mock",
+    "split": "test",
+    "input_mode": "neutral_symptom_alerts (no fault_type leakage)",
+    "scoring": "exact canonical label match; top3 = expected in candidates[:3]"
+  },
+  "cases": [
+    {
+      "case_id": "cpu_sat_007",
+      "expected": "cpu_saturation",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.202
+    },
+    {
+      "case_id": "cpu_sat_008",
+      "expected": "cpu_saturation",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.069
+    },
+    {
+      "case_id": "cpu_sat_009",
+      "expected": "cpu_saturation",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.116
+    },
+    {
+      "case_id": "crashloop_003",
+      "expected": "pod_crashloopbackoff",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.076
+    },
+    {
+      "case_id": "crashloop_004",
+      "expected": "pod_crashloopbackoff",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.081
+    },
+    {
+      "case_id": "crashloop_007",
+      "expected": "pod_crashloopbackoff",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.069
+    },
+    {
+      "case_id": "crashloop_009",
+      "expected": "pod_crashloopbackoff",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.068
+    },
+    {
+      "case_id": "crashloop_016",
+      "expected": "pod_crashloopbackoff",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.064
+    },
+    {
+      "case_id": "db_pool_016",
+      "expected": "database_connection_pool_exhausted",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.067
+    },
+    {
+      "case_id": "db_pool_018",
+      "expected": "database_connection_pool_exhausted",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.072
+    },
+    {
+      "case_id": "db_pool_020",
+      "expected": "database_connection_pool_exhausted",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.068
+    },
+    {
+      "case_id": "http_timeout_003",
+      "expected": "downstream_http_timeout",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.063
+    },
+    {
+      "case_id": "http_timeout_011",
+      "expected": "downstream_http_timeout",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.063
+    },
+    {
+      "case_id": "mq_backlog_009",
+      "expected": "rocketmq_message_backlog",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.07
+    },
+    {
+      "case_id": "redis_pool_020",
+      "expected": "redis_connection_pool_exhausted",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": true,
+      "top3": true,
+      "evidence_precision": 0.75,
+      "evidence_recall": 1.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.063
+    },
+    {
+      "case_id": "redis_slow_012",
+      "expected": "redis_slow_command",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.25,
+      "evidence_recall": 0.3333,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.065
+    },
+    {
+      "case_id": "slow_sql_004",
+      "expected": "slow_sql",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.065
+    },
+    {
+      "case_id": "slow_sql_014",
+      "expected": "slow_sql",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.062
+    },
+    {
+      "case_id": "thread_pool_009",
+      "expected": "thread_pool_exhausted",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.064
+    },
+    {
+      "case_id": "thread_pool_010",
+      "expected": "thread_pool_exhausted",
+      "predicted": "redis_connection_pool_exhausted",
+      "candidates": [
+        "redis_connection_pool_exhausted"
+      ],
+      "confidence": 0.91,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 1,
+      "llm_input_tokens": 120,
+      "llm_output_tokens": 80,
+      "latency_s": 0.068
+    }
+  ]
+}
