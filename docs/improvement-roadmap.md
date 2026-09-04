@@ -50,9 +50,12 @@
   ✅ 已完成（commit 2421e18；compose/K8s strict=true + secret 注入；附带修复 control-plane.yaml 原有 YAML 缩进错误——该 manifest 此前无法通过解析。Java 16/16 tests OK）。
   Effort: S-M
 
-- [ ] **P0-07 (FI-01) Alertmanager 契约适配 + 全链路 E2E**：新增 `POST /api/v1/alerts/alertmanager`（或适配 DTO），从 `alerts[].labels/annotations` 提取 service/alertName/resource/severity/summary；保留原扁平端点给测试；补一条「注入故障→Prom 规则→AM→CP→Agent」E2E（本地 compose 可跑）。
-  验证：用 AM 真实 webhook payload 样例 curl 新端点 → 202 且 incident.service 正确；5 分钟重复告警正确去重。
-  Effort: M
+- [x] **P0-07 (FI-01) Alertmanager 契约适配 + 全链路 E2E**：
+  ✅ 一期完成（commit ac45a53）：`POST /api/v1/alerts/alertmanager`（AM v4 契约）+
+  AlertmanagerAdapter 映射（labels.service→service_name→job→unknown、resolved 跳过、
+  复用 5min 去重/聚合）+ 契约测试 5 用例（Java 36 OK）。
+  ⚠️ 遗留：「注入故障→Prom 规则→AM→CP→Agent」全链路 E2E 需要 docker 环境
+  （本机 WSL 无 docker），到有 docker 的环境补跑并归档日志。
 
 - [ ] **P0-08 (FI-02 一期) REAL 故障：redis pool + cpu**：
   1. payment-service 用 `redis.ConnectionPool(max_connections=2)` + 故障启用时并发占满（真实打满）；
@@ -75,7 +78,11 @@
   验证：compose 环境下 diagnose 的 evidence 中 k8s/db 条目包含真实数据（pod 名/连接数）；审批校验错误 token 403。
   Effort: M
 
-- [ ] **P0-11 (DOC-01) 撤销 Testcontainers 虚假记录**：`docs/docker-validation.md:96`、`docs/coverage.md:23`、`docs/implemented-features.md:407`、`docs/baseline-before-hardening.md:26` 改为 ❌ 未通过（附失败原因），或修复 redis 容器启动后重跑归档新日志。
+- [x] **P0-11 (DOC-01) 撤销 Testcontainers 虚假记录**：
+  ✅ 已完成（commit bacdda8）：docker-validation.md / coverage.md / implemented-features.md /
+  baseline-before-hardening.md 四处改为 ❌ 未通过并引用 `evidence/mvn_it_dind6.log`
+  （BUILD FAILURE，ContainerLaunchException: redis:7-alpine）。
+  遗留：修复 redis 容器启动后重跑 `mvn -Pintegration verify` 并归档新日志。
   验证：四份文档 grep 不再有 "BUILD SUCCESS/Passed"（未重跑前）。
   Effort: S
 
@@ -117,7 +124,10 @@
   验证：Redis 停止时 POST /alerts 仍 202；重复告警 alertCount 不虚增。
   Effort: S
 
-- [ ] **P1-CP-16+18** CP 全链路 SLF4J 日志 + DTO validation（`spring-boot-starter-validation`、@NotBlank、Map.of null 安全）。
+- [x] **P1-CP-16+18** CP 全链路 SLF4J 日志 + DTO validation（`spring-boot-starter-validation`、@NotBlank、Map.of null 安全）。
+  ✅ 已完成（commit 2ebee47）：关键路径日志（告警摄入/诊断保存与幂等跳过/task 生命周期/修复执行）
+  + GlobalExceptionHandler 补 validation 400 与兜底 500 日志；5 个写 DTO 加约束 + 控制器 @Valid；
+  DtoValidationTest(4)，Java 31 OK（后续 36 OK）。
   验证：修复失败有 warn/error 日志含堆栈；缺字段请求 400。
   Effort: S
 
