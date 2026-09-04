@@ -15,14 +15,19 @@
 - [x] **P0-02 (AR-02) 工具参数由 alert 驱动**：Diagnostic/Verification 工具参数取自 `alert.service`；PromQL 对齐 demo 实际指标（旧模板引用的 `http_server_requests_seconds_count` 在 demo 中不存在，恒查空）；latency 类告警自动选 p95 histogram。
   ✅ 已完成（commit eea6a07；tests/test_tool_arguments.py 4 用例；run_baseline monkeypatch 同步修复）。
 
-- [ ] **P0-03 (AR-03/BM-01/DOC-02/DOC-03/T-07) Evaluation 重构**：
-  1. case 增加 `expected_root_cause_label`（snake_case canonical）；保留自然语言为 description；
-  2. `run_evaluation.py` 输入剔除 fault_type（summary 模板化中性描述、alertName 用通用告警名）；
-  3. 打分：Top-1 精确标签匹配；Top-3 基于真实 ranked list（DiagnosisResult 输出候选或多次采样按 confidence 排序）；删除双向子串；
-  4. 读 `evaluation/splits/*.json`，按 dev/validation/test 分别出报告并落盘 `evaluation/results/<date>.json`；
-  5. 增加 Unknown Rate / Evidence Precision·Recall（对照 expected_evidence）/ tool 成功率 / 真实 token（openai usage）/ P95 时延；
-  6. `run_baseline.py` 文档标注"3-case 示意"或用真实 LLM 重做。
-  验证：`python evaluation/runner/run_evaluation.py` 输出三 split 报告 + 结果 JSON 入仓；`grep fault_type` 不再出现在构造的 summary 中；对 test split 报告的 Top-1 ∈ (0,1)。
+- [x] **P0-03 (AR-03/BM-01/DOC-02/DOC-03/T-07) Evaluation 重构**：
+  ✅ 已完成（commits 97af788 / 8b9effa / 3b1a2b3）：
+  ① Agent 侧 canonical 标签约束 + alternatives（真实 Top-3 依据）+ 真实 token 计量；
+  ② 输入无泄漏（中性 symptom 档案，fault_type 绝不进 alert）+ 精确标签打分（删双向子串）+
+  splits 支持 + 结果落盘 evaluation/results/ + Unknown/Evidence P·R/tool 成功率/P95 指标；
+  ③ 顺带修复：`_finalize` 对真实 LLM 形状漂移 500（evidence 字符串列表等）、
+  `--agent-url` 未接线、诊断预算 env 旋钮（DIAG_BUDGET_SECONDS）；
+  ④ **实测（test split, 20 例）**：openai/deepseek-v4-flash **Top-1=0.70、Top-3=0.70、Unknown=0.30、
+  Evidence Recall=0.00**；mock 基线 Top-1=0.05。结果见 docs/benchmark.md 新节。
+  遗留（转入后续项）：6 个 unknown 集中于 cache/db 类故障（LLM 循环超步）；Evidence key 与期望零交集；
+  Top-3 从未救回 miss（alternatives 质量 OK 但 miss 均为 unknown 而非自信错答）。
+  验证：`python evaluation/runner/run_evaluation.py --splits test` 输出报告 + 结果 JSON 入仓；
+  `python3 -m unittest discover -s evaluation/tests`（11 离线用例，含泄漏防护）。
   Effort: M（2-3 天）
 
 - [ ] **P0-04 (CP-01+CP-02+CP-13) 审批参数绑定 + fail-closed + token 强化**：
