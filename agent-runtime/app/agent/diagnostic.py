@@ -9,6 +9,26 @@ from app.tools.registry import ToolRegistry
 
 MAX_STEPS = 12
 
+# P0-03: canonical RCA 标签空间（closed world，与 evaluation/cases 的 fault_type 对齐）。
+# LLM 必须从该集合中输出 rootCause；alternatives 也取自该集合。
+# 新增故障类别时同步扩展：evaluation/cases + 本列表 + runbook。
+RCA_CANDIDATE_LABELS = (
+    "cpu_saturation",
+    "database_connection_pool_exhausted",
+    "downstream_http_timeout",
+    "memory_leak",
+    "pod_crashloopbackoff",
+    "redis_connection_pool_exhausted",
+    "redis_slow_command",
+    "rocketmq_message_backlog",
+    "slow_sql",
+    "thread_pool_exhausted",
+)
+
+
+def normalize_label(value: str | None) -> str:
+    return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
 # P0-02(ponytail): 查询模板与 demo 实际暴露的指标对齐
 # （demo-services/shared/observability.py: http_requests_total / http_request_duration_seconds）。
 # 旧代码写死 payment-service + 一个 demo 里根本不存在的 Spring 指标名。
@@ -142,14 +162,20 @@ class DiagnosticAgent:
 
     def _ask_llm(self, state: AgentState) -> dict:
         context = build_context(state, state.alert)
+        labels = ", ".join(RCA_CANDIDATE_LABELS)
         prompt = (
             "Based on the collected evidence, either return a final diagnosis JSON "
-            '({"rootCause": "", "confidence": 0.0, "evidence": [], "recommendedActions": []}) '
-            'or request one more tool ({"nextTool": "tool_name"}). Do not explain.\n\n'
+            '({"rootCause": "<label>", "alternatives": ["<label>", "<label>"], '
+            '"confidence": 0.0, "evidence": [], "recommendedActions": []}) '
+            'or request one more tool ({"nextTool": "tool_name"}). Do not explain.\n'
+            f"rootCause must be exactly one of these labels: [{labels}].\n"
+            '"alternatives" lists up to 2 other plausible labels (may be empty).\n\n'
             + context.summary
         )
         try:
             result = self.llm.complete([Message(role="user", content=prompt)])
+            state.llm_input_tokens += result.input_tokens
+            state.llm_output_tokens += result.output_tokens
             return json.loads(result.content)
         except Exception:
             return {
@@ -184,6 +210,17 @@ class DiagnosticAgent:
             confidence = min(confidence, 0.3)
             recommended = []
             status = "UNKNOWN"
+        # P0-03: Top-3 = root_cause + alternatives（归一化、去重、去 unknown、封顶 3）
+        candidates: list[str] = []
+        if fallback_used:
+            if heuristic_candidate:
+                candidates.append(normalize_label(heuristic_candidate))
+        else:
+            for alt in [root_cause, *(decision.get("alternatives") or [])]:
+                label = normalize_label(alt)
+                if label and label != "unknown" and label not in candidates:
+                    candidates.append(label)
+            candidates = candidates[:3]
         result = DiagnosisResult(
             root_cause=root_cause,
             confidence=confidence,
@@ -193,6 +230,9 @@ class DiagnosticAgent:
             status=status,
             fallback_used=fallback_used,
             heuristic_candidate=heuristic_candidate,
+            candidate_root_causes=candidates,
+            llm_input_tokens=state.llm_input_tokens,
+            llm_output_tokens=state.llm_output_tokens,
         )
         state.diagnosis = result
         state.status = "DIAGNOSED"
