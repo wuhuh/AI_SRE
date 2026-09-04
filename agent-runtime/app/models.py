@@ -37,6 +37,11 @@ class DiagnosisResult:
     # P0-01: 规则兜底不再冒充结论，仅作为降级提示随结果透出
     fallback_used: bool = False
     heuristic_candidate: str | None = None
+    # P0-03: 真实 Top-3 依据（root_cause + alternatives，归一化后去重，最多 3 个）
+    candidate_root_causes: list[str] = field(default_factory=list)
+    # P0-03: 真实 token 计量（openai provider 返回 usage；mock 为固定值）
+    llm_input_tokens: int = 0
+    llm_output_tokens: int = 0
 
 
 @dataclass
@@ -59,6 +64,9 @@ class AgentState:
     step: int = 0
     status: str = "CREATED"
     error: Optional[str] = None
+    # P0-03: 跨步累计 LLM token 用量
+    llm_input_tokens: int = 0
+    llm_output_tokens: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
