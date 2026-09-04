@@ -187,16 +187,29 @@ class DiagnosticAgent:
 
     def _finalize(self, state: AgentState, decision: dict) -> DiagnosisResult:
         evidence = state.evidence
-        if decision.get("evidence"):
-            for e in decision["evidence"]:
+        # P0-03: 真实 LLM 的输出形状多变 —— evidence 可能是字符串列表、
+        # confidence 可能是字符串、alternatives 可能不是列表。全部宽容解析。
+        raw_evidence = decision.get("evidence") or []
+        if isinstance(raw_evidence, dict):
+            raw_evidence = [raw_evidence]
+        for e in raw_evidence:
+            if isinstance(e, dict):
                 evidence.append(Evidence(
-                    source=e.get("source", "llm"),
-                    key=e.get("key", "llm_evidence"),
-                    content=e.get("content", ""),
+                    source=str(e.get("source") or "llm"),
+                    key=str(e.get("key") or "llm_evidence"),
+                    content=str(e.get("content") or ""),
                 ))
+            elif e:
+                evidence.append(Evidence(source="llm", key="llm_evidence", content=str(e)))
         root_cause = str(decision.get("rootCause") or "unknown").strip() or "unknown"
-        recommended = list(decision.get("recommendedActions", []) or [])
-        confidence = float(decision.get("confidence", 0.0))
+        recommended_raw = decision.get("recommendedActions") or []
+        if isinstance(recommended_raw, str):
+            recommended_raw = [recommended_raw]
+        recommended = [str(a) for a in recommended_raw]
+        try:
+            confidence = float(decision.get("confidence", 0.0))
+        except (TypeError, ValueError):
+            confidence = 0.0
         fallback_used = False
         heuristic_candidate = None
         status = "ROOT_CAUSE_FOUND"
@@ -216,7 +229,10 @@ class DiagnosticAgent:
             if heuristic_candidate:
                 candidates.append(normalize_label(heuristic_candidate))
         else:
-            for alt in [root_cause, *(decision.get("alternatives") or [])]:
+            alternatives = decision.get("alternatives") or []
+            if isinstance(alternatives, str):
+                alternatives = [alternatives]
+            for alt in [root_cause, *alternatives]:
                 label = normalize_label(alt)
                 if label and label != "unknown" and label not in candidates:
                     candidates.append(label)
