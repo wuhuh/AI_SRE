@@ -6,17 +6,14 @@
 
 # P0
 
-- [ ] **P0-12 (GIT-01) git 基线**：`git init` + 扩充 `.gitignore`（`.docker_*` `.k6_*` `.mvn_*` `.dind*` `.pgvector*` `.rocketmq*` `.alert_status*` `.tmp/` `.conda-cache/` `checkpoints/` `idempotency/` 等）+ 确认 `.env` 不入库 + 首次提交。
-  验证：`git log --oneline` 有首个 commit；`git status` 不再列出调试产物；`git check-ignore .env` 成立。
-  Effort: S
+- [x] **P0-12 (GIT-01) git 基线**：`git init` + 扩充 `.gitignore`（调试产物/临时状态/env/node_modules）+ 首次提交。
+  ✅ 已完成（commit 33392f3，468 文件入库；文档引用的证据归档至 `docs/evidence/` 并附 README 溯源）。注意：git 身份暂用 `pzz <pzz@localhost>`，推送前请修改 `git config`。
 
-- [ ] **P0-01 (AR-01) 规则兜底降级与去伪证据**：`diagnostic.py:_finalize` —— 删除 `confidence<=0 → 0.8` 改写；规则兜底输出 `rootCause=unknown` + `heuristicCandidate=<规则结果>` + `confidence<=0.3` + `fallbackUsed=true`；删除无证据时伪造 `source="rule"` 伪证据；`diagnosis_timeout` 保持 unknown 语义。
-  验证：单测三路径（LLM 抛错/坏 JSON/超时）断言 confidence≤0.3 且 evidence 无 rule 伪条目；手动 `POST /api/v1/agent/diagnose`（LLM_PROVIDER=openai 且端点不可达）观察响应。
-  Effort: S
+- [x] **P0-01 (AR-01) 规则兜底降级与去伪证据**：`_finalize` 删除 confidence→0.8 改写与伪造 rule 证据；LLM 失效/未知/超时 → `unknown` + `confidence≤0.3` + `fallbackUsed=true` + `heuristicCandidate`，且不给修复建议。
+  ✅ 已完成（commit 284889e；DiagnosisResult 新增 fallback_used/heuristic_candidate；test_fallback.py 4 用例 + test_llm_instability 更新；257 tests OK）。
 
-- [ ] **P0-02 (AR-02) 工具参数由 alert 驱动**：`diagnostic.py:_tool_arguments` 与 `verification.py:_args` 改为从 `state.alert["service"]` 构造；PromQL 按 alertName 从小映射表/常量取；删除硬编码 `payment-service`。
-  验证：单测捕获工具 URL（monkeypatch `_http_get_json`），对 `service=inventory-service` 的告警断言 URL 含 inventory-service。
-  Effort: S
+- [x] **P0-02 (AR-02) 工具参数由 alert 驱动**：Diagnostic/Verification 工具参数取自 `alert.service`；PromQL 对齐 demo 实际指标（旧模板引用的 `http_server_requests_seconds_count` 在 demo 中不存在，恒查空）；latency 类告警自动选 p95 histogram。
+  ✅ 已完成（commit eea6a07；tests/test_tool_arguments.py 4 用例；run_baseline monkeypatch 同步修复）。
 
 - [ ] **P0-03 (AR-03/BM-01/DOC-02/DOC-03/T-07) Evaluation 重构**：
   1. case 增加 `expected_root_cause_label`（snake_case canonical）；保留自然语言为 description；
@@ -43,8 +40,8 @@
   验证：重放同一 diagnosis 两次 → evidence/tool_calls/approval 数量不变；无 token 回调 401；伪造 verification 的负向测试。
   Effort: M
 
-- [ ] **P0-06 (CP-03+CP-04) 认证修复**：JWT exp 用 Jackson 解析（数字）；启动时校验 `aisre.jwt.secret` 非默认且 ≥32B、口令必须由 env 注入（否则 fail-fast）；口令 BCrypt 存储（迁移期兼容）；登录失败限速（最简：内存计数器）。
-  验证：单测过期 token 必拒；启动缺 env 时应用拒绝启动；错误口令 5 次后 429。
+- [x] **P0-06 (CP-03+CP-04) 认证修复**：JWT exp 用 Jackson 解析（数字）；启动时 strict 模式校验 `aisre.jwt.secret` 非默认且 ≥32B、口令非默认（否则 fail-fast）；口令支持 BCrypt（$2 开头）+ 明文兼容；登录失败限速（10min 内 5 次锁定）。
+  ✅ 已完成（commit 2421e18；compose/K8s strict=true + secret 注入；附带修复 control-plane.yaml 原有 YAML 缩进错误——该 manifest 此前无法通过解析。Java 16/16 tests OK）。
   Effort: S-M
 
 - [ ] **P0-07 (FI-01) Alertmanager 契约适配 + 全链路 E2E**：新增 `POST /api/v1/alerts/alertmanager`（或适配 DTO），从 `alerts[].labels/annotations` 提取 service/alertName/resource/severity/summary；保留原扁平端点给测试；补一条「注入故障→Prom 规则→AM→CP→Agent」E2E（本地 compose 可跑）。
