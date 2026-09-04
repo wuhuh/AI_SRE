@@ -55,7 +55,14 @@ def _build_runner() -> AgentRunner:
     registry = create_default_registry()
     retriever = HybridRetriever(_load_runbook_docs())
     checkpoint_store = FileCheckpointStore() if os.getenv("CHECKPOINT_DIR") else None
-    return AgentRunner(llm=llm, registry=registry, retriever=retriever, checkpoint_store=checkpoint_store)
+    # P0-03: 诊断预算/步数可用环境变量调（默认与原行为一致）
+    try:
+        budget = float(os.getenv("DIAG_BUDGET_SECONDS", "15"))
+        max_steps = int(os.getenv("DIAG_MAX_STEPS", "12"))
+    except ValueError:
+        budget, max_steps = 15.0, 12
+    return AgentRunner(llm=llm, registry=registry, retriever=retriever, checkpoint_store=checkpoint_store,
+                       max_steps=max_steps, max_duration_seconds=budget)
 
 
 @app.on_event("startup")
