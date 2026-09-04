@@ -54,9 +54,15 @@ def submit_diagnosis(cp_url: str, incident_id: int, diagnosis) -> None:
         pass
 
 
+def _worker_id() -> str:
+    import socket
+    return f"{socket.gethostname()}-{os.getpid()}"
+
+
 def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> int:
     tasks = _request_json("GET", f"{cp_url}/api/v1/tasks/pending", timeout=10) or []
     processed = 0
+    worker = _worker_id()
     for task in tasks:
         incident_id = task.get("incidentId")
         task_id = task.get("id")
@@ -65,6 +71,15 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
         key = f"{task_id}:{task.get('type', 'DIAGNOSIS')}" if task_id else None
         if idempotency_store is not None and key and idempotency_store.is_processed(key):
             continue
+        # P1-MQ-02: 先原子领取再诊断；抢不到说明任务已被其他副本处理，直接跳过
+        if task_id is not None:
+            try:
+                claim = _request_json("POST", f"{cp_url}/api/v1/tasks/{task_id}/claim",
+                                      {"worker": worker}, timeout=10) or {}
+            except Exception:
+                continue
+            if not claim.get("claimed"):
+                continue
         try:
             incident = _request_json("GET", f"{cp_url}/api/v1/incidents/{incident_id}", timeout=10) or {}
             alert = {
@@ -80,7 +95,14 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
             if idempotency_store is not None and key:
                 idempotency_store.mark_processed(key)
             processed += 1
-        except Exception:
+        except Exception as exc:
+            # P1-MQ-02: 失败上报终态，任务不再卡 RUNNING（租约回收兜底仍在）
+            if task_id is not None:
+                try:
+                    _request_json("POST", f"{cp_url}/api/v1/tasks/{task_id}/fail",
+                                  {"error": str(exc)[:500]}, timeout=10)
+                except Exception:
+                    pass
             continue
     return processed
 

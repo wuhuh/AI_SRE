@@ -68,6 +68,36 @@ class AutoConsumerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIsNotNone(incident.get("rootCause"))
 
+    def test_claim_prevents_duplicate_consumption(self):
+        # P1-MQ-02: 任务被副本 A 领走后，副本 B 的 consume_once 必须跳过（不重复诊断）
+        cp_url = f"http://localhost:{local_e2e.CP_PORT}"
+        request("POST", f"{cp_url}/api/v1/alerts", {
+            "service": "order-service",
+            "alertName": "claim_test",
+            "resource": "order-claim",
+            "severity": "P2",
+            "summary": "order latency high",
+        })
+        status, tasks = request("GET", f"{cp_url}/api/v1/tasks/pending")
+        self.assertTrue(tasks)
+        task_id = tasks[0]["id"]
+        incident_id = tasks[0]["incidentId"]
+
+        # 副本 A 抢走任务
+        status, claim = request("POST", f"{cp_url}/api/v1/tasks/{task_id}/claim", {"worker": "replica-a"})
+        self.assertEqual(status, 200)
+        self.assertTrue(claim["claimed"])
+
+        # 副本 B 消费：claim 失败 → 跳过，不产生诊断
+        runner = AgentRunner(llm=MockLLMProvider(), registry=ToolRegistry(), retriever=None)
+        self.assertEqual(consume_once(runner, cp_url), 0)
+        _, incident = request("GET", f"{cp_url}/api/v1/incidents/{incident_id}")
+        self.assertIsNone(incident.get("rootCause"))
+
+        # 副本 A 正常完成后任务离队
+        request("POST", f"{cp_url}/api/v1/tasks/{task_id}/complete", {})
+        self.assertEqual(consume_once(runner, cp_url), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

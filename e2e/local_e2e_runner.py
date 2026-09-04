@@ -157,6 +157,25 @@ class ControlPlaneHandler(BaseHTTPRequestHandler):
             incident = create_incident(service, data.get("summary", ""))
             return self._send(202, {"incidentId": incident["id"], "duplicate": False})
         task_parts = path.strip("/").split("/")
+        if len(task_parts) == 5 and task_parts[0] == "api" and task_parts[1] == "v1" and task_parts[2] == "tasks" and task_parts[4] == "claim":
+            # P1-MQ-02: 模拟原子领取 —— QUEUED → RUNNING；已领走的返回 claimed=false
+            task_id = int(task_parts[3])
+            task = STATE["tasks"].get(task_id)
+            if not task:
+                return self._send(404, {"error": "task not found"})
+            if task["status"] != "QUEUED":
+                return self._send(200, {"claimed": False})
+            task["status"] = "RUNNING"
+            return self._send(200, {"claimed": True, "task": task})
+        if len(task_parts) == 5 and task_parts[0] == "api" and task_parts[1] == "v1" and task_parts[2] == "tasks" and task_parts[4] == "fail":
+            task_id = int(task_parts[3])
+            task = STATE["tasks"].get(task_id)
+            if not task:
+                return self._send(404, {"error": "task not found"})
+            data = read_json(self)
+            task["status"] = "FAILED"
+            task["error"] = data.get("error", "")
+            return self._send(200, task)
         if len(task_parts) == 5 and task_parts[0] == "api" and task_parts[1] == "v1" and task_parts[2] == "tasks" and task_parts[4] == "complete":
             task_id = int(task_parts[3])
             task = STATE["tasks"].get(task_id)
