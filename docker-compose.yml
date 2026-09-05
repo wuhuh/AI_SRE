@@ -60,6 +60,10 @@ services:
     image: prom/prometheus:v2.54.1
     ports:
       - "9090:9090"
+    # P1-FI-05: 开启 remote-write receiver，otel-collector 的 prometheusremotewrite 不再 404
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./observability/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
@@ -208,6 +212,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       # P0-04: 与 control-plane 的 AISRE_TOOL_SERVER_TOKEN 同值（统一 fallback）
       APPROVAL_TOKEN: ${AISRE_TOOL_SERVER_TOKEN:-local-dev-token}
+      # P0-10: db 工具接 compose postgres（真实只读查询；无 DSN 时工具如实报错）
+      DATABASE_DSN: postgres://aisre:aisre@postgres:5432/aisre?sslmode=disable
       # P0-07: 挂 docker.sock 后 restart_pod 真实重启 compose 容器（k8s 环境不挂即 dryRun）
       DOCKER_SOCKET: /var/run/docker.sock
     volumes:
