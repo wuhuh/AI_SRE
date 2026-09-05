@@ -49,6 +49,15 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    // P1-CP-18: 未匹配路由按 404 返回，不要落进兜底 500
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFound(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                "timestamp", Instant.now().toString(),
+                "message", "not found"
+        ));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleUnexpected(Exception ex) {
         // P1-CP-16: 未预期异常必须落日志（原实现静默吞掉，排障只能靠猜）

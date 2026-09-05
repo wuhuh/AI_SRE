@@ -15,14 +15,28 @@ scrape_configs:
   - job_name: 'demo-services'
     metrics_path: /metrics
     static_configs:
+      # P0-07: 每目标带 service 标签 —— ServiceDown/HighCPU 等规则也能按服务路由
       - targets:
           - 'gateway:8005'
+        labels:
+          service: gateway
+      - targets:
           - 'order-service:8006'
+        labels:
+          service: order-service
+      - targets:
           - 'inventory-service:8007'
+        labels:
+          service: inventory-service
+      - targets:
           - 'payment-service:8004'
+        labels:
+          service: payment-service
 
   - job_name: 'control-plane'
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
           - 'control-plane:8080'
+        labels:
+          service: control-plane

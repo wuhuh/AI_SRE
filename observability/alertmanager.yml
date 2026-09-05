@@ -8,5 +8,6 @@ route:
 receivers:
   - name: 'aisre-control-plane'
     webhook_configs:
-      - url: 'http://control-plane:8080/api/v1/alerts'
+      # P0-07: 走 AM v4 契约适配端点（labels/annotations 映射 + 5min 去重）
+      - url: 'http://control-plane:8080/api/v1/alerts/alertmanager'
         send_resolved: true
