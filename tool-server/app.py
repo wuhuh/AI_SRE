@@ -7,6 +7,7 @@ only exposed to the control plane with the exact shared execution token
 from __future__ import annotations
 
 import hmac
+import json
 import os
 from typing import Any
 
@@ -97,10 +98,77 @@ def kubernetes_write(payload: dict[str, Any],
         raise HTTPException(status_code=400, detail=f"unknown or read-only action: {action}")
     if not _token_ok(x_execution_token):
         raise HTTPException(status_code=403, detail="invalid execution token")
-    # In a real deployment this calls the Kubernetes API server.
+    params = {k: v for k, v in payload.items() if k not in ("action", "namespace")}
+    # P0-07: compose 演示挂载 docker.sock 时，restart_pod 真实重启容器；
+    # 无 socket（k8s 环境）保持 dryRun，等 in-cluster ServiceAccount 接管（P0-10）
+    if action == "restart_pod" and _docker_available():
+        container = str(params.get("pod", ""))
+        restarted = _docker_restart(container)
+        if restarted:
+            return {"action": action, "namespace": payload.get("namespace", "default"),
+                    "params": params, "executed": True, "detail": restarted}
     return {"action": action, "namespace": payload.get("namespace", "default"),
-            "params": {k: v for k, v in payload.items() if k not in ("action", "namespace")},
-            "dryRun": True}
+            "params": params, "dryRun": True}
+
+
+DOCKER_SOCKET = os.getenv("DOCKER_SOCKET", "")
+
+
+def _docker_available() -> bool:
+    return bool(DOCKER_SOCKET) and os.path.exists(DOCKER_SOCKET)
+
+
+def _unix_http(request: str) -> tuple[str, bytes]:
+    """经 docker.sock 发一次 HTTP/1.1，返回 (status, 解码 chunked 后的 body)。"""
+    import socket
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.settimeout(30)
+    try:
+        s.connect(DOCKER_SOCKET)
+        s.sendall(request.encode())
+        chunks = []
+        while True:
+            c = s.recv(65536)
+            if not c:
+                break
+            chunks.append(c)
+    finally:
+        s.close()
+    raw = b"".join(chunks)
+    head, _, body = raw.partition(b"\r\n\r\n")
+    status = head.split(b" ")[1].decode()
+    if b"chunked" in head.lower():
+        out = bytearray()
+        while body:
+            line, _, body = body.partition(b"\r\n")
+            size = int(line.split(b";")[0], 16)
+            if size == 0:
+                break
+            out.extend(body[:size])
+            body = body[size + 2:]
+        body = bytes(out)
+    return status, body
+
+
+def _docker_restart(container: str) -> str | None:
+    """compose 演示模式：经 docker.sock 真实重启容器。"""
+    try:
+        from urllib.parse import quote
+        filt = quote('{"name":["%s"]}' % container)
+        status, body = _unix_http(f"GET /v1.43/containers/json?all=true&filters={filt} HTTP/1.1\r\nHost: docker\r\nConnection: close\r\n\r\n")
+        if not status.startswith("2"):
+            return None
+        listed = json.loads(body.decode())
+        if not listed:
+            return None
+        cid = listed[0]["Id"][:12]
+        real_name = listed[0].get("Names", ["?"])[0].lstrip("/")
+        status2, _ = _unix_http(f"POST /v1.43/containers/{cid}/restart HTTP/1.1\r\nHost: docker\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        return f"docker restart {real_name}: HTTP {status2}" if status2.startswith("2") else None
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return None
 
 
 @app.get("/api/db")
