@@ -65,9 +65,13 @@
   Effort: M（二期 slow_sql/记忆泄漏：L）
   依赖：FI-03（规则对齐）、FI-04（日志可用性）
 
-- [ ] **P0-09 (T-03) Checkpoint resume（选实现路线）**：FileCheckpointStore 改 tmp+rename 原子写；`run_diagnosis` 每步 save；`/api/v1/agent/diagnose` 入口先 `load` 续跑（幂等标记）；补 kill -9 中途 → 重启 → 续跑集成测试。若决定降级：删除"crash recovery"表述并同步文档/测试改名。
-  验证：集成测试杀进程后重启，断言从中断步继续且 tool_calls 不重复。
-  Effort: S-M（实现）/ S（降级改名）
+- [x] **P0-09 (T-03) Checkpoint resume（选实现路线）**：FileCheckpointStore 改 tmp+rename 原子写；`run_diagnosis` 每步 save；`/api/v1/agent/diagnose` 入口先 `load` 续跑（幂等标记）；补 kill -9 中途 → 重启 → 续跑集成测试。若决定降级：删除"crash recovery"表述并同步文档/测试改名。
+  ✅ 已完成（commit 70ab78a，实现路线）：tmp+os.replace 原子写；AgentState+pending
+  随 checkpoint 持久化；诊断循环每步落盘（on_step 回调，失败不中断诊断）；
+  入口 load：已完成 → 幂等直接返回（不烧 LLM，duration 0 + resumed 标记）；
+  中断 → 从剩余 pending 续跑，已完成工具不重放。测试 3 用例
+  （模拟 kill -9 第二步 → 新 runner 续跑断言 tool_calls 不重复 / tmp 原子替换 /
+  损坏 checkpoint 回退重跑）。Python 268 OK。
 
 - [ ] **P0-10 (TS-01) Tool Server 真数据 + MCP 落地**：
   1. k8s：in-cluster ServiceAccount（复用 `tool-server-rbac.yaml` 最小权限）实现 list_pods/get_deployment/get_events 真实读取；写操作保留审批 + dryRun 开关但如实标注；
