@@ -87,6 +87,23 @@ services:
     volumes:
       - ./observability/loki-config.yml:/etc/loki/local-config.yaml:ro
 
+  # P1-FI-06: 幻影规则落真 —— redis/postgres 真实指标（RocketMQLagHigh 见 prometheus-alerts.yml 注记）
+  redis-exporter:
+    image: redis_exporter:v1.67.0
+    command:
+      - --redis.addr=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  postgres-exporter:
+    image: postgres-exporter:v0.16.0
+    environment:
+      DATA_SOURCE_NAME: postgres://aisre:aisre@postgres:5432/aisre?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # P1-FI-04: 容器日志 → Loki（docker_sd，产出 service 标签供 query_logs 查询）
   promtail:
     image: grafana/promtail:3.4.1

@@ -26,6 +26,10 @@ schema_config:
 
 limits_config:
   allow_structured_metadata: true
+  # P1-FI-04: promtail 首次接入回填历史日志会瞬时超默认 4MB/s（429 丢批），
+  # 本地全量日志场景放宽；生产按真实吞吐收紧
+  ingestion_rate_mb: 30
+  ingestion_burst_size_mb: 60
 
 compactor:
   working_directory: /tmp/loki/compactor
