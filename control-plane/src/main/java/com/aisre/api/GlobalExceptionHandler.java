@@ -58,6 +58,15 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    // HTTP 方法不匹配按 405 返回（原落兜底 500）
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodNotSupported(org.springframework.web.HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(Map.of(
+                "timestamp", Instant.now().toString(),
+                "message", "method not allowed"
+        ));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleUnexpected(Exception ex) {
         // P1-CP-16: 未预期异常必须落日志（原实现静默吞掉，排障只能靠猜）

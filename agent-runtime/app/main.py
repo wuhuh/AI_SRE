@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
+
+# uvicorn 只配自己的 logger，root 仍是 WARNING——诊断关键路径的 INFO 会丢
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"),
+                    format="%(asctime)s %(levelname)s %(name)s %(message)s")
 from dataclasses import asdict
 from typing import Any
 

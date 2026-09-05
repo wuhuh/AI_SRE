@@ -1,1 +1,1 @@
-subclass
+org.mockito.internal.creation.bytebuddy.SubclassByteBuddyMockMaker
