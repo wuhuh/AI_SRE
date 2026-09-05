@@ -177,6 +177,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       # P0-04: 与 control-plane 的 AISRE_TOOL_SERVER_TOKEN 同值（统一 fallback）
       APPROVAL_TOKEN: ${AISRE_TOOL_SERVER_TOKEN:-local-dev-token}
+      # P0-07: 挂 docker.sock 后 restart_pod 真实重启 compose 容器（k8s 环境不挂即 dryRun）
+      DOCKER_SOCKET: /var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "8082:8081"
     depends_on:
