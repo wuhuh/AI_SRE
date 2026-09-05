@@ -57,6 +57,18 @@
   ⚠️ 遗留：「注入故障→Prom 规则→AM→CP→Agent」全链路 E2E 需要 docker 环境
   （本机 WSL 无 docker），到有 docker 的环境补跑并归档日志。
 
+- [x] **P0-07 (FI-01) Alertmanager 契约适配 + 全链路 E2E**：
+  ✅ 一期完成（commit ac45a53）：`POST /api/v1/alerts/alertmanager`（AM v4 契约）+
+  AlertmanagerAdapter 映射（labels.service→service_name→job→unknown、resolved 跳过、
+  复用 5min 去重/聚合）+ 契约测试 5 用例（Java 36 OK）。
+  ✅ 全链路 E2E 完成（docker 环境闭环）：停止 payment-service（真实故障）→
+  Prom ServiceDown 规则 → AM webhook（alertmanager.yml 已指向适配端点）→ CP 建档建任务 →
+  agent claim+诊断（真实工具链）→ 风险分级 → restart_pod 经 tool-server **真实重启容器**
+  （docker.sock 模式，executed=true）→ VERIFICATION_SAVED。修复项：prometheus.yml
+  每目标补 service 标签、LokiTool 相对时间 400、TraceTool Tempo 端点 404、
+  Java HttpClient h2c 升级丢 body（锁 HTTP/1.1）、审批 operator 空值炸审计、
+  共享执行 token。
+
 - [ ] **P0-08 (FI-02 一期) REAL 故障：redis pool + cpu**：
   1. payment-service 用 `redis.ConnectionPool(max_connections=2)` + 故障启用时并发占满（真实打满）；
   2. inventory-service cpu_saturation 改为 busy-loop 线程（真实 CPU 上升）；
@@ -64,6 +76,11 @@
   验证：启用故障后 `curl prometheus:9090/api/v1/query` 对应指标越限；HighCPU/自定规则触发；禁用后恢复。
   Effort: M（二期 slow_sql/记忆泄漏：L）
   依赖：FI-03（规则对齐）、FI-04（日志可用性）
+  进度（部分完成）：inventory cpu_saturation 已改真实进程内 sha256 busy-loop
+  （CPU_BURN_SECONDS 可调），持续灌压下 `avg(rate(process_cpu_seconds_total))=0.79`
+  真实可见；payment 5xx 4.6/s 真实产生。真实故障 × 真实 LLM 诚实基线（14 case）：
+  **Top-1=35.7%**（cpu 类 6/7，redis 类 0/7→runbook 检索修正后复测 v2 进行中），
+  证据缺口与工具 400 已修（TraceTool）。
 
 - [x] **P0-09 (T-03) Checkpoint resume（选实现路线）**：FileCheckpointStore 改 tmp+rename 原子写；`run_diagnosis` 每步 save；`/api/v1/agent/diagnose` 入口先 `load` 续跑（幂等标记）；补 kill -9 中途 → 重启 → 续跑集成测试。若决定降级：删除"crash recovery"表述并同步文档/测试改名。
   ✅ 已完成（commit 70ab78a，实现路线）：tmp+os.replace 原子写；AgentState+pending
@@ -86,8 +103,10 @@
   ✅ 已完成（commit bacdda8）：docker-validation.md / coverage.md / implemented-features.md /
   baseline-before-hardening.md 四处改为 ❌ 未通过并引用 `evidence/mvn_it_dind6.log`
   （BUILD FAILURE，ContainerLaunchException: redis:7-alpine）。
-  遗留：修复 redis 容器启动后重跑 `mvn -Pintegration verify` 并归档新日志。
-  验证：四份文档 grep 不再有 "BUILD SUCCESS/Passed"（未重跑前）。
+  ✅ 闭环（commit 02cf492）：maven 容器挂宿主 docker.sock 真跑，
+  testcontainers 1.21.3 + `-Dapi.version=1.44`（Docker 29 弃用 1.32 ping），
+  **37/37 OK，BUILD SUCCESS**，新日志 `evidence/mvn_it_docker40.log`，
+  四份文档已回填 ✅。
   Effort: S
 
 # P1

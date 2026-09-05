@@ -18,11 +18,14 @@ class OpenAICompatibleLLMProvider(LLMProvider):
     """
 
     def __init__(self, base_url: str | None = None, api_key: str | None = None,
-                 model: str | None = None, timeout_seconds: float = 15.0):
+                 model: str | None = None, timeout_seconds: float | None = None):
         self.base_url = (base_url or os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")).rstrip("/")
         self.api_key = api_key or os.getenv("OPENAI_API_KEY", "")
         self.model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        self.timeout_seconds = timeout_seconds
+        # P0-08: deepseek 等推理型模型决策常超 15s，读超时=全量降级 unknown——
+        # 默认跟随诊断预算，可用 LLM_TIMEOUT_SECONDS 覆盖
+        self.timeout_seconds = timeout_seconds or float(
+            os.getenv("LLM_TIMEOUT_SECONDS", os.getenv("DIAG_BUDGET_SECONDS", "120")))
 
     def complete(self, messages: list[Message], tools: list[dict[str, Any]] | None = None) -> LLMResult:
         payload: dict[str, Any] = {
