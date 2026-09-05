@@ -23,7 +23,9 @@ public class AuthService {
 
     /**
      * P0-06: strict 模式下拒绝默认/过短密钥启动（compose 与 K8s 开启 AISRE_SECURITY_STRICT=true）。
+     * 双构造器时 Spring 需要显式指定注入入口。
      */
+    @org.springframework.beans.factory.annotation.Autowired
     public AuthService(@Value("${aisre.jwt.secret:dev-secret-change-me}") String secret,
                        @Value("${aisre.security.strict:false}") boolean strict) {
         if (strict && (secret == null || secret.isBlank() || DEFAULT_SECRET.equals(secret)
