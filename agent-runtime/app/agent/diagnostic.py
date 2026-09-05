@@ -62,11 +62,23 @@ class DiagnosticAgent:
         self.retriever = retriever
         self.max_steps = max_steps
         self.max_duration_seconds = max_duration_seconds
+        # P0-09: runner 注入的每步回调（落 checkpoint）；诊断循环每执行一步调用一次
+        self.on_step = None
+
+    def _checkpoint(self, state: AgentState) -> None:
+        if self.on_step is not None:
+            try:
+                self.on_step(state)
+            except Exception:
+                pass  # checkpoint 失败不应中断诊断
 
     def run(self, state: AgentState) -> DiagnosisResult:
         import time
         start_time = time.monotonic()
-        pending = list(state.plan)
+        # P0-09: pending 存在 state 上（与 checkpoint 同持久化）——
+        # 崩溃续跑时从剩余步骤继续，已完成工具不重复执行
+        pending = state.pending or list(state.plan)
+        state.pending = pending
         while state.step < self.max_steps:
             if time.monotonic() - start_time > self.max_duration_seconds:
                 state.error = "diagnosis_timeout"
@@ -81,9 +93,11 @@ class DiagnosticAgent:
                 tool_name = self._normalize_tool_name(raw_tool)
                 if tool_name is not None:
                     self._execute_tool(state, tool_name)
+                    self._checkpoint(state)
             else:
                 # Ask the LLM whether it needs another tool or can produce a final diagnosis.
                 decision = self._ask_llm(state)
+                self._checkpoint(state)
                 if decision.get("nextTool"):
                     next_tool = self._normalize_tool_name(decision["nextTool"])
                     if next_tool is not None:

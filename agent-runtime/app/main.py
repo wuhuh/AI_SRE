@@ -140,6 +140,7 @@ def diagnose(req: DiagnoseRequest) -> dict[str, Any]:
         "diagnosis": asdict(result.diagnosis),
         "state": result.state.to_dict(),
         "duration_ms": result.duration_ms,
+        "resumed": result.resumed,
     }
 
 
