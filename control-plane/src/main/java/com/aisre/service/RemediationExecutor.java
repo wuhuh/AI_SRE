@@ -80,13 +80,14 @@ public class RemediationExecutor {
                 auditService.record(incidentId, "remediation-executor", "UNKNOWN_ACTION_REFUSED", action);
                 return remediation;
             }
-            String executionToken = approval.getExecutionToken() != null ? approval.getExecutionToken() : approvalToken;
+            // tool-server 校验的是共享静态密钥（AISRE_TOOL_SERVER_TOKEN）；
+            // 审批上的 per-approval UUID 只用于 CP 侧审计，不能当 tool-server 凭证
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(toolServerUrl.replaceAll("/+$", "") + "/api/k8s"))
                     .timeout(Duration.ofSeconds(30))
                     .header("Content-Type", "application/json")
                     // P0-04: token 走 header，不再拼进 URL（避免进日志/审计泄漏）
-                    .header("X-Execution-Token", executionToken)
+                    .header("X-Execution-Token", approvalToken)
                     .POST(HttpRequest.BodyPublishers.ofString(body.get()))
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
