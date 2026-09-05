@@ -1,0 +1,28 @@
+# P1-FI-04: 容器日志 → Loki（docker_sd + compose service 标签）
+# agent 的 query_logs 工具按 {service="..."} 查询 —— 这里必须产出同名 service 标签
+server:
+  http_listen_port: 9080
+
+positions:
+  filename: /positions/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd:
+      host: unix:///var/run/docker.sock
+      refresh_interval: 5s
+    relabel_configs:
+      # com.docker.compose.service 就是裸服务名（payment-service 等）
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        target_label: service
+      - source_labels: [__meta_docker_container_name]
+        regex: /(.+)
+        target_label: container
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+      - source_labels: [job]
+        target_label: job
+        replacement: docker
