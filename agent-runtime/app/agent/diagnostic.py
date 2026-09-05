@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
 
 from app.context import build_context
 from app.llm.base import LLMProvider, Message
 from app.models import AgentState, DiagnosisResult, Evidence, ToolCall
 from app.tools.registry import ToolRegistry
+
+logger = logging.getLogger("agent.diagnostic")
 
 MAX_STEPS = 12
 
@@ -79,6 +83,8 @@ class DiagnosticAgent:
         # 崩溃续跑时从剩余步骤继续，已完成工具不重复执行
         pending = state.pending or list(state.plan)
         state.pending = pending
+        logger.info("diagnosis start: incident=%s plan=%s resumed_pending=%s",
+                    state.incident_id, state.plan, bool(state.pending))
         while state.step < self.max_steps:
             if time.monotonic() - start_time > self.max_duration_seconds:
                 state.error = "diagnosis_timeout"
@@ -190,8 +196,14 @@ class DiagnosticAgent:
             result = self.llm.complete([Message(role="user", content=prompt)])
             state.llm_input_tokens += result.input_tokens
             state.llm_output_tokens += result.output_tokens
-            return json.loads(result.content)
-        except Exception:
+            decision = json.loads(result.content)
+            # P0-07 排障：决策结果必须可见（LLM 回了什么、是否走降级）
+            logger.info("llm decision: incident=%s root=%s nextTool=%s raw=%s",
+                        state.incident_id, decision.get("rootCause"),
+                        decision.get("nextTool"), result.content[:200])
+            return decision
+        except Exception as exc:
+            logger.warning("llm decision failed: incident=%s error=%s", state.incident_id, exc)
             return {
                 "rootCause": "unknown",
                 "confidence": 0.0,
@@ -266,6 +278,10 @@ class DiagnosticAgent:
         )
         state.diagnosis = result
         state.status = "DIAGNOSED"
+        # P0-07 排障：最终结论/降级/步数/耗时一屏可见
+        logger.info("diagnosis finalize: incident=%s root=%s fallback=%s heuristic=%s steps=%s evidence=%s",
+                    state.incident_id, result.root_cause, result.fallback_used,
+                    result.heuristic_candidate, state.step, len(result.evidence))
         return result
 
     @staticmethod
