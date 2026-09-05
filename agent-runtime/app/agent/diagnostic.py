@@ -85,6 +85,7 @@ class DiagnosticAgent:
         state.pending = pending
         logger.info("diagnosis start: incident=%s plan=%s resumed_pending=%s",
                     state.incident_id, state.plan, bool(state.pending))
+        unresolved = 0  # 连续不可解析 nextTool 计数（P0-08 收敛守卫）
         while state.step < self.max_steps:
             if time.monotonic() - start_time > self.max_duration_seconds:
                 state.error = "diagnosis_timeout"
@@ -108,6 +109,14 @@ class DiagnosticAgent:
                     next_tool = self._normalize_tool_name(decision["nextTool"])
                     if next_tool is not None:
                         pending.append(next_tool)
+                        unresolved = 0
+                    else:
+                        # P0-08: LLM 编造不存在的工具名（如 redis_info/get_container_metrics）
+                        # 会让 pending 永远为空 → 空转烧满预算。连续 2 次不可解析就收敛出结论。
+                        unresolved += 1
+                        if unresolved >= 2:
+                            state.error = f"unresolvable_tool:{decision['nextTool']}"
+                            return self._finalize(state, decision)
                     continue
                 return self._finalize(state, decision)
 
@@ -139,7 +148,11 @@ class DiagnosticAgent:
             "trace": "query_trace",
             "kubectl": "kubernetes",
             "k8s": "kubernetes",
-            "redis": "redis",
+            "redis_info": "redis",
+            "redis-cli": "redis",
+            "redis_cli": "redis",
+            "query_redis": "redis",
+            "redis_tool": "redis",
             "database": "database",
             "db": "database",
             "runbook": "retrieve_runbook",

@@ -162,6 +162,9 @@ services:
       PROMETHEUS_URL: http://prometheus:9090
       LOKI_URL: http://loki:3100
       TEMPO_URL: http://jaeger:16686
+      # P0-08: redis/database 工具也走 tool-server（原默认 localhost:8002 恒连不通）
+      REDIS_TOOL_URL: http://tool-server:8081
+      DATABASE_TOOL_URL: http://tool-server:8081
     ports:
       - "8081:8080"
     depends_on:
