@@ -79,7 +79,10 @@ public class ApprovalService {
         if (decision.equals("APPROVE")) {
             remediationExecutor.execute(incidentId, saved);
         }
-        auditService.record(incidentId, request.operator(), "APPROVAL_DECIDED", decision);
+        // P0-07: operator 缺省时不能让审计表 NOT NULL 约束把整个决策事务炸掉
+        String operator = request.operator() == null || request.operator().isBlank()
+                ? "unknown-operator" : request.operator();
+        auditService.record(incidentId, operator, "APPROVAL_DECIDED", decision);
         return saved;
     }
 }
