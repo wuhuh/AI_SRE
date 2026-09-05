@@ -97,7 +97,11 @@
   损坏 checkpoint 回退重跑）。Python 268 OK。
 
 - [ ] **P0-10 (TS-01) Tool Server 真数据 + MCP 落地**：
-  1. k8s：in-cluster ServiceAccount（复用 `tool-server-rbac.yaml` 最小权限）实现 list_pods/get_deployment/get_events 真实读取；写操作保留审批 + dryRun 开关但如实标注；
+  ✅ 部分完成（commit d09ca46）：db 真实只读查询（pg_stat_activity：health/
+  active_connections/slow_query，原 42 等假数据删除，无 DSN 如实 503）；/mcp tools/call
+  走真实后端；compose 注入 REDIS/DATABASE/KUBE_TOOL_URL；compose 模式 list_pods 经
+  docker ps 返回真实容器清单（source=docker-compose，k8s in-cluster SA 待真 k8s 环境）。
+  1. k8s：in-cluster ServiceAccount（复用 `tool-server-rbac.yaml` 最小权限）实现 get_deployment/get_events 真实读取；写操作保留审批 + dryRun 开关但如实标注；
   2. db：真实只读查询（pg_stat_activity / pg_stat_statements / EXPLAIN）；
   3. redis：保持（已真实）；
   4. `/mcp` tools/call 全部走真实后端；
@@ -204,21 +208,25 @@
   验证：注入每个 REAL 故障后有对应告警触发。
   Effort: S
 
-- [ ] **P1-FI-04** 日志进 Loki：loki docker driver（compose `logging`）或 promtail 容器（或 collector filelog+loki exporter）。
-  验证：`query_logs` 工具返回含 traceId 的日志行；Grafana Explore 可查。
-  Effort: S-M
+- [x] **P1-FI-04** 日志进 Loki：✅ promtail docker_sd 容器（`com.docker.compose.service` → service 标签，
+  Loki 摄入限放宽至 30/60MB 防回填 429）。验证：`query_logs` 实测返回带 traceId 的真实业务
+  日志行；`{service="payment-service"}` 可查（含 ERROR 级 RedisConnectionFailureException 行）。
+  commit 7c5c5f9。Effort: S-M
 
-- [ ] **P1-FI-05** 指标管道：prometheus 加 `--web.enable-remote-write-receiver`；demo services 加 OTel MeterProvider（可分期，先修 404）。
-  验证：collector 日志无 404；Prometheus 有 otlp 指标。
-  Effort: S
+- [x] **P1-FI-05** 指标管道：✅ prometheus 加 `--web.enable-remote-write-receiver`
+  （collector 的 prometheusremotewrite 不再 404，application_ready_time 等 pushed 指标
+  已入 Prometheus）；demo services 的 OTel MeterProvider 分期（未做）。
+  commit d09ca46。Effort: S（剩余部分：MeterProvider，二期）
 
-- [ ] **P1-FI-06** exporter 或删规则：加 redis-exporter/postgres-exporter/rocketmq-exporter 并修表达式；或删除 3 条幻影规则（避免虚假宣传）。
-  验证：规则 expr 查询返回非空。
-  Effort: S
+- [x] **P1-FI-06** exporter 或删规则：✅ redis-exporter + postgres-exporter 落真
+  （redis_connected_clients=3、pg backends=12 真实入 Prometheus，RedisPoolHigh 保持、
+  DatabasePoolHigh 改 `sum(pg_stat_database_numbackends) > 50`）；RocketMQLagHigh 删除
+  （exporter 镜像在可达源均不可得，无数据源规则=虚假可观测；恢复需先落 exporter）。
+  commit 7c5c5f9。验证：规则 expr 查询非空 ✅。Effort: S
 
-- [ ] **P1-T-01** 删 `tests/test_extended.py` + `generate_extended_tests.py`；文档统一"最近一次 CI 运行 N 个"。
-  验证：unittest 数量 = 真实用例数；文档三处数字一致。
-  Effort: S
+- [x] **P1-T-01** 删 `tests/test_extended.py` + `generate_extended_tests.py`：✅ commit abce41c，
+  268→58 用例（真实质量用例全保留，OK 1 skip）；文档计数以 unittest 实际输出为准。
+  验证：unittest 数量 = 真实用例数 ✅。Effort: S
 
 - [ ] **P1-T-02** Java 核心链路测试：@SpringBootTest+Testcontainers 覆盖 ingest→dedup→incident→diagnosis 回调→auto-approval→approval decide→remediation(MockWebServer)→verification；AuthInterceptor 矩阵测试。
   验证：`mvn test` 全绿且覆盖上述路径。
