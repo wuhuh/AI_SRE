@@ -110,10 +110,10 @@ class TraceTool(Tool):
             url = f"{self.base_url}/api/traces/{arguments['traceId']}"
         else:
             # P0-07: TEMPO_URL 实际指向 Jaeger all-in-one —— 用 Jaeger 的 /api/traces
-            # （原 /api/search 是 Tempo 端点，Jaeger 上恒 404）
+            # （原 /api/search 是 Tempo 端点，Jaeger 上恒 404；tags=error=true
+            #  是 Tempo 的键值语法，Jaeger 要求 JSON map，裸传直接 400——默认不带）
             params = urllib.parse.urlencode({
                 "service": arguments.get("service", ""),
-                "tags": "error=true",
                 "lookback": "1h",
                 "limit": arguments.get("limit", 20),
             })
