@@ -69,18 +69,24 @@
   Java HttpClient h2c 升级丢 body（锁 HTTP/1.1）、审批 operator 空值炸审计、
   共享执行 token。
 
-- [ ] **P0-08 (FI-02 一期) REAL 故障：redis pool + cpu**：
+- [x] **P0-08 (FI-02 一期) REAL 故障：redis pool + cpu**：
   1. payment-service 用 `redis.ConnectionPool(max_connections=2)` + 故障启用时并发占满（真实打满）；
   2. inventory-service cpu_saturation 改为 busy-loop 线程（真实 CPU 上升）；
   3. 故障日志改为中性表述（不含结论词），根因证据改由 metric 侧获取。
-  验证：启用故障后 `curl prometheus:9090/api/v1/query` 对应指标越限；HighCPU/自定规则触发；禁用后恢复。
+  ✅ 一期完成：
+  - inventory `cpu_saturation` 改为 uvicorn 进程内 sha256 busy-loop（`CPU_BURN_SECONDS`
+    可调）——持续灌压下 `avg(rate(process_cpu_seconds_total))=0.83` 真实可见，
+    禁用后回落 0.0014（验证含"禁用后恢复"）；payment 5xx 4.6/s 真实产生。
+  - 真实故障 × 真实 LLM（openai/deepseek-v4-flash）诚实基线（14 case，中性告警）：
+    **Top-1=57.1%，Top-3=64.3%，Unknown=21.4%**（cpu_saturation **7/7=100%**，
+    redis 类 1/7 直接 + Top-3 共 2/7）。首轮 35.7% → 57.1% 的提升全部来自真实工程修复：
+    LLM 读超时（15s→跟随预算）、Jaeger trace 400、agent 缺 redis 工具别名、
+    编造工具名空转守卫。归档 `evaluation/results/eval_*_real-fault*.json`。
+  - 遗留（二期）：Evidence Recall=0.00（证据 key 是工具调用序号而非语义 key，
+    见 P2-FI-10）；redis 类证据主要在应用日志，需日志关键词检索强化；
+    `redis.ConnectionPool(max_connections=2)` 真打满与 P1-FI-03 规则对齐。
   Effort: M（二期 slow_sql/记忆泄漏：L）
   依赖：FI-03（规则对齐）、FI-04（日志可用性）
-  进度（部分完成）：inventory cpu_saturation 已改真实进程内 sha256 busy-loop
-  （CPU_BURN_SECONDS 可调），持续灌压下 `avg(rate(process_cpu_seconds_total))=0.79`
-  真实可见；payment 5xx 4.6/s 真实产生。真实故障 × 真实 LLM 诚实基线（14 case）：
-  **Top-1=35.7%**（cpu 类 6/7，redis 类 0/7→runbook 检索修正后复测 v2 进行中），
-  证据缺口与工具 400 已修（TraceTool）。
 
 - [x] **P0-09 (T-03) Checkpoint resume（选实现路线）**：FileCheckpointStore 改 tmp+rename 原子写；`run_diagnosis` 每步 save；`/api/v1/agent/diagnose` 入口先 `load` 续跑（幂等标记）；补 kill -9 中途 → 重启 → 续跑集成测试。若决定降级：删除"crash recovery"表述并同步文档/测试改名。
   ✅ 已完成（commit 70ab78a，实现路线）：tmp+os.replace 原子写；AgentState+pending

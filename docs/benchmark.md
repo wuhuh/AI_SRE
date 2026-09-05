@@ -168,3 +168,43 @@ python benchmark/agent-benchmark.py --concurrency 1 --requests 20
 （redis/slow_sql/mq_backlog），为 LLM 循环超步/解析失败，非错误结论；
 ② Evidence Recall 0.0 —— LLM 声明的证据 key 与期望 key 零交集；
 ③ Top-3 ≡ Top-1：alternatives 从未救回 miss。
+
+## 真实故障评测（2026-09，P0-08 一期，Docker compose 环境）
+
+> 本节是第一次在**真实注入的故障**上测量（此前评测的"故障"只是测试数据里的标签，
+> 系统里并没有故障在发生）。注入方式：
+> - `inventory-service` `cpu_saturation`：uvicorn 进程内 sha256 busy-loop
+>   （进程内真实计算），持续灌压 `avg(rate(process_cpu_seconds_total))=0.83`；
+> - `payment-service` `redis_pool_exhausted`：故障开关使 /payments 全量 503，
+>   5xx 4.6/s 真实产生。
+> 评测期间两个故障**真实存在**于 compose 栈中，agent 的工具读到的都是真实
+> Prometheus/Loki/Jaeger 数据。评测后故障关闭，CPU 回落 0.0014（已验证恢复）。
+>
+> 运行方式（真实 LLM = openai/deepseek-v4-flash，宿主机 agent:18081）：
+> ```bash
+> python evaluation/runner/run_evaluation.py --splits all --provider openai \
+>   --agent-url http://127.0.0.1:18081 \
+>   --types cpu_saturation,redis_connection_pool_exhausted \
+>   --services inventory-service,payment-service --tag real-fault-final2
+> ```
+
+| 故障类（case 数） | Top-1 | 备注 |
+|---|---|---|
+| cpu_saturation（7） | **7/7 (100%)** | 真实 CPU 指标可观测，全部命中 |
+| redis_connection_pool_exhausted（7） | 1/7 | 证据主要在应用日志；Top-3 共 2/7 |
+| **合计（14）** | **Top-1=0.571，Top-3=0.643，Unknown=0.214** | 工具成功率 100% |
+
+迭代轨迹（同 14 case，逐项工程修复的效果）：
+
+| 版本 | Top-1 | 修复内容 |
+|---|---|---|
+| real-fault (v1) | 0.357 | 首轮：LLM 15s 读超时全量降级 + Jaeger 400 + redis 工具缺失 |
+| real-fault-v4 | 0.571 | LLM 超时跟随诊断预算（150s） |
+| real-fault-final2 | **0.571**（Top-3 0.643） | redis 工具别名 + 编造工具名收敛守卫 |
+
+与合成评测（上方 test split 0.70）对比：真实故障 Top-1 略低但量级一致——
+差异主要来自 redis 类（合成评测里 mock/LLM 可凭标签先验，真实故障必须从
+可观测数据推出）。已知短板：Evidence Recall 仍 0.00（LLM 证据 key 为
+`tool:N` 序号，与期望的语义 key 零交集——评测口径问题，见 P2-FI-10）。
+原始结果：`evaluation/results/eval_20260905T165905Z_all_openai_real-fault-final2.json`
+（及 v1–final 全系列）。
