@@ -56,6 +56,8 @@ class AgentState:
     incident_id: int
     alert: dict[str, Any]
     plan: list[str] = field(default_factory=list)
+    # P0-09: 剩余待执行步骤（随 checkpoint 持久化，崩溃后据此续跑）
+    pending: list[str] = field(default_factory=list)
     tool_results: dict[str, str] = field(default_factory=dict)
     evidence: list[Evidence] = field(default_factory=list)
     tool_calls: list[ToolCall] = field(default_factory=list)

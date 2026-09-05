@@ -17,6 +17,7 @@ class AgentRunResult:
     diagnosis: DiagnosisResult
     verification: VerificationResult | None
     duration_ms: int
+    resumed: bool = False
 
 
 class AgentRunner:
@@ -28,17 +29,36 @@ class AgentRunner:
                                           max_steps=max_steps, max_duration_seconds=max_duration_seconds)
         self.verification = VerificationAgent(llm, registry)
         self.checkpoint_store = checkpoint_store
+        if checkpoint_store:
+            # P0-09: 每步落盘 —— 崩溃后可从最近一步续跑
+            self.diagnostic.on_step = lambda s: checkpoint_store.save(s.incident_id, s)
 
     def run_diagnosis(self, incident_id: int, alert: dict) -> AgentRunResult:
-        state = AgentState(incident_id=incident_id, alert=alert, status="PLANNING")
         start = time.perf_counter()
-        state.plan = self.planner.plan(state)
-        state.status = "DIAGNOSING"
+        resumed = False
+        state = None
+        if self.checkpoint_store:
+            saved = self.checkpoint_store.load(incident_id)
+            if saved is not None:
+                if saved.diagnosis is not None:
+                    # P0-09: 已完成的诊断直接返回 —— 幂等，不再重复消耗 LLM
+                    return AgentRunResult(state=saved, diagnosis=saved.diagnosis,
+                                          verification=None, duration_ms=0, resumed=True)
+                # 崩溃中断：从剩余 pending 续跑（已完成工具不重复执行）
+                state = saved
+                state.status = "DIAGNOSING"
+                resumed = True
+        if state is None:
+            state = AgentState(incident_id=incident_id, alert=alert, status="PLANNING")
+            state.plan = self.planner.plan(state)
+            state.status = "DIAGNOSING"
         diagnosis = self.diagnostic.run(state)
+        state.status = "DIAGNOSIS_COMPLETE"
         if self.checkpoint_store:
             self.checkpoint_store.save(incident_id, state)
         duration_ms = int((time.perf_counter() - start) * 1000)
-        return AgentRunResult(state=state, diagnosis=diagnosis, verification=None, duration_ms=duration_ms)
+        return AgentRunResult(state=state, diagnosis=diagnosis, verification=None,
+                              duration_ms=duration_ms, resumed=resumed)
 
     def run_verification(self, state: AgentState) -> AgentRunResult:
         start = time.perf_counter()
