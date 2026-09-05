@@ -70,8 +70,9 @@ groups:
           summary: "Redis connection pool usage high"
 
       - alert: DatabasePoolHigh
+        # P1-FI-06: postgres-exporter 真实指标（原 db_active_connections 无数据源）
         expr: |
-          db_active_connections > 50
+          sum(pg_stat_database_numbackends) > 50
         for: 2m
         labels:
           severity: P2
@@ -80,13 +81,5 @@ groups:
         annotations:
           summary: "Database connection pool usage high"
 
-      - alert: RocketMQLagHigh
-        expr: |
-          rocketmq_consumer_lag > 1000
-        for: 2m
-        labels:
-          severity: P2
-          alertName: rocketmq_lag_high
-          resource: rocketmq
-        annotations:
-          summary: "RocketMQ consumer lag high"
+      # RocketMQLagHigh 已删除（P1-FI-06）：rocketmq-exporter 镜像在可达源均不可得，
+      # 无数据源的规则永不触发=虚假可观测；恢复需先落 exporter 再加回规则

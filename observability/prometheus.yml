@@ -40,3 +40,18 @@ scrape_configs:
           - 'control-plane:8080'
         labels:
           service: control-plane
+
+  # P1-FI-06: 幻影规则落真 —— exporter 真实指标
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets:
+          - 'redis-exporter:9121'
+        labels:
+          service: redis
+
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets:
+          - 'postgres-exporter:9187'
+        labels:
+          service: postgres
