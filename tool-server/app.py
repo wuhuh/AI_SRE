@@ -87,6 +87,27 @@ def kubernetes_read(action: str = "list_pods", namespace: str = "default") -> di
     # P0-04: GET 只保留只读 dryRun 操作；写操作必须走 POST + X-Execution-Token
     if action in WRITE_ACTIONS:
         raise HTTPException(status_code=405, detail="write actions require POST with X-Execution-Token")
+    # P0-10 (compose 模式)：list_pods 用 docker ps 返回真实容器清单（等价 pod 视图）；
+    # 真 k8s 环境走 in-cluster ServiceAccount（未部署时保持 dryRun 并如实标注）
+    if action == "list_pods" and _docker_available():
+        try:
+            status, body = _unix_http("GET /v1.43/containers/json HTTP/1.1\r\nHost: docker\r\nConnection: close\r\n\r\n")
+            if status.startswith("2"):
+                pods = []
+                for c in json.loads(body.decode()):
+                    names = c.get("Names") or []
+                    name = names[0].lstrip("/") if names else c.get("Id", "")[:12]
+                    compose_service = (c.get("Labels") or {}).get("com.docker.compose.service")
+                    pods.append({
+                        "name": name,
+                        "podName": compose_service or name,
+                        "status": "Running" if c.get("State") == "running" else c.get("State", ""),
+                        "image": c.get("Image", ""),
+                    })
+                return {"action": action, "namespace": namespace, "pods": pods, "source": "docker-compose"}
+        except Exception as exc:  # noqa: BLE001 — 失败回退 dryRun，但如实带上错误
+            return {"action": action, "namespace": namespace, "dryRun": True,
+                    "detail": f"docker list failed: {exc}"}
     return {"action": action, "namespace": namespace, "dryRun": True}
 
 
@@ -171,12 +192,54 @@ def _docker_restart(container: str) -> str | None:
         return None
 
 
+DATABASE_DSN = os.getenv("DATABASE_DSN", "")
+
+
+def _db_query(sql: str) -> list[dict[str, Any]]:
+    """P0-10: 只读连接跑真实查询（会话级 read-only，双保险防写）。"""
+    import psycopg2
+    import psycopg2.extras
+    conn = psycopg2.connect(DATABASE_DSN, connect_timeout=5,
+                            options="-c default_transaction_read_only=on")
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql)
+            return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
 @app.get("/api/db")
 def database(command: str = "health") -> dict[str, Any]:
-    if command == "active_connections":
-        return {"active_connections": 42}
-    if command == "slow_query":
-        return {"slow_queries": [{"query": "select * from orders", "duration_ms": 1200}]}
-    if command == "explain_query":
-        return {"plan": "Seq Scan on orders (cost=0.00..1.01 rows=1 width=16)"}
-    return {"status": "ok", "database": os.getenv("DB_NAME", "aisre")}
+    # P0-10: 真实只读查询（原 42/slow_query/explain 全是硬编码假数据）。
+    # 无 DSN（如纯 k8s 环境）时如实报错，不再返回编造数字。
+    if not DATABASE_DSN:
+        raise HTTPException(status_code=503, detail="DATABASE_DSN not configured")
+    try:
+        if command == "health":
+            rows = _db_query("SELECT 1 AS ok, version() AS version")
+            return {"ok": True, "database": rows[0]["version"].split()[0]}
+        if command == "active_connections":
+            rows = _db_query(
+                "SELECT count(*) AS active_connections, "
+                "count(*) FILTER (WHERE state = 'active') AS running "
+                "FROM pg_stat_activity")
+            return {"ok": True, "active_connections": rows[0]["active_connections"],
+                    "running": rows[0]["running"]}
+        if command == "slow_query":
+            rows = _db_query(
+                "SELECT pid, usename, state, "
+                "EXTRACT(epoch FROM now() - query_start) * 1000 AS duration_ms, "
+                "left(query, 120) AS query FROM pg_stat_activity "
+                "WHERE state <> 'idle' AND query NOT LIKE '%pg_stat_activity%' "
+                "AND now() - query_start > interval '1 second' "
+                "ORDER BY query_start LIMIT 10")
+            return {"ok": True, "slow_queries": rows}
+        if command == "explain_query":
+            # 只读会话内 EXPLAIN 合法；query 参数由调用方给出，默认示例
+            return {"ok": True, "note": "pass ?sql= for EXPLAIN"}
+        raise HTTPException(status_code=400, detail=f"unknown db command: {command}")
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 — 真实错误如实返回，不吞
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
