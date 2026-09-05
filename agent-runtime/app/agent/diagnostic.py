@@ -112,9 +112,10 @@ class DiagnosticAgent:
                         unresolved = 0
                     else:
                         # P0-08: LLM 编造不存在的工具名（如 redis_info/get_container_metrics）
-                        # 会让 pending 永远为空 → 空转烧满预算。连续 2 次不可解析就收敛出结论。
+                        # 会让 pending 永远为空 → 空转烧满预算。已执行过工具仍收敛不了才强制出结论；
+                        # 一个工具没跑过就收敛会让可观测的真实证据白白错过。
                         unresolved += 1
-                        if unresolved >= 2:
+                        if unresolved >= 2 and state.tool_calls:
                             state.error = f"unresolvable_tool:{decision['nextTool']}"
                             return self._finalize(state, decision)
                     continue
