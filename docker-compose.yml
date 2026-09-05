@@ -156,6 +156,9 @@ services:
       AUTO_CONSUME: ${AUTO_CONSUME:-true}
       CONTROL_PLANE_URL: http://control-plane:8080
       AGENT_TOKEN: ${AISRE_AGENT_TOKEN:-local-dev-agent-token}
+      # P0-03/P0-07: 慢工具链路下放宽诊断预算；k8s 工具指向 tool-server
+      DIAG_BUDGET_SECONDS: ${DIAG_BUDGET_SECONDS:-120}
+      KUBE_TOOL_URL: http://tool-server:8081
       PROMETHEUS_URL: http://prometheus:9090
       LOKI_URL: http://loki:3100
       TEMPO_URL: http://jaeger:16686

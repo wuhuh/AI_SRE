@@ -75,13 +75,13 @@ class LogTool(Tool):
             query += f' |= "{arguments["traceId"]}"'
         if arguments.get("keyword"):
             query += f' |= "{arguments["keyword"]}"'
-        params = urllib.parse.urlencode({
-            "query": query,
-            "limit": arguments.get("limit", 100),
-            "start": arguments.get("start", "now-1h"),
-            "end": arguments.get("end", "now"),
-        })
-        url = f"{self.base_url}/loki/api/v1/query_range?{params}"
+        params = {"query": query, "limit": arguments.get("limit", 100)}
+        # P0-07: Loki API 不接受 "now-1h" 这类相对时间（400）——缺省即最近 1h，仅透传显式值
+        if arguments.get("start") is not None:
+            params["start"] = arguments["start"]
+        if arguments.get("end") is not None:
+            params["end"] = arguments["end"]
+        url = f"{self.base_url}/loki/api/v1/query_range?{urllib.parse.urlencode(params)}"
         return json.dumps(_http_get_json(url), ensure_ascii=False)
 
 
@@ -109,13 +109,15 @@ class TraceTool(Tool):
         if arguments.get("traceId"):
             url = f"{self.base_url}/api/traces/{arguments['traceId']}"
         else:
+            # P0-07: TEMPO_URL 实际指向 Jaeger all-in-one —— 用 Jaeger 的 /api/traces
+            # （原 /api/search 是 Tempo 端点，Jaeger 上恒 404）
             params = urllib.parse.urlencode({
                 "service": arguments.get("service", ""),
                 "tags": "error=true",
-                "minDuration": arguments.get("minDuration", "100ms"),
+                "lookback": "1h",
                 "limit": arguments.get("limit", 20),
             })
-            url = f"{self.base_url}/api/search?{params}"
+            url = f"{self.base_url}/api/traces?{params}"
         return json.dumps(_http_get_json(url), ensure_ascii=False)
 
 
