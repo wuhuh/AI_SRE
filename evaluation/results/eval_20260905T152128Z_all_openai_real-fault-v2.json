@@ -1,0 +1,314 @@
+{
+  "report": {
+    "total_cases": 14,
+    "http_errors": 0,
+    "root_cause_top1_accuracy": 0.3571,
+    "root_cause_top3_accuracy": 0.3571,
+    "unknown_rate": 0.6429,
+    "fallback_rate": 0.6429,
+    "evidence_precision_avg": 0.0,
+    "evidence_recall_avg": 0.0,
+    "tool_success_rate": 1.0,
+    "average_tool_calls": 2.57,
+    "average_diagnosis_time_s": 28.776,
+    "p95_diagnosis_time_s": 37.729,
+    "average_input_tokens": 888.1,
+    "average_output_tokens": 331.0,
+    "provider": "openai",
+    "split": "all",
+    "input_mode": "neutral_symptom_alerts (no fault_type leakage)",
+    "scoring": "exact canonical label match; top3 = expected in candidates[:3]",
+    "tag": "real-fault-v2"
+  },
+  "cases": [
+    {
+      "case_id": "cpu_sat_001",
+      "expected": "cpu_saturation",
+      "predicted": "unknown",
+      "candidates": [
+        "inventory_service_issue"
+      ],
+      "confidence": 0.0,
+      "status": "UNKNOWN",
+      "fallback_used": true,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 3,
+      "llm_input_tokens": 0,
+      "llm_output_tokens": 0,
+      "latency_s": 31.211
+    },
+    {
+      "case_id": "cpu_sat_004",
+      "expected": "cpu_saturation",
+      "predicted": "cpu_saturation",
+      "candidates": [
+        "cpu_saturation",
+        "thread_pool_exhausted",
+        "downstream_http_timeout"
+      ],
+      "confidence": 0.58,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": true,
+      "top3": true,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 4,
+      "tool_success": 4,
+      "llm_input_tokens": 2564,
+      "llm_output_tokens": 503,
+      "latency_s": 15.334
+    },
+    {
+      "case_id": "cpu_sat_007",
+      "expected": "cpu_saturation",
+      "predicted": "cpu_saturation",
+      "candidates": [
+        "cpu_saturation",
+        "thread_pool_exhausted",
+        "memory_leak"
+      ],
+      "confidence": 0.72,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": true,
+      "top3": true,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 0,
+      "tool_success": 0,
+      "llm_input_tokens": 1204,
+      "llm_output_tokens": 1810,
+      "latency_s": 43.319
+    },
+    {
+      "case_id": "cpu_sat_010",
+      "expected": "cpu_saturation",
+      "predicted": "cpu_saturation",
+      "candidates": [
+        "cpu_saturation",
+        "thread_pool_exhausted"
+      ],
+      "confidence": 0.7,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": true,
+      "top3": true,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 0,
+      "tool_success": 0,
+      "llm_input_tokens": 301,
+      "llm_output_tokens": 266,
+      "latency_s": 13.406
+    },
+    {
+      "case_id": "cpu_sat_013",
+      "expected": "cpu_saturation",
+      "predicted": "unknown",
+      "candidates": [
+        "inventory_service_issue"
+      ],
+      "confidence": 0.0,
+      "status": "UNKNOWN",
+      "fallback_used": true,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 3,
+      "llm_input_tokens": 0,
+      "llm_output_tokens": 0,
+      "latency_s": 31.258
+    },
+    {
+      "case_id": "cpu_sat_016",
+      "expected": "cpu_saturation",
+      "predicted": "cpu_saturation",
+      "candidates": [
+        "cpu_saturation",
+        "thread_pool_exhausted",
+        "slow_sql"
+      ],
+      "confidence": 0.65,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": true,
+      "top3": true,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 0,
+      "tool_success": 0,
+      "llm_input_tokens": 301,
+      "llm_output_tokens": 369,
+      "latency_s": 20.803
+    },
+    {
+      "case_id": "cpu_sat_019",
+      "expected": "cpu_saturation",
+      "predicted": "cpu_saturation",
+      "candidates": [
+        "cpu_saturation",
+        "thread_pool_exhausted",
+        "downstream_http_timeout"
+      ],
+      "confidence": 0.72,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": true,
+      "top3": true,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 4,
+      "tool_success": 4,
+      "llm_input_tokens": 2566,
+      "llm_output_tokens": 463,
+      "latency_s": 25.566
+    },
+    {
+      "case_id": "redis_pool_001",
+      "expected": "redis_connection_pool_exhausted",
+      "predicted": "unknown",
+      "candidates": [
+        "payment_service_issue"
+      ],
+      "confidence": 0.0,
+      "status": "UNKNOWN",
+      "fallback_used": true,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 4,
+      "tool_success": 4,
+      "llm_input_tokens": 0,
+      "llm_output_tokens": 0,
+      "latency_s": 30.677
+    },
+    {
+      "case_id": "redis_pool_004",
+      "expected": "redis_connection_pool_exhausted",
+      "predicted": "unknown",
+      "candidates": [
+        "payment_service_issue"
+      ],
+      "confidence": 0.0,
+      "status": "UNKNOWN",
+      "fallback_used": true,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 1,
+      "tool_success": 1,
+      "llm_input_tokens": 2878,
+      "llm_output_tokens": 876,
+      "latency_s": 37.729
+    },
+    {
+      "case_id": "redis_pool_007",
+      "expected": "redis_connection_pool_exhausted",
+      "predicted": "unknown",
+      "candidates": [
+        "payment_service_issue"
+      ],
+      "confidence": 0.0,
+      "status": "UNKNOWN",
+      "fallback_used": true,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 4,
+      "tool_success": 4,
+      "llm_input_tokens": 0,
+      "llm_output_tokens": 0,
+      "latency_s": 30.852
+    },
+    {
+      "case_id": "redis_pool_010",
+      "expected": "redis_connection_pool_exhausted",
+      "predicted": "unknown",
+      "candidates": [
+        "payment_service_issue"
+      ],
+      "confidence": 0.0,
+      "status": "UNKNOWN",
+      "fallback_used": true,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 3,
+      "llm_input_tokens": 0,
+      "llm_output_tokens": 0,
+      "latency_s": 31.418
+    },
+    {
+      "case_id": "redis_pool_013",
+      "expected": "redis_connection_pool_exhausted",
+      "predicted": "unknown",
+      "candidates": [
+        "payment_service_issue"
+      ],
+      "confidence": 0.0,
+      "status": "UNKNOWN",
+      "fallback_used": true,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 3,
+      "llm_input_tokens": 0,
+      "llm_output_tokens": 0,
+      "latency_s": 31.16
+    },
+    {
+      "case_id": "redis_pool_016",
+      "expected": "redis_connection_pool_exhausted",
+      "predicted": "unknown",
+      "candidates": [
+        "payment_service_issue"
+      ],
+      "confidence": 0.0,
+      "status": "UNKNOWN",
+      "fallback_used": true,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 4,
+      "tool_success": 4,
+      "llm_input_tokens": 2619,
+      "llm_output_tokens": 347,
+      "latency_s": 28.895
+    },
+    {
+      "case_id": "redis_pool_019",
+      "expected": "redis_connection_pool_exhausted",
+      "predicted": "unknown",
+      "candidates": [
+        "payment_service_issue"
+      ],
+      "confidence": 0.0,
+      "status": "UNKNOWN",
+      "fallback_used": true,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 3,
+      "llm_input_tokens": 0,
+      "llm_output_tokens": 0,
+      "latency_s": 31.234
+    }
+  ]
+}
