@@ -117,9 +117,7 @@ FAILED
   - IncidentStateMachineTest
   - InMemoryDeduplicationStoreTest
   - AuthServiceTest
-- Testcontainers 集成测试：
-  - PostgreSQL 16
-  - Redis 7
+- Testcontainers 集成测试：✅（maven 容器挂 docker.sock 真跑，37/37 OK，P0-11 闭环，日志 `evidence/mvn_it_docker40.log`）
 
 ---
 
@@ -404,7 +402,7 @@ Incident Query：
 - React Docker 构建：通过
 - pgvector 真实联调：通过
 - RocketMQ Topic/Producer：通过
-- Testcontainers：❌ 未通过（`evidence/mvn_it_dind6.log` BUILD FAILURE，redis:7-alpine 启动失败；此前"通过"为虚假记录，P0-11 更正）
+- Testcontainers：✅ 已通过（maven 容器挂 docker.sock 真跑，testcontainers 1.21.3 + api.version=1.44，37/37 OK；闭环日志 `evidence/mvn_it_docker40.log`，P0-11）
 
 ---
 

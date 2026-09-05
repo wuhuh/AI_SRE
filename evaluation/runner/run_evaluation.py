@@ -245,6 +245,11 @@ def main() -> int:
                         help="报告元数据：本次评测使用的 LLM provider")
     parser.add_argument("--agent-url", default=AGENT_URL)
     parser.add_argument("--limit", type=int, default=0, help="只跑前 N 个 case（冒烟用）")
+    parser.add_argument("--types", default="",
+                        help="逗号分隔 fault_type 过滤（P0-08：只跑已注入真实故障的类型）")
+    parser.add_argument("--services", default="",
+                        help="逗号分隔 service 过滤（P0-08：只跑部署栈里真实存在故障的服务）")
+    parser.add_argument("--tag", default="", help="结果文件名附加标记（如 real-fault）")
     args = parser.parse_args()
 
     base = Path(__file__).resolve().parents[1]
@@ -258,6 +263,12 @@ def main() -> int:
             print(f"Split file not found: {args.splits}")
             return 1
         cases = [c for c in cases if c.get("id") in ids]
+    if args.types:
+        wanted = {t.strip() for t in args.types.split(",") if t.strip()}
+        cases = [c for c in cases if c.get("fault_type") in wanted]
+    if args.services:
+        wanted_svcs = {s.strip() for s in args.services.split(",") if s.strip()}
+        cases = [c for c in cases if c.get("service") in wanted_svcs]
     if args.limit > 0:
         cases = cases[: args.limit]
 
@@ -267,11 +278,14 @@ def main() -> int:
     report["split"] = args.splits
     report["input_mode"] = "neutral_symptom_alerts (no fault_type leakage)"
     report["scoring"] = "exact canonical label match; top3 = expected in candidates[:3]"
+    if args.tag:
+        report["tag"] = args.tag
 
     results_dir = base / "results"
     results_dir.mkdir(exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out = results_dir / f"eval_{stamp}_{args.splits}_{args.provider}.json"
+    suffix = f"_{args.tag}" if args.tag else ""
+    out = results_dir / f"eval_{stamp}_{args.splits}_{args.provider}{suffix}.json"
     out.write_text(json.dumps({"report": report, "cases": rows}, indent=2, ensure_ascii=False), encoding="utf-8")
 
     print(json.dumps(report, indent=2, ensure_ascii=False))
