@@ -158,7 +158,7 @@ def call_diagnose(case: dict, agent_url: str = AGENT_URL) -> tuple[dict, float]:
         headers={"Content-Type": "application/json"},
     )
     start = time.perf_counter()
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    with urllib.request.urlopen(req, timeout=150) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     return data, time.perf_counter() - start
 

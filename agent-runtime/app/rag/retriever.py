@@ -116,6 +116,8 @@ class HybridRetriever:
         q = query.lower().strip()
         replacements = {
             "connection pool": "redis pool exhausted",
+            "caching dependency": "redis connection pool",
+            "cache": "redis",
             "5xx": "error rate high",
             "p99": "latency slow",
         }
