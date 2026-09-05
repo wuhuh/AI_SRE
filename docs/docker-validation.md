@@ -98,7 +98,12 @@ mvn -Pintegration verify
 > **更正（2026-09 审计，P0-11）**：上方"BUILD SUCCESS"为虚假记录。实际归档日志
 > `evidence/mvn_it_dind6.log` 显示 `BUILD FAILURE`（Tests run: 8, Errors: 1，
 > ControlPlaneIntegrationTest 抛 `ContainerLaunchException`，redis:7-alpine 容器启动失败）。
-> Testcontainers 集成测试 **❌ 未通过**，待修复 redis 容器启动后重跑归档新日志。
+>
+> **复测通过（P0-11 闭环）**：maven 容器挂载宿主 `/var/run/docker.sock` 真跑，
+> `testcontainers 1.20.4→1.21.3` + `-Dapi.version=1.44`（Docker 29 弃用 1.32 API ping），
+> **Tests run: 37, Failures: 0, Errors: 0，BUILD SUCCESS**。真实拉起
+> postgres:16-alpine + redis:7-alpine 容器并通过。
+> 日志：`evidence/mvn_it_docker40.log`。✅
 
 ## 未验证
 

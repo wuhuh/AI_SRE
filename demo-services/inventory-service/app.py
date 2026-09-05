@@ -61,8 +61,16 @@ def check_inventory():
     if inventory_faults["memory_pressure"]:
         _ = [bytearray(1024 * 1024) for _ in range(30)]
         logger.warning("memory pressure simulated")
-    if inventory_faults["slow_sql"] or inventory_faults["cpu_saturation"]:
+    if inventory_faults["slow_sql"]:
         time.sleep(2.0)
         logger.warning("degraded inventory query detected")
+    if inventory_faults["cpu_saturation"]:
+        # P0-08: 真实 CPU 饱和——uvicorn 进程内持续计算，process_cpu 指标随之升高
+        # （原纯 sleep 只抬高时延，Prometheus 的 process_cpu 看不见）
+        import hashlib
+        burn_until = time.perf_counter() + float(os.getenv("CPU_BURN_SECONDS", "0.6"))
+        payload = b"inventory-check"
+        while time.perf_counter() < burn_until:
+            payload = hashlib.sha256(payload).digest()
     return {"items": ["sku-1"], "available": True}
 
