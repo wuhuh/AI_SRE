@@ -1,0 +1,101 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------------< com.aisre:control-plane >-----------------------
+[INFO] Building control-plane 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ control-plane ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 3 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ control-plane ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- build-helper:3.5.0:add-test-source (add-integration-test-source) @ control-plane ---
+[INFO] Test Source directory: /work/src/integration-test/java added.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ control-plane ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ control-plane ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.2:test (default-test) @ control-plane ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.aisre.api.AuthControllerTest
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.431 s -- in com.aisre.api.AuthControllerTest
+[INFO] Running com.aisre.api.dto.DtoValidationTest
+14:53:28.379 [main] INFO org.hibernate.validator.internal.util.Version -- HV000001: Hibernate Validator 8.0.1.Final
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.359 s -- in com.aisre.api.dto.DtoValidationTest
+[INFO] Running com.aisre.integration.ControlPlaneIntegrationTest
+14:53:29.663 [main] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+14:53:29.677 [main] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+14:53:29.707 [main] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 1.20.4
+14:53:31.698 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with Environment variables, system properties and defaults. Resolved dockerHost=unix:///var/run/docker.sock
+14:53:31.731 [main] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is 172.17.0.1
+14:53:31.765 [main] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
+  Server Version: 29.8.0
+  API Version: 1.56
+  Operating System: Ubuntu 26.04 LTS
+  Total Memory: 15508 MB
+14:53:31.770 [main] WARN org.testcontainers.utility.ResourceReaper -- 
+********************************************************************************
+Ryuk has been disabled. This can cause unexpected behavior in your environment.
+********************************************************************************
+14:53:31.780 [main] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+14:53:31.781 [main] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
+14:53:31.898 [main] INFO tc.redis:7-alpine -- Creating container for image: redis:7-alpine
+14:53:31.916 [main] INFO org.testcontainers.utility.RegistryAuthLocator -- Failure when attempting to lookup auth config. Please ignore if you don't have images in an authenticated registry. Details: (dockerImageName: redis:7-alpine, configFile: /root/.docker/config.json, configEnv: DOCKER_AUTH_CONFIG). Falling back to docker-java default behaviour. Exception message: Status 404: No config supplied. Checked in order: /root/.docker/config.json (file not found), DOCKER_AUTH_CONFIG (not set)
+14:53:32.268 [main] INFO tc.redis:7-alpine -- Container redis:7-alpine is starting: f532df120a05c6a9572a08b38a25890fa687aaa7690d58c83d9870ad74d0e08c
+14:53:33.365 [main] INFO tc.redis:7-alpine -- Container redis:7-alpine started in PT1.466778312S
+14:53:33.366 [main] INFO tc.postgres:16-alpine -- Creating container for image: postgres:16-alpine
+14:53:33.473 [main] INFO tc.postgres:16-alpine -- Container postgres:16-alpine is starting: ec8115c0236eb72b5c197759401e2259bea3e081e04a7a81c3b93c2c18629b28
+14:53:35.362 [main] INFO tc.postgres:16-alpine -- Container postgres:16-alpine started in PT1.995647789S
+14:53:35.363 [main] INFO tc.postgres:16-alpine -- Container is started (JDBC URL: jdbc:postgresql://172.17.0.1:44623/aisre?loggerLevel=OFF)
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.915 s -- in com.aisre.integration.ControlPlaneIntegrationTest
+[INFO] Running com.aisre.security.AuthInterceptorTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.078 s -- in com.aisre.security.AuthInterceptorTest
+[INFO] Running com.aisre.security.AuthServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.073 s -- in com.aisre.security.AuthServiceTest
+[INFO] Running com.aisre.security.RiskPolicyTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.017 s -- in com.aisre.security.RiskPolicyTest
+[INFO] Running com.aisre.service.AlertmanagerAdapterTest
+14:53:49.094 [main] INFO com.aisre.service.AlertService -- alert ingested: fingerprint=s:HighLatency:null, duplicate=false, incidentId=1, alertName=HighLatency
+14:53:49.121 [main] INFO com.aisre.service.AlertService -- alert ingested: fingerprint=payment-service:ServiceLatencyHigh:10.0.0.5:8080, duplicate=false, incidentId=1, alertName=ServiceLatencyHigh
+14:53:49.122 [main] INFO com.aisre.service.AlertService -- alert ingested: fingerprint=order-service:HighErrorRate:null, duplicate=false, incidentId=1, alertName=HighErrorRate
+14:53:49.123 [main] INFO com.aisre.service.AlertService -- alert ingested: fingerprint=order-service:HighErrorRate:null, duplicate=true, incidentId=1, alertName=HighErrorRate
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.47 s -- in com.aisre.service.AlertmanagerAdapterTest
+[INFO] Running com.aisre.service.InMemoryDeduplicationStoreTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.365 s -- in com.aisre.service.InMemoryDeduplicationStoreTest
+[INFO] Running com.aisre.service.RemediationExecutorBodyTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.099 s -- in com.aisre.service.RemediationExecutorBodyTest
+[INFO] Running com.aisre.state.IncidentStateMachineTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.aisre.state.IncidentStateMachineTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 37, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[WARNING] Corrupted channel by directly writing to native stream in forked JVM 1. See FAQ web page and the dump file /work/target/surefire-reports/2026-09-05T14-53-25_451-jvmRun1.dumpstream
+[INFO] 
+[INFO] --- jar:3.4.2:jar (default-jar) @ control-plane ---
+[INFO] 
+[INFO] --- spring-boot:3.4.0:repackage (repackage) @ control-plane ---
+[INFO] Replacing main artifact /work/target/control-plane-0.1.0-SNAPSHOT.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+[INFO] The original artifact has been renamed to /work/target/control-plane-0.1.0-SNAPSHOT.jar.original
+[INFO] 
+[INFO] --- failsafe:3.2.5:integration-test (default) @ control-plane ---
+[INFO] 
+[INFO] --- failsafe:3.2.5:verify (default) @ control-plane ---
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  30.988 s
+[INFO] Finished at: 2026-09-05T14:53:53Z
+[INFO] ------------------------------------------------------------------------
