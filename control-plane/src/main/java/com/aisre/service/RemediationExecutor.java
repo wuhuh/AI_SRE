@@ -36,6 +36,8 @@ public class RemediationExecutor {
     private final String approvalToken;
     private final String agentRuntimeUrl;
     private final HttpClient httpClient = HttpClient.newBuilder()
+            // 默认 HTTP_2 会对 uvicorn 发 h2c 升级，POST body 被丢弃（422 body null）——锁 1.1
+            .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(5))
             .build();
 
