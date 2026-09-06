@@ -117,7 +117,7 @@ FAILED
   - IncidentStateMachineTest
   - InMemoryDeduplicationStoreTest
   - AuthServiceTest
-- Testcontainers 集成测试：✅（maven 容器挂 docker.sock 真跑，37/37 OK，P0-11 闭环，日志 `evidence/mvn_it_docker40.log`）
+- Testcontainers 集成测试：✅（maven 容器挂 docker.sock 真跑，39/39 OK（37 既有 + 2 核心链路，P1-T-02），P0-11 闭环，日志 `evidence/mvn_it_p1t02.log`）
 
 ---
 
@@ -402,7 +402,7 @@ Incident Query：
 - React Docker 构建：通过
 - pgvector 真实联调：通过
 - RocketMQ Topic/Producer：通过
-- Testcontainers：✅ 已通过（maven 容器挂 docker.sock 真跑，testcontainers 1.21.3 + api.version=1.44，37/37 OK；闭环日志 `evidence/mvn_it_docker40.log`，P0-11）
+- Testcontainers：✅ 已通过（maven 容器挂 docker.sock 真跑，testcontainers 1.21.3 + api.version=1.44，39/39 OK（37 既有 + 2 核心链路，P1-T-02）；P1-T-02 日志 `evidence/mvn_it_p1t02.log`）
 
 ---
 

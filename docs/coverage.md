@@ -20,7 +20,7 @@
 | Benchmark | 🟡 | 本地 E2E / Agent 数据已有；Docker k6 数据待补 |
 | 真实 Docker E2E | ✅ | 已在 Docker 网络内 3 个故障场景全部通过 |
 | React 生产构建 | ✅ | 已在 Docker 内成功 `docker build` |
-| Testcontainers | ✅ | maven 容器挂 docker.sock 真跑（testcontainers 1.21.3 + api.version=1.44），37/37 OK，日志 `evidence/mvn_it_docker40.log`（P0-11 闭环；此前 ❌ 记录见 `evidence/mvn_it_dind6.log`） |
+| Testcontainers | ✅ | maven 容器挂 docker.sock 真跑（testcontainers 1.21.3 + api.version=1.44），39/39 OK（37 既有 + 2 核心链路，P1-T-02），日志 `evidence/mvn_it_p1t02.log`（P1-T-02；P0-11 闭环日志 `mvn_it_docker40.log`） |
 | Docker k6 | ✅ | Alert / Incident 压测已执行并记录真实数据 |
 | pgvector | ✅ | 已通过真实 pgvector 容器验证 upsert/search |
 | RocketMQ 发送/Topic | ✅ | 真实 Topic `aisre-agent-task` 已存在，Producer 在 E2E 中真实发送 |

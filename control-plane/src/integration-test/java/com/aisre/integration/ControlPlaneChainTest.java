@@ -148,15 +148,13 @@ class ControlPlaneChainTest {
                 id -> id != null, "incident should be created from alertmanager webhook");
         assertNotNull(incidentId);
 
-        // ---- 2. dedup：同 fingerprint 重放不再新建 incident ----
+        // ---- 2. dedup：同 fingerprint 重放不再新建 incident（按 service 过滤，防跨用例污染）----
         ResponseEntity<String> replay = post(base() + "/api/v1/alerts/alertmanager",
                 alertmanagerBody("payment-service", "HighErrorRate"), null);
         System.out.println("[chain-it] replay ingest http=" + replay.getStatusCode() + " body=" + replay.getBody());
-        int incidentCount = poll(() -> {
-            JsonNode list = getJson(base() + "/api/v1/incidents");
-            return list != null && list.isArray() ? list.size() : -1;
-        }, n -> n == 1, "duplicate alert must be deduplicated (still exactly 1 incident)");
-        assertEquals(1, incidentCount);
+        int paymentIncidents = poll(() -> countIncidentsFor("payment-service"),
+                n -> n == 1, "duplicate alert must be deduplicated (exactly 1 payment-service incident)");
+        assertEquals(1, paymentIncidents);
 
         // ---- 3. diagnosis 回调（agent token；LOW 风险动作 auto-policy 自动批准）----
         mockBackends.enqueue(new MockResponse().setResponseCode(200)
@@ -311,6 +309,20 @@ class ControlPlaneChainTest {
             }
         }
         return null;
+    }
+
+    private int countIncidentsFor(String service) {
+        JsonNode list = getJson(base() + "/api/v1/incidents");
+        if (list == null || !list.isArray()) {
+            return -1;
+        }
+        int count = 0;
+        for (JsonNode n : list) {
+            if (service.equals(n.path("service").asText())) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private Long findPendingApprovalId(Long incidentId) {
