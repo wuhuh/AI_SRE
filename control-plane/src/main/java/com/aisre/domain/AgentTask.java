@@ -60,6 +60,29 @@ public class AgentTask {
 
     private Instant claimedAt;
 
+    // P1-CP-07: outbox 投递状态（PENDING→SENT；发送失败/崩溃由扫描器补发）
+    @Column(nullable = false, length = 16)
+    private String mqStatus = "PENDING";
+
+    @Column(nullable = false)
+    private int mqAttempts = 0;
+
+    public String getMqStatus() {
+        return mqStatus;
+    }
+
+    public void setMqStatus(String mqStatus) {
+        this.mqStatus = mqStatus;
+    }
+
+    public int getMqAttempts() {
+        return mqAttempts;
+    }
+
+    public void setMqAttempts(int mqAttempts) {
+        this.mqAttempts = mqAttempts;
+    }
+
     public AgentTask() {
     }
 

@@ -16,6 +16,12 @@ public interface AgentTaskRepository extends JpaRepository<AgentTask, Long> {
 
     Optional<AgentTask> findByIdempotencyKey(String idempotencyKey);
 
+    /** P1-CP-08: 幂等键查询（首键 diag-<incidentId>，重试键 diag-<incidentId>-r<N>）。 */
+    Optional<AgentTask> findTopByIdempotencyKeyOrderByIdDesc(String idempotencyKey);
+
+    /** P1-CP-07: outbox 扫描——待投递且未超重试上限的任务。 */
+    List<AgentTask> findByMqStatusAndMqAttemptsLessThan(String mqStatus, int maxAttempts);
+
     List<AgentTask> findByStatusOrderByCreatedAtAsc(String status);
 
     /**

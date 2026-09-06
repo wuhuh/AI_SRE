@@ -129,11 +129,15 @@
   验证：两线程并发 decide 仅一次执行的集成测试。
   Effort: S
 
-- [ ] **P1-CP-07** MQ 双写原子性：`TransactionSynchronization.afterCommit` 发送（或 outbox：AgentTask 表加 SENT 状态由后台扫描补发）；评估 producer 启动失败对应用启动的影响并解耦。
+- [x] **P1-CP-07** MQ 双写原子性：✅ outbox 模式——AgentTask 加 mq_status(PENDING→SENT)/
+  mq_attempts（V5 迁移），发送移到事务 afterCommit；后台扫描器（10s）按上限补发
+  （发送失败/提交后崩溃都覆盖）；producer 启动失败不再炸应用启动（懒重连解耦）。
   验证：注入 audit 失败断言消息未发出；MQ 宕机时告警接入仍 202（补发机制兜底）。
   Effort: M
 
-- [ ] **P1-CP-08** 任务幂等键与生命周期：键改 `diag-<incidentId>`（去 UUID）；消费侧回写 RUNNING/FAILED；失败任务有终态。
+- [x] **P1-CP-08** 任务幂等键与生命周期：✅ 幂等键 `diag-<incidentId>`（首键）+
+  `-r<N>`（FAILED 重派，确定性序号）；唯一索引防并发重复；同键非 FAILED 跳过重派。
+  消费侧 RUNNING/FAILED 回写与租约回收已在 P1-MQ-02 落地。
   验证：同 incident 重复 sendDiagnosisTask 仅一行任务。
   Effort: S
 
