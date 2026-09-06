@@ -39,7 +39,8 @@ class FileIdempotencyStore(IdempotencyStore):
             return False
 
     def mark_processed(self, key: str) -> None:
-        self._path(key).write_text(
-            json.dumps({"key": key, "ts": time.time()}),
-            encoding="utf-8",
-        )
+        # P1-AR-05: tmp + 原子 rename——并发读不会看到半截 JSON
+        path = self._path(key)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"key": key, "ts": time.time()}), encoding="utf-8")
+        os.replace(tmp, path)

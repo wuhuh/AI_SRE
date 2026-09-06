@@ -26,12 +26,20 @@ class Tool(ABC):
 
     def call(self, arguments: dict[str, Any], principal: str = "agent") -> ToolCall:
         import time
+        from concurrent.futures import ThreadPoolExecutor
         start = time.perf_counter()
         call = ToolCall(name=self.spec.name, arguments=arguments, status="SUCCESS")
         try:
             if principal not in self.spec.allowed_principals:
                 raise PermissionError(f"{principal} is not allowed to call {self.spec.name}")
-            result = self.execute(arguments, principal=principal)
+            # P1-AR-07: 按 spec.timeout_seconds 强制超时（卡死的工具会耗尽诊断预算）。
+            # wait=False：超时后不再等待卡死线程（Python 无法杀线程，本地 HTTP 工具会自行结束）
+            pool = ThreadPoolExecutor(max_workers=1)
+            future = pool.submit(self.execute, arguments, principal)
+            try:
+                result = future.result(timeout=self.spec.timeout_seconds)
+            finally:
+                pool.shutdown(wait=False)
             call.result_summary = str(result)[:2000]
         except TimeoutError:
             call.status = "TIMEOUT"

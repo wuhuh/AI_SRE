@@ -55,11 +55,21 @@ def submit_diagnosis(cp_url: str, incident_id: int, diagnosis, task_id: int | No
     }
     if task_id is not None:
         payload["taskId"] = task_id
-    try:
-        _request_json("POST", f"{cp_url}/api/v1/incidents/{incident_id}/diagnosis", payload,
-                      timeout=10, headers=agent_headers())
-    except Exception:
-        pass
+    # P1-AR-05: submit 失败必须让调用方知道（重试 N 次后上抛）——
+    # 否则诊断没落库任务却被 complete，事故永远停在诊断完成之前
+    max_retries = int(os.getenv("SUBMIT_MAX_RETRIES", "3"))
+    delay = float(os.getenv("SUBMIT_RETRY_DELAY_SECONDS", "0.5"))
+    last_exc: Exception | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            _request_json("POST", f"{cp_url}/api/v1/incidents/{incident_id}/diagnosis", payload,
+                          timeout=10, headers=agent_headers())
+            return
+        except Exception as exc:  # noqa: BLE001 - 重试边界
+            last_exc = exc
+            if attempt < max_retries:
+                time.sleep(delay)
+    raise RuntimeError(f"diagnosis submit failed after {max_retries + 1} attempts: {last_exc}")
 
 
 def _worker_id() -> str:
