@@ -82,9 +82,12 @@
     redis 类 1/7 直接 + Top-3 共 2/7）。首轮 35.7% → 57.1% 的提升全部来自真实工程修复：
     LLM 读超时（15s→跟随预算）、Jaeger trace 400、agent 缺 redis 工具别名、
     编造工具名空转守卫。归档 `evaluation/results/eval_*_real-fault*.json`。
-  - 遗留（二期）：Evidence Recall=0.00（证据 key 是工具调用序号而非语义 key，
-    见 P2-FI-10）；redis 类证据主要在应用日志，需日志关键词检索强化；
-    `redis.ConnectionPool(max_connections=2)` 真打满与 P1-FI-03 规则对齐。
+  - ✅ 二期（真打满，commit 0e2f39a 附近）：payment 改真实有界
+    `ConnectionPool(max_connections=2)`，故障启用 = 后台 BLPOP 线程真实持占全部
+    连接，/payments 收真实 "Too many connections"（redis 侧 blocked_clients=2
+    真实证据，禁用回 0）。删除合成日志（伪造结论+标签泄漏）。
+    redis 类 Top-1 **1/7 → 3/7（42.9%）**，Top-3 → 57.1%（real-fault-realpool）。
+  - 遗留：Evidence Recall=0.00（证据 key 是工具调用序号而非语义 key，见 P2-FI-10）。
   Effort: M（二期 slow_sql/记忆泄漏：L）
   依赖：FI-03（规则对齐）、FI-04（日志可用性）
 
