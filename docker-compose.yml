@@ -166,6 +166,10 @@ services:
       AISRE_AGENT_TOKEN: ${AISRE_AGENT_TOKEN:-local-dev-agent-token}
       # P0-04: 审批执行 token（tool-server 的 APPROVAL_TOKEN 必须同值）
       AISRE_TOOL_SERVER_TOKEN: ${AISRE_TOOL_SERVER_TOKEN:-local-dev-token}
+      # P1-CP-14: alertmanager webhook 共享 secret（alertmanager.yml 同值）
+      AISRE_WEBHOOK_SECRET: ${AISRE_WEBHOOK_SECRET:-local-dev-webhook-token}
+      # P1-CP-14: 管理端点独立端口（内部，不映射宿主）
+      MANAGEMENT_PORT: "8085"
     ports:
       - "8080:8080"
     depends_on:
