@@ -169,7 +169,10 @@
   验证：过期 decide 409；REJECT 后状态断言。
   Effort: S-M
 
-- [ ] **P1-CP-14** AuthZ 收紧：读端点 ≥VIEWER；alerts 加共享 webhook secret；actuator 移独立管理端口；保留公开面仅 health/login/alerts(secret)。
+- [x] **P1-CP-14** AuthZ 收紧：✅ 读端点 ≥VIEWER（Bearer JWT 或 agent token）；
+  alerts webhook 加共享 secret（X-Webhook-Token，未配置放行+WARN，compose 与
+  alertmanager.yml 同值）；actuator 移独立管理端口 8085（内部）。前端/agent-runtime
+  GET 均已带凭据；stream SSE 放行（EventSource 无法带头）。
   验证：端点×角色矩阵测试。
   Effort: M
 
@@ -186,11 +189,16 @@
   验证：修复失败有 warn/error 日志含堆栈；缺字段请求 400。
   Effort: S
 
-- [ ] **P1-CP-17** schema 单轨：生产 `ddl-auto: validate`；实体对齐 TEXT/唯一索引；CI 加 validate 启动断言。
+- [x] **P1-CP-17** schema 单轨：✅ ddl-auto=validate；抓出并修复：flyway 原只在
+  docker profile（IT 无 flyway、agent_step 一直靠 ddl-auto 建）→ flyway 提升为
+  主依赖，IT 走真实迁移路径；CI 新增 java-integration job（testcontainers +
+  validate 启动即断言实体↔Flyway 对齐）。
   验证：Testcontainers PG + Flyway 后以 validate 启动无 diff。
   Effort: S
 
-- [ ] **P1-AR-04** LLM 重试接线：`_build_runner` 包 `RetryLLMProvider`（3 次+指数退避）；删除或实现 TimeoutLLMProvider；429 读 Retry-After。
+- [x] **P1-AR-04** LLM 重试接线：✅ `_build_runner` 包 RetryLLMProvider（此前只定义
+  未接线）；429 尊重 Retry-After（封顶 10s，超上限直接上抛）、5xx/网络短退避、
+  4xx 不重试；可配 LLM_MAX_RETRIES/LLM_RETRY_DELAY_SECONDS；单测 5 个。
   验证：接线断言（失败 2 次后成功，调用计数=3）。
   Effort: S
 
