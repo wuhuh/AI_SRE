@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AuthInterceptorTest {
 
     private AuthInterceptor interceptor(String agentToken) {
-        return new AuthInterceptor(new StubAuthService(), agentToken);
+        return new AuthInterceptor(new StubAuthService(), agentToken, "");
     }
 
     private MockHttpServletRequest request(String method, String uri) {

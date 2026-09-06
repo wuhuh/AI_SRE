@@ -38,7 +38,7 @@ export default function App() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/incidents');
+      const res = await fetch('/api/v1/incidents', { headers: authHeaders() });
       setIncidents(await res.json());
     } finally {
       setLoading(false);
@@ -46,7 +46,7 @@ export default function App() {
   };
 
   const loadServices = async () => {
-    const res = await fetch('/api/v1/dashboard/services');
+    const res = await fetch('/api/v1/dashboard/services', { headers: authHeaders() });
     if (res.ok) {
       setServices(await res.json());
     }
@@ -76,7 +76,7 @@ export default function App() {
 
   const loadApprovals = async (id) => {
     if (!id) return;
-    const res = await fetch(`/api/v1/approvals/incident/${id}`);
+    const res = await fetch(`/api/v1/approvals/incident/${id}`, { headers: authHeaders() });
     if (res.ok) {
       setApprovals(await res.json());
     }
@@ -85,10 +85,10 @@ export default function App() {
   const loadDetails = async (id) => {
     if (!id) return;
     const [ev, tc, rm, st] = await Promise.all([
-      fetch(`/api/v1/incidents/${id}/evidence`),
-      fetch(`/api/v1/incidents/${id}/tool-calls`),
-      fetch(`/api/v1/incidents/${id}/remediations`),
-      fetch(`/api/v1/incidents/${id}/steps`),
+      fetch(`/api/v1/incidents/${id}/evidence`, { headers: authHeaders() }),
+      fetch(`/api/v1/incidents/${id}/tool-calls`, { headers: authHeaders() }),
+      fetch(`/api/v1/incidents/${id}/remediations`, { headers: authHeaders() }),
+      fetch(`/api/v1/incidents/${id}/steps`, { headers: authHeaders() }),
     ]);
     if (ev.ok) setEvidence(await ev.json());
     if (tc.ok) setToolCalls(await tc.json());

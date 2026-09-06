@@ -89,7 +89,9 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
             if not claim.get("claimed"):
                 continue
         try:
-            incident = _request_json("GET", f"{cp_url}/api/v1/incidents/{incident_id}", timeout=10) or {}
+            # P1-CP-14: 控制面读接口需要凭据（agent token 或 JWT）
+            incident = _request_json("GET", f"{cp_url}/api/v1/incidents/{incident_id}",
+                                     timeout=10, headers=agent_headers()) or {}
             alert = {
                 "service": incident.get("service", "unknown"),
                 "alertName": "auto-consumed",

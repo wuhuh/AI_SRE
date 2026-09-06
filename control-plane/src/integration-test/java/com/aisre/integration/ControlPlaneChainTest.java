@@ -65,6 +65,9 @@ class ControlPlaneChainTest {
 
     static MockWebServer mockBackends;
 
+    /** P1-CP-14: IT 读接口用 admin token（登录一次缓存）。 */
+    private String cachedAdminToken;
+
     @LocalServerPort
     int port;
 
@@ -332,11 +335,23 @@ class ControlPlaneChainTest {
 
     private JsonNode getJson(String url) {
         try {
-            ResponseEntity<String> resp = rest.getForEntity(url, String.class);
+            // P1-CP-14: 读接口 ≥VIEWER——IT 用 admin token 读
+            HttpHeaders headers = jsonHeaders();
+            headers.set("Authorization", "Bearer " + adminToken());
+            ResponseEntity<String> resp = rest.exchange(url, org.springframework.http.HttpMethod.GET,
+                    new org.springframework.http.HttpEntity<>(headers), String.class);
             return resp.getBody() == null ? null : MAPPER.readTree(resp.getBody());
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** P1-CP-14: 登录一次缓存（登录本身不需要 token）。 */
+    private String adminToken() {
+        if (cachedAdminToken == null) {
+            cachedAdminToken = login("admin", "admin");
+        }
+        return cachedAdminToken;
     }
 
     private static String jsonToString(JsonNode node) {
