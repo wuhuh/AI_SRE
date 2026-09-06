@@ -207,7 +207,12 @@
   验证：构造必失败消息 → 终态 FAILED + DLQ 记录 + 告警事件。
   Effort: M
 
-- [ ] **P1-FI-03** 告警规则与故障对齐：修机制（P0-08）或对齐（HighMemory 阈值/HighCPU 换容器指标）；每类故障至少一条可触发规则。
+- [x] **P1-FI-03** 告警规则与故障对齐：✅ 7 条规则 expr 逐一经 Prometheus API 验证引用
+  真实非空序列（HighErrorRate/HighLatency/ServiceDown/HighCPU/HighMemory/
+  RedisPoolHigh/DatabasePoolHigh）；HighCPU 阈值 0.8→0.7（busy-loop 实测 0.79-0.83
+  贴边易漏报）。故障类型→规则映射：cpu_saturation→HighCPU；redis_pool→HighErrorRate
+  （真实 503）；memory_leak→HighMemory；thread_pool→HighLatency；slow_sql/mq_backlog
+  需先落对应真实故障源（slow_sql 无 pg 慢查询注入、rocketmq-exporter 不可得，见 FI-06 注记）。
   验证：注入每个 REAL 故障后有对应告警触发。
   Effort: S
 
@@ -216,10 +221,13 @@
   日志行；`{service="payment-service"}` 可查（含 ERROR 级 RedisConnectionFailureException 行）。
   commit 7c5c5f9。Effort: S-M
 
-- [x] **P1-FI-05** 指标管道：✅ prometheus 加 `--web.enable-remote-write-receiver`
-  （collector 的 prometheusremotewrite 不再 404，application_ready_time 等 pushed 指标
-  已入 Prometheus）；demo services 的 OTel MeterProvider 分期（未做）。
-  commit d09ca46。Effort: S（剩余部分：MeterProvider，二期）
+- [x] **P1-FI-05** 指标管道：✅ 全部完成。
+  一期（commit d09ca46）：prometheus `--web.enable-remote-write-receiver`，
+  application_ready_time 等 pushed 指标入 Prometheus。
+  二期：demo services shared/observability.py 加 OTel MeterProvider
+  （OTLPMetricExporter → collector /v1/metrics，15s 间隔）；验证：demo 侧
+  `http_server_duration_milliseconds_*` 等 OTel 族指标真实入 Prometheus
+  （与 prometheus_client 的 `http_request_duration_seconds_*` 两族并存），collector 无 404。
 
 - [x] **P1-FI-06** exporter 或删规则：✅ redis-exporter + postgres-exporter 落真
   （redis_connected_clients=3、pg backends=12 真实入 Prometheus，RedisPoolHigh 保持、

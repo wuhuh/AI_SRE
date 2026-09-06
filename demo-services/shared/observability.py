@@ -24,6 +24,16 @@ except Exception:  # pragma: no cover - depends on environment
     _OTEL_AVAILABLE = False
 
 try:
+    # P1-FI-05 二期：OTel 指标 → collector(prometheusremotewrite) → Prometheus
+    from opentelemetry import metrics
+    from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+    from opentelemetry.sdk.metrics import MeterProvider
+    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+    _OTEL_METRICS_AVAILABLE = True
+except Exception:  # pragma: no cover - depends on environment
+    _OTEL_METRICS_AVAILABLE = False
+
+try:
     from prometheus_client import Counter, Histogram, start_http_server
     _PROMETHEUS_AVAILABLE = True
 except Exception:  # pragma: no cover
@@ -81,7 +91,17 @@ def setup(service_name: str, otlp_endpoint: str | None = None, metrics_port: int
         endpoint = otlp_endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
         provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint + "/v1/traces")))
         trace.set_tracer_provider(provider)
-        logger.info("OpenTelemetry enabled for %s", service_name)
+        if _OTEL_METRICS_AVAILABLE:
+            metrics.set_meter_provider(MeterProvider(
+                resource=resource,
+                metric_readers=[PeriodicExportingMetricReader(
+                    OTLPMetricExporter(endpoint=endpoint + "/v1/metrics"),
+                    export_interval_millis=int(os.getenv("OTEL_METRIC_EXPORT_INTERVAL", "15000")),
+                )],
+            ))
+            logger.info("OpenTelemetry traces+metrics enabled for %s", service_name)
+        else:
+            logger.info("OpenTelemetry traces enabled for %s (metrics exporter not installed)", service_name)
     else:
         logger.warning("OpenTelemetry packages not installed; traces are disabled for %s", service_name)
     if _PROMETHEUS_AVAILABLE and metrics_port:
