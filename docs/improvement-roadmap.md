@@ -202,7 +202,9 @@
   验证：接线断言（失败 2 次后成功，调用计数=3）。
   Effort: S
 
-- [ ] **P1-AR-05** 消费提交语义：submit 失败不 complete（重试 N 次）；mark_processed 在 complete 成功后；文件写 tmp+rename。
+- [x] **P1-AR-05** 消费提交语义：✅ submit 失败重试 N 次后**上抛**（不再吞掉）→
+  任务 fail 上报、complete 不调；mark_processed 保持 complete 成功后执行；
+  幂等文件写改 tmp+原子 rename。单测 2 个。
   验证：submit 抛错 → 任务保持 QUEUED；重复投递仅一次 submit。
   Effort: S-M
 
@@ -211,7 +213,9 @@
   Effort: M
   依赖：P0-02（查询对的服务）
 
-- [ ] **P1-AR-07** 工具超时强制：Tool.call 按 spec.timeout_seconds 强制（executor future / socket timeout）。
+- [x] **P1-AR-07** 工具超时强制：✅ Tool.call 线程池 future.result(timeout=
+  spec.timeout_seconds)（wait=False，超时后不陪卡死线程等完）；TIMEOUT 状态照旧
+  透出给 agent。单测 2 个（慢工具 0.2s 截断 / 快工具不受影响）。
   验证：卡死工具在 timeout 内返回 TIMEOUT 状态。
   Effort: S
 
