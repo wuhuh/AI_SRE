@@ -136,7 +136,10 @@
   验证：同 incident 重复 sendDiagnosisTask 仅一行任务。
   Effort: S
 
-- [ ] **P1-CP-09** 聚合修正：精确匹配 `findByServiceAndStatusInAndStartedAtAfter`；incident 创建条件化（唯一约束或锁）。
+- [x] **P1-CP-09** 聚合修正：✅ commit 46e7cab。精确匹配
+  `findByServiceAndStatusInAndStartedAtAfter`（状态/时间窗下推 SQL，不再 containing
+  误聚合）；incident 并发创建竞态以 ponytail 注记（fingerprint 去重已挡同指纹重复，
+  同服务不同告警并发窗口窄，根治需 partial unique index——遗留）。
   验证：并发 50 条同类告警 ≤1 incident；"api" 不聚合进 "api-gateway"。
   Effort: S-M
 
@@ -156,7 +159,9 @@
   验证：端点×角色矩阵测试。
   Effort: M
 
-- [ ] **P1-CP-15** Redis 降级策略：putIfAbsent try/catch → fail-open + WARN + 指标；firstSeen 真正用于抑制重复（重复告警不重复触发任务/计数）。
+- [x] **P1-CP-15** Redis 降级策略：✅ commit 46e7cab。putIfAbsent/delete try/catch →
+  fail-open + WARN（告警管道不再因 redis 故障 500）；firstSeen=false 时只落 alert 行
+  挂活跃 incident，不重复计数/摘要/触发任务（链 IT 断言重放后 alertCount==1）。
   验证：Redis 停止时 POST /alerts 仍 202；重复告警 alertCount 不虚增。
   Effort: S
 
