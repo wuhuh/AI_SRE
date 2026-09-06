@@ -37,8 +37,10 @@ groups:
           summary: "{{ $labels.job }} is down"
 
       - alert: HighCPU
+        # P1-FI-03: 阈值对齐真实注入——busy-loop 实测 avg rate≈0.79-0.83，
+        # 0.8 贴边易漏报，0.7 保证 cpu_saturation 故障可靠触发
         expr: |
-          avg by (instance) (rate(process_cpu_seconds_total[5m])) > 0.8
+          avg by (instance) (rate(process_cpu_seconds_total[5m])) > 0.7
         for: 5m
         labels:
           severity: P2
