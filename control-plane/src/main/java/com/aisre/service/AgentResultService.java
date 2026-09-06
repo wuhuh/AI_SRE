@@ -133,14 +133,19 @@ public class AgentResultService {
                 String payload = buildActionPayload(action, incident.getService());
                 if (RiskPolicy.requiresApproval(action)) {
                     hasHighRisk = true;
-                    approvalRepository.save(new Approval(
-                            incidentId,
-                            action,
-                            payload,
-                            "PENDING",
-                            "agent",
-                            Instant.now()
-                    ));
+                    // P1-CP-12: 同 incident+action 已有 PENDING 则复用，不重复建审批单
+                    if (approvalRepository
+                            .findFirstByIncidentIdAndActionTypeAndStatusOrderByIdDesc(
+                                    incidentId, action, "PENDING").isEmpty()) {
+                        approvalRepository.save(new Approval(
+                                incidentId,
+                                action,
+                                payload,
+                                "PENDING",
+                                "agent",
+                                Instant.now()
+                        ));
+                    }
                 } else {
                     Approval autoApproval = new Approval(
                             incidentId,

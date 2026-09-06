@@ -124,7 +124,8 @@
 
 # P1
 
-- [ ] **P1-CP-06** Approval.decide 并发竞态：条件 UPDATE `WHERE status='PENDING'`（返回 0 行→409）或 @Version。
+- [x] **P1-CP-06** Approval.decide 并发竞态：✅ 条件 UPDATE `decideIfPending ... WHERE
+  status='PENDING'`（0 行更新→409 "already decided"）。40/40 绿。
   验证：两线程并发 decide 仅一次执行的集成测试。
   Effort: S
 
@@ -151,7 +152,11 @@
   验证：HTTP 成功但后续事务失败 → remediation 行仍存在且状态明确。
   Effort: M
 
-- [ ] **P1-CP-12** 审批语义补全：expiresAt + decide 校验；REJECT 推进状态（回 ROOT_CAUSE_FOUND）并审计；decidedBy 取 JWT sub；同 incident+action 复用 PENDING。
+- [x] **P1-CP-12** 审批语义补全：✅ expiresAt（V4 迁移 + create() TTL 1h 可配
+  `aisre.approval.ttl-seconds`，过期 decide→409）；REJECT 推进 WAITING_APPROVAL→
+  ROOT_CAUSE_FOUND（状态机放开该转换）并审计；decidedBy 缺省取 JWT sub
+  （ApprovalController 解析）；同 incident+action 复用 PENDING（AgentResultService）。
+  链 IT 新增 Order(3) REJECT 回退断言。
   验证：过期 decide 409；REJECT 后状态断言。
   Effort: S-M
 
