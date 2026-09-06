@@ -60,7 +60,9 @@ public class ApprovalService {
         if (!decision.equals("APPROVE") && !decision.equals("REJECT")) {
             throw new IllegalArgumentException("decision must be APPROVE or REJECT");
         }
-        approval.setStatus(decision);
+        // P1-T-02: 终态与 auto-policy 对齐（原 decide 写 "APPROVE"/"REJECT"，与
+        // AgentResultService 的 "APPROVED" 同字段两种约定，消费方无从区分）
+        approval.setStatus(decision.equals("APPROVE") ? "APPROVED" : "REJECTED");
         approval.setDecidedBy(request.operator() != null ? request.operator() : "unknown");
         approval.setComment(request.comment());
         approval.setDecidedAt(Instant.now());
