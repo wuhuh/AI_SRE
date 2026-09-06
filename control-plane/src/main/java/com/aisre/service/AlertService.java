@@ -63,6 +63,18 @@ public class AlertService {
         );
         alertRepository.save(alert);
 
+        // P1-CP-15: 重复告警真正被抑制——落 alert 行（留证据）但不重复计数、不追加
+        // 摘要、不再触发任务。firstSeen=false 时只把告警挂到活跃 incident 上。
+        if (!firstSeen) {
+            Optional<Incident> active = findActiveIncident(request.service());
+            if (active.isPresent()) {
+                alert.setIncidentId(active.get().getId());
+                alertRepository.save(alert);
+                return new AlertResult(active.get().getId(), true);
+            }
+            // 活跃 incident 已不在（已被验证解决等）：视为新告警继续走完整链路
+        }
+
         Optional<Incident> existing = findActiveIncident(request.service());
         Incident incident;
         if (existing.isPresent()) {
@@ -75,6 +87,8 @@ public class AlertService {
             incident = new Incident(request.service(), request.severity(), alert.getSummary(), receivedAt);
             incident.setAlertCount(1);
             incident = incidentRepository.save(incident);
+            // ponytail: 同服务不同告警并发创建的竞态窗口仍在（需要 partial unique
+            // index 或行锁才根治）；fingerprint 去重已挡住同指纹重复，窗口足够窄
             agentJobProducer.sendDiagnosisTask(incident.getId());
         }
 
@@ -89,14 +103,15 @@ public class AlertService {
     }
 
     public Optional<Incident> findActiveIncident(String service) {
+        // P1-CP-09: 精确匹配 + 状态/时间窗条件下推到 SQL（原 containing 忽略大小写
+        // 且把 payment-service-v2 误聚合进 payment-service）
         Instant since = Instant.now().minus(AGGREGATION_WINDOW);
-        List<Incident> candidates = incidentRepository.findByServiceContainingIgnoreCaseOrderByStartedAtDesc(service);
-        return candidates.stream()
-                .filter(i -> i.getStartedAt().isAfter(since))
-                .filter(i -> i.getStatus() == IncidentStatus.DETECTED
-                        || i.getStatus() == IncidentStatus.TRIAGING
-                        || i.getStatus() == IncidentStatus.DIAGNOSING)
-                .findFirst();
+        List<Incident> candidates = incidentRepository
+                .findByServiceAndStatusInAndStartedAtAfterOrderByStartedAtDesc(
+                        service,
+                        List.of(IncidentStatus.DETECTED, IncidentStatus.TRIAGING, IncidentStatus.DIAGNOSING),
+                        since);
+        return candidates.stream().findFirst();
     }
 
     public static String fingerprint(String service, String alertName, String resource) {
