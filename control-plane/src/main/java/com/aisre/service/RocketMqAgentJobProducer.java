@@ -36,12 +36,17 @@ public class RocketMqAgentJobProducer implements AgentJobProducer {
     private final AgentTaskRepository agentTaskRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final int maxSendAttempts;
+    private final org.springframework.transaction.support.TransactionTemplate requiresNewTx;
     private DefaultMQProducer producer;
 
     public RocketMqAgentJobProducer(AgentTaskRepository agentTaskRepository,
-                                    @Value("${aisre.task.max-send-attempts:20}") int maxSendAttempts) {
+                                    @Value("${aisre.task.max-send-attempts:20}") int maxSendAttempts,
+                                    org.springframework.transaction.PlatformTransactionManager transactionManager) {
         this.agentTaskRepository = agentTaskRepository;
         this.maxSendAttempts = maxSendAttempts;
+        this.requiresNewTx = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        this.requiresNewTx.setPropagationBehavior(
+                org.springframework.transaction.support.TransactionTemplate.PROPAGATION_REQUIRES_NEW);
     }
 
     @PostConstruct
@@ -97,12 +102,13 @@ public class RocketMqAgentJobProducer implements AgentJobProducer {
         task.setMqStatus("PENDING");
         task = agentTaskRepository.save(task);
         final Long taskId = task.getId();
-        // P1-CP-07: 提交后再发；发送失败/提交后崩溃由扫描器补发
+        // P1-CP-07: 提交后再发；发送失败/提交后崩溃由扫描器补发。
+        // P1-CP-11: afterCommit 里的写必须 REQUIRES_NEW（REQUIRED 会进死事务静默丢失）
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    attemptSend(taskId);
+                    requiresNewTx.executeWithoutResult(status -> attemptSend(taskId));
                 }
             });
         } else {

@@ -24,6 +24,10 @@ public class Incident {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** P1-CP-10: 乐观锁——并发状态推进（诊断回调 vs 人工 transition）丢更新防护。 */
+    @jakarta.persistence.Version
+    private Long version;
+
     @Column(nullable = false, length = 128)
     private String service;
 
@@ -68,6 +72,10 @@ public class Incident {
 
     public Long getId() {
         return id;
+    }
+
+    public Long getVersion() {
+        return version;
     }
 
     public void setId(Long id) {
