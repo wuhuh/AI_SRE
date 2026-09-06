@@ -155,6 +155,9 @@ class ControlPlaneChainTest {
         int paymentIncidents = poll(() -> countIncidentsFor("payment-service"),
                 n -> n == 1, "duplicate alert must be deduplicated (exactly 1 payment-service incident)");
         assertEquals(1, paymentIncidents);
+        // P1-CP-15: 重复告警不重复计数
+        JsonNode detail0 = getJson(base() + "/api/v1/incidents/" + incidentId);
+        assertEquals(1, detail0.path("alertCount").asInt(-1), "duplicate must not inflate alertCount");
 
         // ---- 3. diagnosis 回调（agent token；LOW 风险动作 auto-policy 自动批准）----
         mockBackends.enqueue(new MockResponse().setResponseCode(200)
