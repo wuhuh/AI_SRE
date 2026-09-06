@@ -20,6 +20,7 @@ from app.checkpoint import FileCheckpointStore
 from app.consumer import agent_headers, consumer_loop
 from app.llm.mock import MockLLMProvider
 from app.llm.openai_compatible import OpenAICompatibleLLMProvider
+from app.llm.retry import RetryLLMProvider
 from app.models import AgentState
 from app.rag.retriever import Document, HybridRetriever
 from app.tools.factory import create_default_registry
@@ -54,7 +55,12 @@ def _load_runbook_docs() -> list[Document]:
 
 def _build_runner() -> AgentRunner:
     if os.getenv("LLM_PROVIDER", "mock") == "openai":
-        llm = OpenAICompatibleLLMProvider()
+        # P1-AR-04: 重试边界——429 尊重 Retry-After（封顶），5xx 短退避，4xx 直接上抛
+        llm = RetryLLMProvider(
+            OpenAICompatibleLLMProvider(),
+            max_retries=int(os.getenv("LLM_MAX_RETRIES", "2")),
+            delay_seconds=float(os.getenv("LLM_RETRY_DELAY_SECONDS", "0.5")),
+        )
     else:
         llm = MockLLMProvider()
     registry = create_default_registry()
