@@ -231,16 +231,24 @@
   268→58 用例（真实质量用例全保留，OK 1 skip）；文档计数以 unittest 实际输出为准。
   验证：unittest 数量 = 真实用例数 ✅。Effort: S
 
-- [ ] **P1-T-02** Java 核心链路测试：@SpringBootTest+Testcontainers 覆盖 ingest→dedup→incident→diagnosis 回调→auto-approval→approval decide→remediation(MockWebServer)→verification；AuthInterceptor 矩阵测试。
-  验证：`mvn test` 全绿且覆盖上述路径。
+- [x] **P1-T-02** Java 核心链路测试：✅ ControlPlaneChainTest（commit 82f59ff）
+  @SpringBootTest + Testcontainers(POSTGRES+redis) + MockWebServer 覆盖
+  ingest→dedup(重放 duplicate=true)→incident→诊断回调→LOW 风险 auto-policy 自动批准
+  →remediation 断言(/api/k8s + X-Execution-Token)→VERIFYING→verification(RECOVERED)
+  →RESOLVED；HIGH 风险人工审批链 + AuthInterceptor 矩阵（无/坏 token 401、viewer 403、
+  admin 200、agent 错 token 401）。39/39 全绿（37+2）。
+  顺带修复：decide() 终态归一 APPROVED/REJECTED（原与 auto-policy 两种约定）。
   Effort: M-L
 
-- [ ] **P1-CI-01** CI 补 lint 与前端构建：`ruff check agent-runtime`；`npm --prefix web run build` job（FE-01 定版后）。
-  验证：CI 日志含 ruff 与 web build 步骤。
+- [x] **P1-CI-01** CI 补 lint 与前端构建：✅ ruff check agent-runtime + web build job
+  已入 CI（FE-01 定版后 npm ci 可复现）。验证：CI 步骤含 ruff 与 web build ✅。
   Effort: S
 
-- [ ] **P1-FE-01** 前端定版：删除 React 版（或修 vite entry + compose 改用镜像 + Dockerfile `npm ci`）；二选一后删除另一轨。
-  验证：`docker compose build frontend` 产物页面可用；仓库仅一套前端。
+- [x] **P1-FE-01** 前端定版：✅ 用户拍板保留 React(vite) 轨（commit 7a8543d）。
+  删静态轨（旧 index.html/app.js），React 入口改标准 index.html（原
+  index.react.html 非标准名导致 vite 永远构建静态轨）；Dockerfile `npm ci`
+  （lock 重生成同步）+ npmmirror；compose frontend 改构建镜像。
+  验证：`docker compose build frontend` 产物 /assets/index-*.js 200、/api 代理正常 ✅。
   Effort: S
 
 - [ ] **P1-DOC-04/05/06/07** 文档与代码对齐：架构图（直连 P/L/J + 轮询链路）、security.md 措辞（可重放 token/GET 公开/脱敏死代码）、production-readiness-audit.md 重写为现状。

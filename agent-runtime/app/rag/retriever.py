@@ -10,8 +10,8 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 TOKEN_RE = re.compile(r"[a-z0-9_]+")
 
