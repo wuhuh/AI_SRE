@@ -4,7 +4,7 @@ import json
 import logging
 import time
 
-from app.context import build_context
+from app.context import DATA_NOT_INSTRUCTIONS, build_context
 from app.llm.base import LLMProvider, Message
 from app.models import AgentState, DiagnosisResult, Evidence, ToolCall
 from app.tools.registry import ToolRegistry
@@ -197,6 +197,7 @@ class DiagnosticAgent:
         context = build_context(state, state.alert)
         labels = ", ".join(RCA_CANDIDATE_LABELS)
         prompt = (
+            f"{DATA_NOT_INSTRUCTIONS}\n"
             "Based on the collected evidence, either return a final diagnosis JSON "
             '({"rootCause": "<label>", "alternatives": ["<label>", "<label>"], '
             '"confidence": 0.0, "evidence": [], "recommendedActions": []}) '
