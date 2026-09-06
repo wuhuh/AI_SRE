@@ -5,14 +5,13 @@
 """
 from __future__ import annotations
 
-import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from app.agent.runner import AgentRunner
 from app.checkpoint import FileCheckpointStore
-from app.llm.base import LLMProvider, LLMResult
+from app.llm.base import LLMProvider
 from app.llm.mock import MockLLMProvider
 from app.tools.registry import ToolRegistry
 

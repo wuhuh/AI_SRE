@@ -30,11 +30,27 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements-dev.txt
+          pip install ruff
+      - name: Lint (ruff)
+        run: ruff check agent-runtime
       - name: Run unit tests
         working-directory: agent-runtime
         run: python -m unittest discover -s tests -v
       - name: Run all local tests
         run: python run_all_local_tests.py
+
+  web-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build web (React/vite)
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
 
   docker-build:
     runs-on: ubuntu-latest

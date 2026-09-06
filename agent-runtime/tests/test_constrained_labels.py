@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from app.agent.diagnostic import DiagnosticAgent, RCA_CANDIDATE_LABELS, normalize_label
+from app.agent.diagnostic import RCA_CANDIDATE_LABELS, DiagnosticAgent, normalize_label
 from app.llm.base import LLMProvider, LLMResult
 from app.llm.mock import MockLLMProvider
 from app.models import AgentState

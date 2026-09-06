@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.models import AgentState, Evidence, ToolCall
+from app.models import AgentState, Evidence
 
 MAX_RECENT_STEPS = 8
 MAX_CONTEXT_CHARS = 12_000

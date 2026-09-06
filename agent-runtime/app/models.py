@@ -5,8 +5,8 @@ installing FastAPI/Pydantic.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
-from typing import Any, Optional
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -15,7 +15,7 @@ class ToolCall:
     arguments: dict[str, Any]
     status: str = "PENDING"  # PENDING, SUCCESS, ERROR, TIMEOUT, DENIED
     result_summary: str = ""
-    error: Optional[str] = None
+    error: str | None = None
     duration_ms: int = 0
 
 
@@ -61,11 +61,11 @@ class AgentState:
     tool_results: dict[str, str] = field(default_factory=dict)
     evidence: list[Evidence] = field(default_factory=list)
     tool_calls: list[ToolCall] = field(default_factory=list)
-    diagnosis: Optional[DiagnosisResult] = None
-    verification: Optional[VerificationResult] = None
+    diagnosis: DiagnosisResult | None = None
+    verification: VerificationResult | None = None
     step: int = 0
     status: str = "CREATED"
-    error: Optional[str] = None
+    error: str | None = None
     # P0-03: 跨步累计 LLM token 用量
     llm_input_tokens: int = 0
     llm_output_tokens: int = 0

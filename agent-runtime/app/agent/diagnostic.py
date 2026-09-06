@@ -77,7 +77,6 @@ class DiagnosticAgent:
                 pass  # checkpoint 失败不应中断诊断
 
     def run(self, state: AgentState) -> DiagnosisResult:
-        import time
         start_time = time.monotonic()
         # P0-09: pending 存在 state 上（与 checkpoint 同持久化）——
         # 崩溃续跑时从剩余步骤继续，已完成工具不重复执行

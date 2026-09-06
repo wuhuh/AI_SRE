@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from app.idempotency import IdempotencyStore
 

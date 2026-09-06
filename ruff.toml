@@ -1,0 +1,15 @@
+# P1-CI-01: lint 门禁——选当前基线能绿且真正防退化的规则集；
+# BLE001/S110 等风格意见（traceback.print_exc 是刻意的失败可见化）不纳入
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = [
+    "E501",   # 行宽不设硬门禁（有 line-length 软约束）
+    "UP042",  # RiskLevel(str, Enum) 的 JSON 序列化语义依赖现状，不迁移 StrEnum
+]
+
+[lint.per-file-ignores]
+# app/main.py 刻意先配 root logger 再 import app.*（uvicorn 不配 root，import 期日志会丢）
+"agent-runtime/app/main.py" = ["E402"]

@@ -2,7 +2,7 @@ import json
 import unittest
 
 from app.agent.diagnostic import DiagnosticAgent
-from app.llm.base import LLMProvider, Message
+from app.llm.base import LLMProvider
 from app.llm.mock import MockLLMProvider
 from app.models import AgentState, LLMResult
 from app.tools.registry import ToolRegistry
