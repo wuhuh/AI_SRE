@@ -296,6 +296,13 @@ class ControlPlaneChainTest {
         }, s -> s != null, "reject must return incident to ROOT_CAUSE_FOUND for re-diagnosis");
         // decidedBy 取 JWT sub（P1-CP-12）
         assertTrue(decided.getBody().contains("admin"), "decidedBy should be the JWT subject (admin)");
+
+        // P1-CP-10: 非法流转 → 409（RESOLVED 之前从 DETECTED 直接跳 RESOLVED 被拒）
+        HttpHeaders adminH = jsonHeaders();
+        adminH.set("Authorization", "Bearer " + login("admin", "admin"));
+        assertEquals(409, post(base() + "/api/v1/incidents/" + incidentId + "/transition",
+                "{\"status\":\"RESOLVED\"}", adminH).getStatusCode().value(),
+                "illegal state transition must be rejected with 409");
     }
 
     // ---------- helpers ----------

@@ -148,11 +148,16 @@
   验证：并发 50 条同类告警 ≤1 incident；"api" 不聚合进 "api-gateway"。
   Effort: S-M
 
-- [ ] **P1-CP-10** 乐观锁与状态机强制：Incident 加 @Version；transition 条件 UPDATE；`transitionIfAllowed` 非法流转抛 409（去掉静默）。
+- [x] **P1-CP-10** 乐观锁与状态机强制：✅ Incident @Version（V6 迁移）+ 乐观锁冲突
+  统一映射 409；transitionIfAllowed 非法流转抛 409（同状态视为幂等重放放行）。
+  链 IT 断言 DETECTED→RESOLVED 非法流转 409。
   验证：并发 transition 仅一个成功；非法流转 409。
   Effort: S
 
-- [ ] **P1-CP-11** 事务边界：auto-remediation/triggerVerification 移出事务（提交后事件或 REQUIRES_NEW 先落行）；rootCause null 校验（配合 CP-18）。
+- [x] **P1-CP-11** 事务边界：✅ auto-remediation/approve 执行移到事务 afterCommit +
+  **REQUIRES_NEW 事务模板**（关键坑：afterCommit 里 REQUIRED 写会进已提交的死事务
+  静默丢失——IT 实测 executor HTTP 200 但状态不落，修复后 40/40 绿）；
+  rootCause @NotNull→@NotBlank。
   验证：HTTP 成功但后续事务失败 → remediation 行仍存在且状态明确。
   Effort: M
 

@@ -7,7 +7,9 @@ import com.aisre.repo.ApprovalRepository;
 import com.aisre.repo.IncidentRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.List;
@@ -22,12 +24,16 @@ public class ApprovalService {
     private final AuditService auditService;
     private final RemediationExecutor remediationExecutor;
     private final long approvalTtlSeconds;
+    private final TransactionTemplate requiresNewTx;
 
     public ApprovalService(ApprovalRepository approvalRepository,
                            IncidentRepository incidentRepository,
                            AuditService auditService,
                            RemediationExecutor remediationExecutor,
+                           PlatformTransactionManager transactionManager,
                            @Value("${aisre.approval.ttl-seconds:3600}") long approvalTtlSeconds) {
+        this.requiresNewTx = new TransactionTemplate(transactionManager);
+        this.requiresNewTx.setPropagationBehavior(TransactionTemplate.PROPAGATION_REQUIRES_NEW);
         this.approvalRepository = approvalRepository;
         this.incidentRepository = incidentRepository;
         this.auditService = auditService;
@@ -99,12 +105,32 @@ public class ApprovalService {
             }
         });
         if (decision.equals("APPROVE")) {
-            remediationExecutor.execute(incidentId, approval);
+            // P1-CP-11: 修复执行移出事务（afterCommit），不拖长 DB 事务
+            final Long execIncidentId = incidentId;
+            runAfterCommit(() -> remediationExecutor.execute(execIncidentId, approval));
         }
         // P0-07: operator 缺省时不能让审计表 NOT NULL 约束把整个决策事务炸掉
         String operator = request.operator() == null || request.operator().isBlank()
                 ? "unknown-operator" : request.operator();
         auditService.record(incidentId, operator, "APPROVAL_DECIDED", terminalStatus);
         return approval;
+    }
+
+    /**
+     * P1-CP-11: 事务提交后执行副作用。afterCommit 里 REQUIRED 写会进死事务静默丢失，
+     * 必须 REQUIRES_NEW；无事务时直接执行。
+     */
+    private void runAfterCommit(Runnable action) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager
+                    .registerSynchronization(new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            requiresNewTx.executeWithoutResult(status -> action.run());
+                        }
+                    });
+        } else {
+            action.run();
+        }
     }
 }

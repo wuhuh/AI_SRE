@@ -23,7 +23,9 @@ import com.aisre.state.IncidentStateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.List;
@@ -44,6 +46,7 @@ public class AgentResultService {
     private final IncidentEventService eventService;
     private final ApprovalRepository approvalRepository;
     private final RemediationExecutor remediationExecutor;
+    private final TransactionTemplate requiresNewTx;
 
     public AgentResultService(IncidentRepository incidentRepository,
                               EvidenceRepository evidenceRepository,
@@ -53,7 +56,10 @@ public class AgentResultService {
                               AuditService auditService,
                               IncidentEventService eventService,
                               ApprovalRepository approvalRepository,
-                              RemediationExecutor remediationExecutor) {
+                              RemediationExecutor remediationExecutor,
+                              PlatformTransactionManager transactionManager) {
+        this.requiresNewTx = new TransactionTemplate(transactionManager);
+        this.requiresNewTx.setPropagationBehavior(TransactionTemplate.PROPAGATION_REQUIRES_NEW);
         this.incidentRepository = incidentRepository;
         this.evidenceRepository = evidenceRepository;
         this.toolCallRepository = toolCallRepository;
@@ -157,8 +163,10 @@ public class AgentResultService {
                     );
                     autoApproval.setDecidedBy("auto-policy");
                     autoApproval.setDecidedAt(Instant.now());
-                    autoApproval = approvalRepository.save(autoApproval);
-                    remediationExecutor.execute(incidentId, autoApproval);
+                    final Approval savedAuto = approvalRepository.save(autoApproval);
+                    // P1-CP-11: 修复执行（HTTP 外呼）移出事务——提交后再执行，
+                    // 不让 tool-server 的网络延迟拖长 DB 事务/持锁
+                    runAfterCommit(() -> remediationExecutor.execute(incidentId, savedAuto));
                 }
             }
         }
@@ -277,8 +285,34 @@ public class AgentResultService {
     }
 
     private void transitionIfAllowed(Incident incident, IncidentStatus target) {
-        if (IncidentStateMachine.canTransition(incident.getStatus(), target)) {
-            incident.setStatus(target);
+        // P1-CP-10: 同状态视为幂等重放（回调重试），放行不抛；其余非法流转抛 409
+        // （原静默忽略会掩盖真实的状态机破坏）
+        if (incident.getStatus() == target) {
+            return;
+        }
+        if (!IncidentStateMachine.canTransition(incident.getStatus(), target)) {
+            throw new IllegalStateException(
+                    "Invalid incident transition: " + incident.getStatus() + " -> " + target);
+        }
+        incident.setStatus(target);
+    }
+
+    /**
+     * P1-CP-11: 事务提交后执行副作用（HTTP 外呼/修复落行）。
+     * 关键：afterCommit 里不能再往"已提交的死事务"上写（REQUIRED 会静默丢失），
+     * 必须用 REQUIRES_NEW 开新事务；无事务时直接执行。
+     */
+    private void runAfterCommit(Runnable action) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager
+                    .registerSynchronization(new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            requiresNewTx.executeWithoutResult(status -> action.run());
+                        }
+                    });
+        } else {
+            action.run();
         }
     }
 }

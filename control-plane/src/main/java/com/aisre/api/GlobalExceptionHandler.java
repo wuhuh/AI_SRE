@@ -26,6 +26,19 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    /** P1-CP-10: 乐观锁冲突（并发状态推进）→ 409，可重试。 */
+    @ExceptionHandler({
+            org.springframework.dao.OptimisticLockingFailureException.class,
+            jakarta.persistence.OptimisticLockException.class
+    })
+    public ResponseEntity<Map<String, Object>> handleOptimisticLock(Exception ex) {
+        log.warn("optimistic lock conflict: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "timestamp", Instant.now().toString(),
+                "message", "concurrent modification, please retry"
+        ));
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleConflict(IllegalStateException ex) {
         log.warn("conflict: {}", ex.getMessage());
