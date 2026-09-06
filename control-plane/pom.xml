@@ -150,6 +150,13 @@
                     <artifactId>postgresql</artifactId>
                     <scope>test</scope>
                 </dependency>
+                <!-- P1-T-02: 全链路 IT 需要 MockWebServer 模拟 tool-server / agent-runtime -->
+                <dependency>
+                    <groupId>com.squareup.okhttp3</groupId>
+                    <artifactId>mockwebserver</artifactId>
+                    <version>4.12.0</version>
+                    <scope>test</scope>
+                </dependency>
             </dependencies>
         </profile>
     </profiles>
