@@ -49,6 +49,8 @@ class VerificationResult:
     status: str  # RECOVERED, NOT_RECOVERED, UNKNOWN
     detail: str
     evidence: list[Evidence] = field(default_factory=list)
+    # P1-AR-06: SLI 实测值（RECOVERED 必须带证据；空 = Prometheus 无数据）
+    sli: dict = field(default_factory=dict)
 
 
 @dataclass
