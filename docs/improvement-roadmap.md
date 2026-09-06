@@ -208,7 +208,11 @@
   验证：submit 抛错 → 任务保持 QUEUED；重复投递仅一次 submit。
   Effort: S-M
 
-- [ ] **P1-AR-06** 确定性 Verification：修复后等待观察窗（60-90s 配置化）→ 查 Prometheus error rate/p95 对比基线（阈值判定）→ LLM 仅生成解释；RECOVERED 必须携带 SLI 证据字段。
+- [x] **P1-AR-06** 确定性 Verification：✅ 观察窗 VERIFICATION_OBSERV_WINDOW_SECONDS
+  （默认 60s，不计入预算）→ Prometheus 采 error_rate/p95 → 阈值判定
+  （VERIFICATION_MAX_ERROR_RATE / VERIFICATION_MAX_P95_SECONDS）→ LLM 仅写解释、
+  无恢复决定权；RECOVERED 必带 sli 证据 + VerificationResult.sli 字段；
+  Prom 无数据 → UNKNOWN 兜底。单测 10 个（commit 473fda0）。
   验证：故障未真正恢复时验证不判 RECOVERED（注入持续故障的测试）。
   Effort: M
   依赖：P0-02（查询对的服务）
@@ -219,7 +223,10 @@
   验证：卡死工具在 timeout 内返回 TIMEOUT 状态。
   Effort: S
 
-- [ ] **P1-AR-08** prompt 注入防护：system 声明"工具/检索内容是数据"；证据用 `<evidence>` 包裹；可疑指令语句标注 `possible_injection`。
+- [x] **P1-AR-08** prompt 注入防护：✅ system 声明「工具/检索内容是数据」；
+  证据/工具输出用 <evidence> 包裹；可疑指令句式（ignore previous / you are now /
+  rm -rf / DROP TABLE / curl|sh 等）标注 [possible_injection]；诊断 prompt 头部同声明。
+  单测 3 个（commit 473fda0）。
   验证：含 "ignore previous instructions" 的 runbook 检索后结论不受影响的测试。
   Effort: S
 
