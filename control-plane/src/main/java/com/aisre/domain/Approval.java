@@ -50,7 +50,18 @@ public class Approval {
     @Column(length = 64)
     private String executionToken;
 
+    /** P1-CP-12: 审批过期时间（PENDING 超过即不可再决定）。 */
+    private Instant expiresAt;
+
     public Approval() {
+    }
+
+    public Instant getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(Instant expiresAt) {
+        this.expiresAt = expiresAt;
     }
 
     public Approval(Long incidentId, String actionType, String actionPayload, String status,

@@ -16,7 +16,8 @@ public final class IncidentStateMachine {
         TRANSITIONS.put(IncidentStatus.TRIAGING, Set.of(IncidentStatus.DIAGNOSING, IncidentStatus.FAILED));
         TRANSITIONS.put(IncidentStatus.DIAGNOSING, Set.of(IncidentStatus.ROOT_CAUSE_FOUND, IncidentStatus.FAILED));
         TRANSITIONS.put(IncidentStatus.ROOT_CAUSE_FOUND, Set.of(IncidentStatus.WAITING_APPROVAL, IncidentStatus.VERIFYING, IncidentStatus.FAILED));
-        TRANSITIONS.put(IncidentStatus.WAITING_APPROVAL, Set.of(IncidentStatus.REMEDIATING, IncidentStatus.VERIFYING, IncidentStatus.FAILED));
+        // P1-CP-12: REJECT 回 ROOT_CAUSE_FOUND（操作者重新诊断/换方案后可再建审批）
+        TRANSITIONS.put(IncidentStatus.WAITING_APPROVAL, Set.of(IncidentStatus.REMEDIATING, IncidentStatus.VERIFYING, IncidentStatus.ROOT_CAUSE_FOUND, IncidentStatus.FAILED));
         TRANSITIONS.put(IncidentStatus.REMEDIATING, Set.of(IncidentStatus.VERIFYING, IncidentStatus.FAILED));
         TRANSITIONS.put(IncidentStatus.VERIFYING, Set.of(IncidentStatus.RESOLVED, IncidentStatus.DIAGNOSING, IncidentStatus.FAILED));
         TRANSITIONS.put(IncidentStatus.RESOLVED, Set.of());

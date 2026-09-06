@@ -263,6 +263,41 @@ class ControlPlaneChainTest {
                 "{\"rootCause\":\"x\"}", wrongAgent).getStatusCode().value());
     }
 
+    @Test
+    @Order(3)
+    void rejectApprovalReturnsIncidentToRootCauseFound() {
+        // P1-CP-12: REJECT 推进 WAITING_APPROVAL → ROOT_CAUSE_FOUND
+        post(base() + "/api/v1/alerts/alertmanager",
+                alertmanagerBody("inventory-service", "HighMemory"), null);
+        Long incidentId = poll(() -> findIncidentByService("inventory-service"),
+                id -> id != null, "incident for inventory-service should be created");
+
+        assertEquals(200, post(base() + "/api/v1/incidents/" + incidentId + "/diagnosis",
+                "{\"taskId\": 3, \"rootCause\": \"memory_leak\", \"confidence\": 0.8, "
+                        + "\"recommendedActions\": [\"delete_pod\"], "
+                        + "\"evidence\": [{\"source\": \"prometheus\", \"key\": \"mem\", \"content\": \"rising\"}]}",
+                agentHeaders()).getStatusCode().value());
+        poll(() -> {
+            JsonNode detail = getJson(base() + "/api/v1/incidents/" + incidentId);
+            return "WAITING_APPROVAL".equals(detail.path("status").asText()) ? "WAITING_APPROVAL" : null;
+        }, s -> s != null, "high risk action must wait for human approval");
+
+        Long approvalId = findPendingApprovalId(incidentId);
+        assertNotNull(approvalId, "PENDING approval should exist");
+        HttpHeaders admin = jsonHeaders();
+        admin.set("Authorization", "Bearer " + login("admin", "admin"));
+        ResponseEntity<String> decided = post(base() + "/api/v1/approvals/" + approvalId + "/decision",
+                "{\"decision\":\"REJECT\",\"comment\":\"wrong plan, keep the pod\"}", admin);
+        assertEquals(200, decided.getStatusCode().value());
+        assertTrue(decided.getBody().contains("REJECTED"), "reject should persist terminal status REJECTED");
+        poll(() -> {
+            JsonNode detail = getJson(base() + "/api/v1/incidents/" + incidentId);
+            return "ROOT_CAUSE_FOUND".equals(detail.path("status").asText()) ? "ROOT_CAUSE_FOUND" : null;
+        }, s -> s != null, "reject must return incident to ROOT_CAUSE_FOUND for re-diagnosis");
+        // decidedBy 取 JWT sub（P1-CP-12）
+        assertTrue(decided.getBody().contains("admin"), "decidedBy should be the JWT subject (admin)");
+    }
+
     // ---------- helpers ----------
 
     private ResponseEntity<String> post(String url, String body, HttpHeaders headers) {
