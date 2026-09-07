@@ -352,7 +352,10 @@
   实测：9/9 targets up；真实故障 21 次工具调用 + 3 次诊断 + p90 0.9s 全部入库。
   验证：Grafana 有平台面板；停 agent-runtime 有 ServiceDown 告警。
 - [ ] **P2-FI-09** SLO recording rules（availability/p95/error rate）+ 最小 error budget 面板。
-- [ ] **P2-FI-10** 评估期望证据与真实机制对齐（随 P0-08）。
+- [x] **P2-FI-10** Evidence Recall 指标语义修正：✅ 期望标签按关键词拆分在
+  证据 key+source+content 上匹配（旧实现只对 `tool:step` 序号 key 精确匹配 →
+  recall 恒 0 失真）；precision=命中证据占比、recall=命中标签占比；测试更新
+  （语义匹配/部分命中/空期望三例）。
 - [ ] **P2-T-04** 集成测试加迁移+仓库冒烟；CI 加 `-Pintegration verify`（services: docker）。
 - [ ] **P2-T-05** contract test 对真 CP 跑（Testcontainers 起真 CP）。
 - [ ] **P2-FE-02** Playwright 冒烟（3-5 用例：列表/详情/审批 401）。
