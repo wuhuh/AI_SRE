@@ -83,9 +83,11 @@ def setup(service_name: str, otlp_endpoint: str | None = None, metrics_port: int
     for handler in logging.root.handlers:
         handler.addFilter(ContextFilter(service_name))
     # P3-FI-11: access log 走根格式——uvicorn.access 默认自带的 formatter 不带
-    # traceId/requestId（audit FI-11「access log 无 traceId」）
-    logging.getLogger("uvicorn.access").handlers = []
-    logging.getLogger("uvicorn.access").propagate = True
+    # traceId/requestId（audit FI-11「access log 无 traceId」）。直接把根 handler
+    # 挂到 uvicorn.access（propagate=False），替换其默认 StreamHandler。
+    access_logger = logging.getLogger("uvicorn.access")
+    access_logger.handlers = list(logging.root.handlers)
+    access_logger.propagate = False
     if _OTEL_AVAILABLE:
         resource = Resource.create({
             SERVICE_NAME: service_name,
