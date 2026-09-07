@@ -24,6 +24,10 @@ import { formatRootCause } from './theme';
 
 const { Header, Content } = Layout;
 
+// P3-FE-04: API base 注入点 —— 默认同源（nginx/vite 代理），构建期可用
+// VITE_API_BASE 注入其它后端地址（如直连 CP :8080）
+const API_BASE = import.meta.env.VITE_API_BASE || '';
+
 export default function App() {
   const [incidents, setIncidents] = useState([]);
   const [services, setServices] = useState([]);
@@ -39,8 +43,10 @@ export default function App() {
   const [error, setError] = useState('');
 
   // P2-FE-03: 统一 fetch —— 401 清 token 提示重登，非 2xx 抛错由调用方提示
+  // P3-FE-04: 相对路径统一挂 API_BASE
   const apiFetch = async (url, opts = {}) => {
-    const res = await fetch(url, { ...opts, headers: { ...authHeaders(), ...(opts.headers || {}) } });
+    const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
+    const res = await fetch(fullUrl, { ...opts, headers: { ...authHeaders(), ...(opts.headers || {}) } });
     if (res.status === 401) {
       setAuthToken('');
       localStorage.removeItem('aisre_token');
@@ -76,7 +82,7 @@ export default function App() {
     if (!username) return;
     const password = window.prompt('密码');
     if (!password) return;
-    const res = await fetch('/api/v1/auth/login', {
+    const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -125,7 +131,7 @@ export default function App() {
     let disposed = false;
     const connect = () => {
       if (disposed) return;
-      es = new EventSource('/api/v1/stream/incidents');
+      es = new EventSource(`${API_BASE}/api/v1/stream/incidents`);
       es.onmessage = () => load();
       es.onopen = () => { attempt = 0; };
       es.onerror = () => {
@@ -206,7 +212,8 @@ export default function App() {
       children: steps.length === 0 ? <Typography.Text type="secondary">暂无步骤</Typography.Text> : (
         <Timeline
           items={steps.map((s) => ({
-            children: `${s.stepType} - ${s.outputSummary || s.inputSummary || ''}`,
+            // P3-FE-04: 真实 createdAt（此前只有步骤文字，时间戳失真为渲染时刻）
+            children: `${s.createdAt ? new Date(s.createdAt).toLocaleTimeString() + ' ' : ''}${s.stepType} - ${s.outputSummary || s.inputSummary || ''}`,
           }))}
         />
       ),
