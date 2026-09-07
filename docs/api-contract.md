@@ -42,20 +42,26 @@ Response:
 
 ## Alertmanager Webhook
 
-`POST /api/v1/alerts`
+`POST /api/v1/alerts/alertmanager`（P0-07 v4 契约端点；需 `X-Webhook-Token`）
 
 ```json
 {
-  "service": "payment-service",
-  "alertName": "latency_high",
-  "resource": "payment-1",
-  "severity": "P1",
-  "summary": "payment p99 high",
-  "labels": {"service": "payment-service"}
+  "version": "4",
+  "status": "firing",
+  "alerts": [
+    {
+      "labels": {"service": "payment-service", "alertname": "latency_high", "severity": "P1"},
+      "annotations": {"summary": "payment p99 high"},
+      "startsAt": "2026-09-07T00:00:00Z"
+    }
+  ]
 }
 ```
 
-Response: `202 {"incidentId": 1, "duplicate": false}`
+Response: `202 {"results": [...], "skippedResolved": 0}`
+
+（遗留直连端点 `POST /api/v1/alerts` 仍存在但需 JWT ADMIN/OPERATOR，k6/脚本
+统一走 alertmanager 端点。）
 
 ## REST API 汇总
 
@@ -77,10 +83,14 @@ Response: `202 {"incidentId": 1, "duplicate": false}`
 | GET | `/api/v1/dashboard/summary` | Dashboard summary stats |
 | POST | `/api/v1/approvals` | Create approval request |
 | POST | `/api/v1/approvals/{id}/decision` | Approve/reject high-risk action |
+| GET | `/api/v1/approvals/incident/{id}` | List approvals of an incident |
 | POST | `/api/v1/auth/login` | Login and get JWT |
 | POST | `/mcp` | MCP-style JSON-RPC tool discovery/call |
 | GET | `/api/v1/tasks/pending` | List pending agent tasks |
+| POST | `/api/v1/tasks/{id}/claim` | Atomic claim (QUEUED→RUNNING) |
 | POST | `/api/v1/tasks/{id}/complete` | Mark agent task complete |
+| POST | `/api/v1/tasks/{id}/fail` | Mark agent task failed（租约回收兜底） |
+| GET | `/api/v1/dashboard/services` | Service health list |
 | GET | `/api/v1/stream/incidents` | SSE stream for incident events |
 | POST | `/api/v1/agent/diagnose` | Agent diagnosis (Agent Runtime) |
 | POST | `/api/v1/agent/verify` | Recovery verification (Agent Runtime) |
