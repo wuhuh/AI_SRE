@@ -165,6 +165,9 @@ FAILED
 | `database` | Database 只读 | READ_ONLY |
 | `retrieve_runbook` | RAG | READ_ONLY |
 
+> 风险来源（P2-CP-23）：工具风险=agent 端 ToolSpec（执行时盖章落库 tool_call.risk_level）；
+> 动作风险（restart_pod 等）=CP 端 RiskPolicy 静态表（未知动作 fail-closed→HIGH_RISK）。
+
 ### 2.4 规则兜底诊断
 
 - LLM 失败 / unknown 时自动根据 Alert 推断：
@@ -200,7 +203,7 @@ runbook → retrieve_runbook
 
 ### 2.7 测试
 
-- Python 单元测试：240 个
+- Python 单元测试：73 个（agent-runtime）+ 12 个（evaluation）
 - 覆盖：
   - Tool Registry
   - RAG
@@ -261,10 +264,11 @@ POST /faults?name=xxx&enabled=true|false
 
 | 故障 | 服务 | 效果 |
 | --- | --- | --- |
-| `redis_pool_exhausted` | payment-service | `/payments` 返回 503 |
-| `redis_slow_command` | payment-service | 延迟 1.5s |
-| `slow_sql` | inventory-service | 延迟 2s |
-| `cpu_saturation` | inventory-service | 请求降级 |
+| `redis_pool_exhausted` | payment-service | 真实占满 Redis 连接（BLPOP 驻留）→ `/payments` 503 |
+| `redis_slow_command` | payment-service | 命令延迟 1.5s |
+| `memory_pressure` | inventory-service | 每请求分配 ~30MB 短命对象 |
+| `slow_sql` | inventory-service | 查询延迟 2s |
+| `cpu_saturation` | inventory-service | 进程内真实 CPU 烧（hashlib，P0-08）→ process_cpu 可见 |
 
 ---
 
@@ -369,10 +373,10 @@ Final（Full Tool Calling）：100%
 ### 9.1 本地测试
 
 ```text
-Python 单元测试：240 个通过
-Java 单元测试：通过
-本地 Contract Test：通过
-本地完整 E2E：通过
+Python 单元测试：73 + 12 个通过（2026-09-07）
+Java 集成链路（testcontainers 真实链路）：42 个通过
+Web Playwright 冒烟（compose 真 CP）：5 个通过
+本地契约冒烟：通过（e2e/local_contract_smoke.py —— mock 契约验证，非真闭环）
 ```
 
 ### 9.2 Docker E2E

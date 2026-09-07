@@ -16,7 +16,7 @@ def run(cmd, cwd=ROOT):
 def main() -> int:
     checks = [
         ([sys.executable, "-m", "unittest", "discover", "-s", "tests"], ROOT / "agent-runtime"),
-        ([sys.executable, "e2e/local_e2e_runner.py"], ROOT),
+        ([sys.executable, "e2e/local_contract_smoke.py"], ROOT),
         ([sys.executable, "evaluation/runner/run_baseline.py"], ROOT),
     ]
     for cmd, cwd in checks:

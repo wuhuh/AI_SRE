@@ -29,7 +29,7 @@ python -m unittest discover -s tests/e2e -v
 如果当前机器无法使用 Docker，可以用本地轻量 HTTP 服务跑通同一套 E2E 用例：
 
 ```powershell
-python e2e/local_e2e_runner.py
+python e2e/local_contract_smoke.py
 ```
 
 该 runner 会启动：

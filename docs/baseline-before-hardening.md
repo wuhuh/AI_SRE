@@ -19,7 +19,7 @@
 | Test | Result |
 | --- | --- |
 | Java Unit Tests | Passed |
-| Python Unit Tests | 240 passed |
+| Python Unit Tests | 240 passed（基线历史值） |
 | Local Contract Test | Passed |
 | Local E2E | 3 passed |
 | Docker E2E | 3 passed |

@@ -14,9 +14,9 @@ import urllib.request
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RUNNER_PATH = PROJECT_ROOT / "e2e" / "local_e2e_runner.py"
+RUNNER_PATH = PROJECT_ROOT / "e2e" / "local_contract_smoke.py"
 
-spec = importlib.util.spec_from_file_location("local_e2e_runner", RUNNER_PATH)
+spec = importlib.util.spec_from_file_location("local_contract_smoke", RUNNER_PATH)
 local_e2e = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(local_e2e)

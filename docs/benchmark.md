@@ -38,9 +38,9 @@
 | 慢 SQL E2E | OK |
 | 2 个 E2E 总耗时 | ~47s |
 | Contract Test | OK（16s 左右） |
-| Python 单元测试 | 222 个 OK |
+| Python 单元测试 | 73 个 OK（agent-runtime，2026-09-07 实测） |
 
-> 该数据来自 `python e2e/local_e2e_runner.py`，不是虚构数据。
+> 该数据来自 `python e2e/local_contract_smoke.py`，不是虚构数据。
 
 ## Baseline 对比（本地可复现）
 

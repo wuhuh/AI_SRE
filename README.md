@@ -148,7 +148,7 @@ cd control-plane && mvn -o test
 cd agent-runtime && python -m unittest discover -s tests
 
 # 本地完整 E2E（无需 Docker）
-python e2e/local_e2e_runner.py
+python e2e/local_contract_smoke.py
 
 # 本地 Agent Benchmark
 python e2e/local_benchmark_runner.py
@@ -206,7 +206,10 @@ docs/                架构/进度/技术评审/基准
 
 ## Future Work
 
-- 接入真实 LLM Provider 与 pgvector
-- 前端 Dashboard（React + Ant Design）
-- Chaos Mesh 故障注入
-- 更多 Evaluation Case 与自动化报告
+- 接入真实 LLM Provider（当前 mock / openai-compatible）与 pgvector 真实 embedding
+- Chaos Mesh 故障注入实测（P2-FI-07 后需真实集群，见 docs/improvement-roadmap.md）
+- K8s 修复执行与 RBAC/NetworkPolicy 实测（P0-10/P2-K8S-01）
+- CD：镜像推送与不可变 tag（P3）
+- 更多 Evaluation Case 与 Held-out split（P2-BM 后续）
+
+> 当前完整现状与差距见 docs/production-readiness-audit.md 与 docs/limitations.md。
