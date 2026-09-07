@@ -314,10 +314,17 @@
 
 # P2
 
-- [ ] **P2-CP-19** SSE 心跳+onError+并行发送（多实例留 Redis pub/sub 注释）。
-- [ ] **P2-CP-20** findAll 扫描改派生查询（list/dashboard/findActiveIncident）。
-- [ ] **P2-CP-21** 健康检查统一配置+并行+依赖检查（readiness/liveness 分离）。
-- [ ] **P2-CP-22** 死代码清理（Runbook/EvaluationCase 实体、updateRootCause、Incident.report、包装类）。
+- [x] **P2-CP-19** SSE 心跳+onError+并行发送：✅ 15s heartbeat（防中间层断链）+
+  onError/onTimeout/onCompletion 三清理；单实例进程内广播（多实例 Redis pub/sub 注释已留）。
+- [x] **P2-CP-20** findAll 扫描改派生查询：✅ list(null)→findAllByOrderByStartedAtDesc；
+  dashboard/summary→countByStatus/countByStatusIn 下推 DB（恢复时长仍取已解决行）。
+- [x] **P2-CP-21** 健康检查统一：✅ /health 并行探测 DB+Redis（CompletableFuture，
+  10s 超时）→ ok/degraded；management.endpoint.health.probes.enabled=true
+  （/actuator/health/{liveness,readiness}，管理端口 8085）。
+- [x] **P2-CP-22** 死代码清理：✅ 删 Runbook/EvaluationCase 实体+repo（V8 drop 表）、
+  Incident.report、updateRootCause、TimeoutLLMProvider 假超时包装（超时由 httpx +
+  RetryLLMProvider 边界负责）。教训：删实体后必须 clean 重编译（增量编译残留 stale
+  class 会骗过 schema validate）。
 - [ ] **P2-CP-23** Agent 链路关联（taskId 传递；riskLevel 由 RiskPolicy 填充）。
 - [ ] **P2-CP-24** 随 P1-T-02 覆盖。
 - [ ] **P2-AR-09** Evidence 字段扩展（timestamp/query/time_range）；DiagnosisResult.status 语义（UNKNOWN/TIMEOUT）。

@@ -28,9 +28,8 @@ public class IncidentService {
 
     public List<Incident> list(IncidentStatus status) {
         if (status == null) {
-            return incidentRepository.findAll().stream()
-                    .sorted((a, b) -> b.getStartedAt().compareTo(a.getStartedAt()))
-                    .toList();
+            // P2-CP-20: 派生查询替代 findAll + 内存排序
+            return incidentRepository.findAllByOrderByStartedAtDesc();
         }
         return incidentRepository.findByStatusOrderByStartedAtDesc(status);
     }
@@ -52,17 +51,6 @@ public class IncidentService {
         Incident saved = incidentRepository.save(incident);
         auditService.record(id, "system", "INCIDENT_TRANSITION", from + " -> " + next);
         eventService.publish(id, "INCIDENT_TRANSITION", Map.of("from", from, "to", next));
-        return saved;
-    }
-
-    @Transactional
-    public Incident updateRootCause(Long id, String rootCause, Double confidence) {
-        Incident incident = get(id);
-        incident.setRootCause(rootCause);
-        incident.setConfidence(confidence);
-        Incident saved = incidentRepository.save(incident);
-        auditService.record(id, "agent", "ROOT_CAUSE_UPDATED", rootCause);
-        eventService.publish(id, "ROOT_CAUSE_UPDATED", Map.of("rootCause", rootCause));
         return saved;
     }
 }

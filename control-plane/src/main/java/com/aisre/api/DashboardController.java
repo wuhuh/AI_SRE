@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -32,27 +33,24 @@ public class DashboardController {
 
     @GetMapping("/summary")
     public Map<String, Object> summary() {
-        List<Incident> incidents = incidentRepository.findAll();
-        long resolved = incidents.stream().filter(i -> i.getStatus() == IncidentStatus.RESOLVED).count();
-        long diagnosing = incidents.stream()
-                .filter(i -> i.getStatus() == IncidentStatus.DETECTED
-                        || i.getStatus() == IncidentStatus.TRIAGING
-                        || i.getStatus() == IncidentStatus.DIAGNOSING
-                        || i.getStatus() == IncidentStatus.ROOT_CAUSE_FOUND)
-                .count();
-        long waitingApproval = incidents.stream()
-                .filter(i -> i.getStatus() == IncidentStatus.WAITING_APPROVAL)
-                .count();
-        long failed = incidents.stream().filter(i -> i.getStatus() == IncidentStatus.FAILED).count();
+        // P2-CP-20: 聚合下推到 DB（count 查询 + 仅恢复时长取已解决行）
+        long total = incidentRepository.count();
+        long resolved = incidentRepository.countByStatus(IncidentStatus.RESOLVED);
+        long diagnosing = incidentRepository.countByStatusIn(List.of(
+                IncidentStatus.DETECTED, IncidentStatus.TRIAGING,
+                IncidentStatus.DIAGNOSING, IncidentStatus.ROOT_CAUSE_FOUND));
+        long waitingApproval = incidentRepository.countByStatus(IncidentStatus.WAITING_APPROVAL);
+        long failed = incidentRepository.countByStatus(IncidentStatus.FAILED);
 
-        double avgRecoverySeconds = incidents.stream()
+        double avgRecoverySeconds = incidentRepository.findByStatusOrderByStartedAtDesc(IncidentStatus.RESOLVED)
+                .stream()
                 .filter(i -> i.getResolvedAt() != null && i.getStartedAt() != null)
                 .mapToLong(i -> Duration.between(i.getStartedAt(), i.getResolvedAt()).getSeconds())
                 .average()
                 .orElse(0.0);
 
         return Map.of(
-                "total", incidents.size(),
+                "total", total,
                 "resolved", resolved,
                 "diagnosing", diagnosing,
                 "waitingApproval", waitingApproval,

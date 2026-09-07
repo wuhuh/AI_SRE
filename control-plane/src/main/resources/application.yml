@@ -34,6 +34,11 @@ management:
   # P1-CP-14: 管理端点独立端口（默认 8085），不再与业务端口同面暴露
   server:
     port: ${MANAGEMENT_PORT:8085}
+  # P2-CP-21: readiness/liveness 分离探针（/actuator/health/{liveness|readiness}）
+  endpoint:
+    health:
+      probes:
+        enabled: true
   endpoints:
     web:
       exposure:
