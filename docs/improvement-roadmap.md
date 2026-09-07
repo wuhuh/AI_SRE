@@ -458,6 +458,9 @@
 - [x] **P3-CI-05** gitleaks + kubeconform 接 CI：✅ secret-scan job
   （gitleaks v8.21.2 detect --redact，命中 exit 1）+ k8s-validate job
   （kubeconform v0.6.7 -strict deploy/k8s）。
+  → **本地实测（round 18）**：kubeconform 36/36 valid（实测抓到并修复
+  control-plane.yaml 重复 ports 块 + network-policy 分隔符拼行）；
+  gitleaks 0 leaks（实测 2 处误报入 .gitleaksignore：HPA 字段/测试假样本）。
 - [x] **P3-FE-04** API base 注入点；timeline 真实 createdAt：✅ App.jsx
   `API_BASE = import.meta.env.VITE_API_BASE || ''`（apiFetch + login 统一挂）；
   Agent 步骤 Timeline 前缀 `new Date(s.createdAt)`（AgentStep.createdAt 实存）。

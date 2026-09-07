@@ -68,7 +68,8 @@ spec:
               app: agent-runtime
       ports:
         - protocol: TCP
-          port: 8080---
+          port: 8080
+---
 # P2-K8S-01: DNS egress——default-deny 下不放行 53 端口，所有 Pod 的
 # 服务发现（CoreDNS）都被拒，这是原清单断网的首因
 apiVersion: networking.k8s.io/v1

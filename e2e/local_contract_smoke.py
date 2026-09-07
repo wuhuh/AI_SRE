@@ -149,11 +149,25 @@ class ControlPlaneHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0]
+        # P0-06 契约：e2e 套件 setUpClass 先登录拿 JWT（mock 直接发固定 token）
+        if path == "/api/v1/auth/login":
+            return self._send(200, {"token": "mock-jwt-token"})
         if path == "/api/v1/alerts":
             data = read_json(self)
             service = data.get("service", "unknown")
             incident = create_incident(service, data.get("summary", ""))
             return self._send(202, {"incidentId": incident["id"], "duplicate": False})
+        # P0-07 v4 契约（与 compose CP 对齐）：AM webhook 结构 + X-Webhook-Token
+        if path == "/api/v1/alerts/alertmanager":
+            data = read_json(self)
+            alerts = data.get("alerts", [])
+            results = []
+            for a in alerts:
+                labels = a.get("labels", {})
+                service = labels.get("service", "unknown")
+                incident = create_incident(service, a.get("annotations", {}).get("summary", ""))
+                results.append({"incidentId": incident["id"], "duplicate": False})
+            return self._send(202, {"results": results, "skippedResolved": 0})
         task_parts = path.strip("/").split("/")
         if len(task_parts) == 5 and task_parts[0] == "api" and task_parts[1] == "v1" and task_parts[2] == "tasks" and task_parts[4] == "claim":
             # P1-MQ-02: 模拟原子领取 —— QUEUED → RUNNING；已领走的返回 claimed=false
