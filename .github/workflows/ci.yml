@@ -63,7 +63,8 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements-dev.txt
-          pip install ruff
+          # P3-CI-04 版本统一：pin 已本地验证的 ruff（CI 拉最新版规则漂移会红）
+          pip install "ruff==0.16.6"
       - name: Lint (ruff)
         run: ruff check agent-runtime
       # P3-CI-04 去重：run_all_local_tests 内含 unittest discover，不再单独跑一遍
