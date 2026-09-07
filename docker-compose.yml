@@ -48,7 +48,7 @@ services:
       - "10909:10909"
 
   alertmanager:
-    image: prom/alertmanager:v0.27.0
+    image: prom/alertmanager:v0.28.1
     ports:
       - "9093:9093"
     volumes:

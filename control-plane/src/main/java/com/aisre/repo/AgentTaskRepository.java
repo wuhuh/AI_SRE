@@ -35,10 +35,17 @@ public interface AgentTaskRepository extends JpaRepository<AgentTask, Long> {
     int claimTask(@Param("id") Long id, @Param("worker") String worker, @Param("now") Instant now);
 
     /**
-     * P1-MQ-02: 租约超时回收 —— RUNNING 且 claimedAt 早于 deadline 的任务重回 QUEUED。
+     * P1-MQ-02: 租约超时回收 —— RUNNING 且 claimedAt 早于 deadline 的任务：
+     * 重试次数 +1，未达上限重回 QUEUED；达上限转 DEAD（P1-MQ-03 毒任务，DLQ 等价物）。
      */
     @Modifying
-    @Query("UPDATE AgentTask t SET t.status = 'QUEUED', t.claimedBy = null, t.claimedAt = null "
+    @Query("UPDATE AgentTask t SET t.attempts = t.attempts + 1, "
+            + "t.status = CASE WHEN t.attempts + 1 >= :maxAttempts THEN 'DEAD' ELSE 'QUEUED' END, "
+            + "t.claimedBy = null, t.claimedAt = null "
             + "WHERE t.status = 'RUNNING' AND t.claimedAt < :deadline")
-    int reclaimExpiredLeases(@Param("deadline") Instant deadline);
+    int reclaimExpiredLeases(@Param("deadline") Instant deadline,
+                             @Param("maxAttempts") int maxAttempts);
+
+    /** P1-MQ-03: 本次回收转为 DEAD 的毒任务（用于审计/告警）。 */
+    List<AgentTask> findByStatusAndAttemptsGreaterThanEqual(String status, int minAttempts);
 }

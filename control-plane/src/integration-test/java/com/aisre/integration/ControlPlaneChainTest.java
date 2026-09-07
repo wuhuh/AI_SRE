@@ -74,6 +74,12 @@ class ControlPlaneChainTest {
     @Autowired
     TestRestTemplate rest;
 
+    @Autowired
+    com.aisre.repo.AgentTaskRepository agentTaskRepository;
+
+    @Autowired
+    com.aisre.service.AgentTaskService agentTaskService;
+
     @TestConfiguration
     static class TestBeans {
         /** IT 无 RocketMQ namesrv：用 Noop 生产者顶替（链路语义不变）。 */
@@ -95,6 +101,8 @@ class ControlPlaneChainTest {
         registry.add("aisre.agent-runtime.url", () -> mockBackends.url("/").toString());
         registry.add("AISRE_TOOL_SERVER_TOKEN", () -> "it-tool-token");
         registry.add("aisre.agent.token", () -> "it-agent-token");
+        // P1-MQ-03: IT 里用小上限验证毒任务回收语义
+        registry.add("aisre.task.max-attempts", () -> "2");
     }
 
     @BeforeAll
@@ -306,6 +314,33 @@ class ControlPlaneChainTest {
         assertEquals(409, post(base() + "/api/v1/incidents/" + incidentId + "/transition",
                 "{\"status\":\"RESOLVED\"}", adminH).getStatusCode().value(),
                 "illegal state transition must be rejected with 409");
+    }
+
+    @Test
+    @Order(4)
+    void expiredLeaseReclaimCountsAttemptsAndPoisonTasksTurnDead() {
+        // P1-MQ-03: 崩溃 worker 的任务回收重试；达上限转 DEAD（DLQ 等价物）
+        com.aisre.domain.AgentTask task = agentTaskRepository.save(new com.aisre.domain.AgentTask(
+                999L, com.aisre.domain.AgentTask.TaskType.DIAGNOSIS, "QUEUED",
+                "diag-poison-it", java.time.Instant.now()));
+
+        for (int round = 1; round <= 2; round++) {
+            assertTrue(agentTaskService.claim(task.getId(), "it-worker-crash").isPresent(),
+                    "round " + round + ": claim must succeed on QUEUED task");
+            com.aisre.domain.AgentTask running = agentTaskRepository.findById(task.getId()).orElseThrow();
+            // worker 崩溃：claimedAt 回拨到租约窗口之外
+            running.setClaimedAt(java.time.Instant.now().minusSeconds(3600));
+            agentTaskRepository.save(running);
+            agentTaskService.reclaimExpiredLeases();
+            com.aisre.domain.AgentTask after = agentTaskRepository.findById(task.getId()).orElseThrow();
+            if (round == 1) {
+                assertEquals("QUEUED", after.getStatus(), "attempt 1: back to QUEUED for retry");
+                assertEquals(1, after.getAttempts());
+            } else {
+                assertEquals("DEAD", after.getStatus(), "attempt 2 (max-attempts=2): poison → DEAD");
+                assertEquals(2, after.getAttempts());
+            }
+        }
     }
 
     // ---------- helpers ----------

@@ -67,6 +67,18 @@ public class AgentTask {
     @Column(nullable = false)
     private int mqAttempts = 0;
 
+    // P1-MQ-03: 租约回收重试计数（达上限 → DEAD，DLQ 等价物）
+    @Column(nullable = false)
+    private int attempts = 0;
+
+    public int getAttempts() {
+        return attempts;
+    }
+
+    public void setAttempts(int attempts) {
+        this.attempts = attempts;
+    }
+
     public String getMqStatus() {
         return mqStatus;
     }
