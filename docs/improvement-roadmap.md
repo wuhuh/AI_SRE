@@ -407,7 +407,20 @@
 - [x] **P2-GIT-02** 调试产物归档：✅ 根目录 67 个 `.docker_*/.k6_*/.dind_*/`
   等隐藏调试产物 → `archive/debug-2026-08/`（README 说明）；同类新产物已入
   .gitignore。
-- [ ] **P2-K8S-01** K8s 修复与实测：default-deny 加 DNS egress；补 tool-server/frontend Deployment；数据层 manifest（或明确 compose-only）；镜像 pin；liveness/securityContext；kind/minikube 部署演练并归档。
+- [x] **P2-K8S-01** K8s 修复与实测（kind 演练，2026-09-07）：✅
+  ① default-deny 补 DNS egress（原清单断网首因）+ 同 ns 互通 policy；
+  ② 补 tool-server/frontend Deployment+Service（frontend nginx caps 修正）；
+  ③ 数据层 manifest（postgres/redis；RocketMQ 声明 compose-only——producer
+  起不来不炸启动，outbox 兜底）；④ 镜像全部 pin :k8s01（kind load）；
+  ⑤ liveness/readiness 分离（CP 走 8085 管理端口）+ securityContext
+  （runAsNonRoot/uid/caps drop ALL/seccomp，nginx 例外加 caps）；
+  ⑥ kind v0.24 + node v1.31 演练：**11 pods 全 Running**、in-cluster 闭环
+  alert→incident→agent 轮询消费→诊断回调→ROOT_CAUSE_FOUND
+  （evidence docs/evidence/k8s01_kind_drill.log）。
+  演练暴露并修复：secret 占位值/命名用户 uid/agent /tmp 权限（emptyDir +
+  IDEMPOTENCY_DIR/CHECKPOINT_DIR env）/nginx 非 root bind——4 类典型 K8s 化问题。
+  观测栈（prometheus/loki/jaeger/grafana）声明 compose-only；
+  daocloud 镜像名用于数据层（网络受限环境）。
   验证：kind 部署后全链路 smoke 通过。
 
 # P3
