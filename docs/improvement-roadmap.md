@@ -303,7 +303,12 @@
   验证：`docker compose build frontend` 产物 /assets/index-*.js 200、/api 代理正常 ✅。
   Effort: S
 
-- [ ] **P1-DOC-04/05/06/07** 文档与代码对齐：架构图（直连 P/L/J + 轮询链路）、security.md 措辞（可重放 token/GET 公开/脱敏死代码）、production-readiness-audit.md 重写为现状。
+- [x] **P1-DOC-04/05/06/07** 文档与代码对齐：✅ architecture.md 重绘（轮询主链路 +
+  MQ outbox 标注 EXPERIMENTAL、REJECT→ROOT_CAUSE_FOUND、任务生命周期含 DEAD、
+  API 表带鉴权列；audit DOC-04 的工具 URL 未注入问题 compose 已修——`*_TOOL_URL`
+  指向 tool-server）；security.md 重写（静态 token 可重放、脱敏死代码、SSE 公开、
+  /faults 开放等如实披露）；production-readiness-audit.md 按现状重写
+  （RBAC/Flyway/审批 token/AM 链路从 ❌/🟡 转 ✅，关键风险表更新）。
   验证：逐条对照 audit 的 DOC 总表无 FALSE/PARTIAL 未披露项。
   Effort: S-M
 
