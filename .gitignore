@@ -18,6 +18,15 @@ node_modules/
 # IDE
 .idea/
 .vscode/
+
+# 调试产物（P2-GIT-02：历史产物已归档 archive/debug-2026-08/）
+.docker_*.log
+.docker_*.txt
+.k6_*.log
+.mvn_*.log
+.e2e_*.log
+.dind_*.log
+.alert_status*.txt
 *.iml
 
 # 运行期临时状态（agent-runtime）
