@@ -10,7 +10,7 @@
 | RAG | ✅ | Hybrid Retrieval + 20+ Runbook + Baseline 对比 |
 | 故障注入 | ✅ | `/faults` + 脚本 + Chaos Mesh YAML |
 | Evaluation | ✅ | 200 Case + Runner + Baseline |
-| 测试 | ✅ | 233 Python + Java + Contract + E2E + Auto Consumer + MCP + LLM Instability |
+| 测试 | ✅ | 132 = agent 73 + evaluation 12 + Java IT 42 + Playwright 5（2026-09-07 实测；Java 单测含在 mvn test） |
 | 前端 | ✅ | 静态 Dashboard + React 工程 |
 | Security | ✅ | JWT + Tool 分级 + 审计 + 脱敏 |
 | Observability | ✅ | Prometheus / Loki / OTel / Jaeger 配置 |

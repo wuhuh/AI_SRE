@@ -378,7 +378,10 @@
   React 新增 error 态（antd Alert，可关闭）；SSE onerror 断线**自动重连**
   （指数退避封顶 10s，卸载时彻底清理）。window.prompt 登录保留（换成 Modal
   属体验升级，未列入本项）。
-- [ ] **P2-E2E-01** local_e2e_runner 更名"契约冒烟"；文档定位改写。
+- [x] **P2-E2E-01** 契约冒烟定位改写：✅ `e2e/local_e2e_runner.py` →
+  `e2e/local_contract_smoke.py`；docstring 明确「mock 契约验证 ≠ 真实闭环」，
+  真闭环只认 compose+RUN_E2E / Playwright；CI/测试/文档全部 10 处引用同步；
+  run_all_local_tests 全绿。
 - [x] **P2-BM-02** agent-benchmark 重写：✅ `--url/--output/--provider` +
   `--max-p95-s/--max-error-rate` 阈值门禁（超限 exit 1 可接 CI）+ 逐请求错误处理
   （不再因单个失败崩溃）；结果 JSON 入仓 `benchmark/results/`。
@@ -394,7 +397,11 @@
   （--splits all --limit 2）；失败时 compose 日志收集 + artifact 上传。
   （CI-03 遗留：需 push 到 GitHub 才有真实运行记录。）
 - [ ] **P2-CI-03** 首次 push 后以真实 CI 运行记录更新文档。
-- [ ] **P2-DOC-08/09/10** 测试计数统一、故障表/Tool 说明更新、README Future Work/limitations/runbooks 清理。
+- [x] **P2-DOC-08/09/10** 文档三连：✅ 测试计数统一为实测口径
+  （agent 73 + eval 12 + Java IT 42 + Playwright 5 = 132，基线值标注「历史」）；
+  故障表补 `memory_pressure` + cpu_saturation 改「真实 CPU 烧（P0-08）」+
+  工具表补风险来源注（ToolSpec/RiskPolicy）；README Future Work 更新为现行
+  差距 + limitations 标注历史快照（Docker/Vite 限制已解决）。
 - [x] **P2-GIT-02** 调试产物归档：✅ 根目录 67 个 `.docker_*/.k6_*/.dind_*/`
   等隐藏调试产物 → `archive/debug-2026-08/`（README 说明）；同类新产物已入
   .gitignore。

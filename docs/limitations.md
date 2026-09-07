@@ -1,6 +1,10 @@
 # 当前环境限制
 
-## Docker
+> 2026-09-07 更新：下列 Docker/Vite 限制为**历史快照**（当时开发会话的环境问题），
+> 现已解决：compose 21 容器可复现运行、Testcontainers 链路 42/42 通过、
+> Vite 构建正常。本文件保留供对照，实时差距见 docs/production-readiness-audit.md。
+
+## Docker（历史，已解决）
 
 当前开发会话无法访问 Docker daemon：
 

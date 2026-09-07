@@ -16,7 +16,7 @@ cd agent-runtime && python -m unittest tests.test_local_contract -v
 ## 本地完整 E2E（无需 Docker）
 
 ```bash
-python e2e/local_e2e_runner.py
+python e2e/local_contract_smoke.py
 ```
 
 覆盖：

@@ -1,15 +1,13 @@
-"""Local lightweight E2E runner.
+"""Local contract smoke（P2-E2E-01 更名与定位改写）.
 
-This starts minimal HTTP servers that implement the same API contract as the
-Docker-based project, then runs the real E2E test suite against them.
+本脚本启动最小 mock HTTP 服务（模拟 CP/AR/Payment/Inventory 的 API 契约），
+在其中验证 agent 消费链路的**契约正确性**——不是真实闭环 E2E：
 
-It is intended for environments where Docker is not available but we still want
-to verify the full loop:
+    契约冒烟（本脚本）= mock 服务上验证请求/响应形状与流转
+    真实闭环（真 E2E）  = compose 全栈 + RUN_E2E=1（见 .github/workflows/ci.yml
+                         nightly-integration）或 Web E2E（web/e2e/dashboard.spec.js）
 
-    alert -> incident -> diagnosis -> recovery -> verification -> resolved
-
-Usage:
-    python e2e/local_e2e_runner.py
+对外宣传口径以此为准：不要把本脚本的 "ok" 当作真实故障闭环的证据。
 """
 from __future__ import annotations
 
