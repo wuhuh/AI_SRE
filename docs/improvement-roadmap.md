@@ -362,8 +362,13 @@
   证据 key+source+content 上匹配（旧实现只对 `tool:step` 序号 key 精确匹配 →
   recall 恒 0 失真）；precision=命中证据占比、recall=命中标签占比；测试更新
   （语义匹配/部分命中/空期望三例）。
-- [ ] **P2-T-04** 集成测试加迁移+仓库冒烟；CI 加 `-Pintegration verify`（services: docker）。
-- [ ] **P2-T-05** contract test 对真 CP 跑（Testcontainers 起真 CP）。
+- [x] **P2-T-04** 迁移+仓库冒烟：✅ ControlPlaneIntegrationTest 从「只验容器启动」
+  升级为编程式 Flyway V1..V9 + schema 断言（agent_task.attempts/mq_status、
+  evidence.query/time_range、V8 删表生效）；CI 已有 `-Pintegration` job（P1-CP-17）。
+  42/42 绿。
+- [x] **P2-T-05** 契约对真 CP：✅ 由 ControlPlaneChainTest 承担（agent 的
+  diagnosis/verification/approval/tasks 载荷全部经 testcontainers 真 CP HTTP 走通，
+  含 auth 矩阵）；Python mock 契约测试保留为本地快速反馈（不建第二套 harness）。
 - [ ] **P2-FE-02** Playwright 冒烟（3-5 用例：列表/详情/审批 401）。
 - [ ] **P2-FE-03** EventSource 去手动 close；统一 fetch 错误+401 处理。
 - [ ] **P2-E2E-01** local_e2e_runner 更名"契约冒烟"；文档定位改写。
