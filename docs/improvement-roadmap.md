@@ -338,8 +338,11 @@
   （查询类工具自动提取 `[5m]` 类窗口），payload + CP V9 迁移（evidence.query/time_range），
   timestamp 由 DTO 可选携带；DiagnosisResult.status 语义三分：ROOT_CAUSE_FOUND /
   UNKNOWN（LLM 降级）/ **TIMEOUT**（预算耗尽，不再伪装 UNKNOWN，测试同步更新）。
-- [ ] **P2-AR-10** Planner 与 function calling 合并决策（随 AR-02 中期方案）。
-- [ ] **P2-AR-11** mcp_client 删除或接线。
+- [x] **P2-AR-10** Planner 决策：✅ 删除 LLM 预规划（装饰调用——与逐步 LLM 决策
+  重复且输出未经校验，mock 下恒 DEFAULT_PLAN），保留固定初始计划（DEFAULT_PLAN）；
+  真规划待 AR-02 中期 function calling 方案重建。每次诊断省一次 LLM 往返。
+- [x] **P2-AR-11** mcp_client 决策：✅ 删除（主链路零调用，agent 走 REST）；
+  tool-server `/mcp` JSON-RPC 服务端保留（对外 MCP 宿主契约）。
 - [x] **P2-FI-07** chaos YAML 标注 EXPERIMENTAL：✅ 三份 Chaos Mesh YAML 头部注明
   未在真实集群实测、启用条件（P2-K8S-01 后实测转正）。
 - [x] **P2-FI-08** self-monitoring 从 0 到 1：✅ agent-runtime/tool-server 挂载

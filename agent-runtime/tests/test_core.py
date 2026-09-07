@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from app.agent.diagnostic import DiagnosticAgent
-from app.agent.planner import Planner
+from app.agent.planner import DEFAULT_PLAN
 from app.llm.mock import MockLLMProvider
 from app.models import AgentState
 from app.rag.retriever import Document, HybridRetriever
@@ -95,10 +95,9 @@ class DiagnosticAgentTest(unittest.TestCase):
 
 
 class PlannerTest(unittest.TestCase):
-    def test_invalid_json_falls_back_to_default_plan(self):
-        planner = Planner(MockLLMProvider(mode="invalid_json"))
-        state = AgentState(incident_id=1, alert={})
-        self.assertEqual(planner.plan(state), ["query_prometheus", "query_logs", "query_trace", "retrieve_runbook"])
+    def test_default_plan_is_stable(self):
+        # P2-AR-10: 初始计划固定可预测；LLM 预规划已删（装饰调用）
+        self.assertEqual(DEFAULT_PLAN, ["query_prometheus", "query_logs", "query_trace", "retrieve_runbook"])
 
 
 if __name__ == "__main__":
