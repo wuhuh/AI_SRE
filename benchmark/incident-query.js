@@ -13,7 +13,10 @@ export const options = {
 const BASE = __ENV.BASE_URL || 'http://localhost:8080';
 
 export default function () {
-  const res = http.get(`${BASE}/api/v1/incidents`);
+  // P2-BM-03: 读接口现需 JWT（P1-CP-14），从 env 取 token
+  const res = http.get(`${BASE}/api/v1/incidents`, {
+    headers: { Authorization: `Bearer ${__ENV.JWT_TOKEN || ''}` },
+  });
   check(res, { 'status is 200': (r) => r.status === 200 });
   sleep(0.05);
 }

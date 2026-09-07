@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
-import statistics
 import sys
 import time
 import urllib.error
@@ -48,17 +47,21 @@ def request(method: str, url: str, payload: dict | None = None, timeout: float =
 
 
 def run_load(url: str, method: str, payload: dict | None, requests: int, concurrency: int) -> dict:
+    # P2-BM-03: 吞吐按 wall-clock 计（旧公式 n/sum(latencies) 把延迟倒数当吞吐，
+    # 并发 10 时低估 ~10 倍）
+    wall_start = time.perf_counter()
     with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:
         futures = [pool.submit(request, method, url, payload) for _ in range(requests)]
         results = [f.result() for f in futures]
+    wall_s = time.perf_counter() - wall_start
     latencies = sorted(r[0] for r in results)
     errors = [r for r in results if r[1] >= 400]
-    total = sum(r[0] for r in results)
     n = len(latencies)
     return {
         "requests": n,
         "concurrency": concurrency,
-        "qps": round(n / total, 1) if total else 0,
+        "qps": round(n / wall_s, 1) if wall_s else 0,
+        "wall_s": round(wall_s, 3),
         "p50_ms": round(latencies[max(0, int(n * 0.50) - 1)] * 1000, 1),
         "p95_ms": round(latencies[max(0, int(n * 0.95) - 1)] * 1000, 1),
         "p99_ms": round(latencies[max(0, int(n * 0.99) - 1)] * 1000, 1),

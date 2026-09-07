@@ -364,8 +364,16 @@
 - [ ] **P2-FE-02** Playwright 冒烟（3-5 用例：列表/详情/审批 401）。
 - [ ] **P2-FE-03** EventSource 去手动 close；统一 fetch 错误+401 处理。
 - [ ] **P2-E2E-01** local_e2e_runner 更名"契约冒烟"；文档定位改写。
-- [ ] **P2-BM-02** agent-benchmark `--url/--output`、失败处理、阈值；结果 JSON 入仓。
-- [ ] **P2-BM-03** qps 改 wall-time；删/换 sse-stream；k6 alert 阈值结论如实记录。
+- [x] **P2-BM-02** agent-benchmark 重写：✅ `--url/--output/--provider` +
+  `--max-p95-s/--max-error-rate` 阈值门禁（超限 exit 1 可接 CI）+ 逐请求错误处理
+  （不再因单个失败崩溃）；结果 JSON 入仓 `benchmark/results/`。
+  实测（mock LLM，3 并发×10）：p95=0.062s、0 错误、55 rps，阈值通过。
+- [x] **P2-BM-03** 口径修正：✅ qps 改 wall-clock（旧 n/sum(latencies) 把延迟倒数
+  当吞吐，并发 10 高估 ~10×，实测对比：新 48 vs 旧口径 ~500）；删 sse-stream.js
+  （http.get 压流式端点无意义）；k6 脚本对齐 auth 硬化后契约（webhook+token /
+  incidents+JWT）——旧脚本曾 100% 401；benchmark.md 如实披露：旧 8-31 数据
+  p95=682ms 已击穿 500ms 阈值未披露、口径错高估，新数据（alert 46k req p95 231ms
+  ✅ / incidents 56k req p95 4.4ms ✅）原始 summary 入仓。
 - [ ] **P2-CI-02** nightly integration job：compose up + RUN_E2E=1 + k6 smoke + run_evaluation。
 - [ ] **P2-CI-03** 首次 push 后以真实 CI 运行记录更新文档。
 - [ ] **P2-DOC-08/09/10** 测试计数统一、故障表/Tool 说明更新、README Future Work/limitations/runbooks 清理。

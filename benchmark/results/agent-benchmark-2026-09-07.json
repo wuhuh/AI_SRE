@@ -1,0 +1,12 @@
+{
+  "target": "agent-runtime:/api/v1/agent/diagnose（真实诊断链路）",
+  "provider": "mock",
+  "requests": 10,
+  "concurrency": 3,
+  "errors": 0,
+  "error_rate": 0.0,
+  "avg_s": 0.05,
+  "p95_s": 0.062,
+  "wall_s": 0.181,
+  "throughput_rps": 55.14
+}
