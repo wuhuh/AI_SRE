@@ -17,6 +17,8 @@ class ToolCall:
     result_summary: str = ""
     error: str | None = None
     duration_ms: int = 0
+    # P2-CP-23: 风险来自 ToolSpec（策略工件），执行时盖章，CP 侧落库
+    risk_level: str = "READ_ONLY"
 
 
 @dataclass
@@ -24,6 +26,9 @@ class Evidence:
     source: str
     key: str
     content: str
+    # P2-AR-09: 证据溯源字段（查询语句/时间范围），可缺省
+    query: str | None = None
+    time_range: str | None = None
 
 
 @dataclass

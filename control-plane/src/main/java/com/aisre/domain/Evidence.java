@@ -35,6 +35,13 @@ public class Evidence {
     @Column(nullable = false, length = 4096)
     private String content;
 
+    // P2-AR-09: 溯源字段（查询语句/时间范围）
+    @Column(length = 1024)
+    private String query;
+
+    @Column(length = 64)
+    private String timeRange;
+
     @Column(nullable = false)
     private Instant collectedAt;
 
@@ -43,12 +50,27 @@ public class Evidence {
 
     public Evidence(Long incidentId, Long taskId, String source, String evidenceKey,
                     String content, Instant collectedAt) {
+        this(incidentId, taskId, source, evidenceKey, content, null, null, collectedAt);
+    }
+
+    public Evidence(Long incidentId, Long taskId, String source, String evidenceKey,
+                    String content, String query, String timeRange, Instant collectedAt) {
         this.incidentId = incidentId;
         this.taskId = taskId;
         this.source = source;
         this.evidenceKey = evidenceKey;
         this.content = content;
+        this.query = query;
+        this.timeRange = timeRange;
         this.collectedAt = collectedAt;
+    }
+
+    public String getQuery() {
+        return query;
+    }
+
+    public String getTimeRange() {
+        return timeRange;
     }
 
     public Long getId() {

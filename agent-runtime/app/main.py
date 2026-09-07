@@ -119,11 +119,19 @@ def _submit_diagnosis(incident_id: int, diagnosis) -> None:
 
 
 def _submit_verification(incident_id: int, verification) -> None:
-    evidence = [{"source": e.source, "key": e.key, "content": e.content} for e in verification.evidence]
+    # P2-AR-09: 证据带溯源字段；P2-CP-23: taskId 链路关联
+    evidence = [{
+        "source": e.source,
+        "key": e.key,
+        "content": e.content,
+        "query": getattr(e, "query", None),
+        "timeRange": getattr(e, "time_range", None),
+    } for e in verification.evidence]
     payload = {
         "status": verification.status,
         "detail": verification.detail,
         "evidence": evidence,
+        "taskId": getattr(verification, "task_id", None),
     }
     try:
         httpx.post(

@@ -6,6 +6,7 @@ public record ToolCallDTO(
         String toolName,
         String argumentsJson,
         String status,
+        String riskLevel,
         String resultSummary,
         Long durationMs,
         String error,

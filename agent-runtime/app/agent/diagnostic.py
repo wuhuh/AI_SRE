@@ -93,7 +93,7 @@ class DiagnosticAgent:
                     "confidence": 0.0,
                     "evidence": [],
                     "recommendedActions": [],
-                })
+                }, timed_out=True)
             if pending:
                 raw_tool = pending.pop(0)
                 tool_name = self._normalize_tool_name(raw_tool)
@@ -174,10 +174,19 @@ class DiagnosticAgent:
         state.tool_results[tool_name] = call.result_summary or call.error or ""
         state.step += 1
         if call.status == "SUCCESS":
+            # P2-AR-09: 证据带溯源（query/time_range），目前对查询类工具可填
+            query = args.get("query") if isinstance(args, dict) else None
+            time_range = None
+            if query:
+                import re as _re
+                m = _re.search(r"\[(\w+)\]", query)
+                time_range = m.group(1) if m else None
             state.evidence.append(Evidence(
                 source=tool_name,
                 key=f"{tool_name}:{state.step}",
                 content=call.result_summary[:1000],
+                query=query,
+                time_range=time_range,
             ))
         return call
 
@@ -225,7 +234,7 @@ class DiagnosticAgent:
                 "recommendedActions": [],
             }
 
-    def _finalize(self, state: AgentState, decision: dict) -> DiagnosisResult:
+    def _finalize(self, state: AgentState, decision: dict, timed_out: bool = False) -> DiagnosisResult:
         evidence = state.evidence
         # P0-03: 真实 LLM 的输出形状多变 —— evidence 可能是字符串列表、
         # confidence 可能是字符串、alternatives 可能不是列表。全部宽容解析。
@@ -252,8 +261,12 @@ class DiagnosticAgent:
             confidence = 0.0
         fallback_used = False
         heuristic_candidate = None
-        status = "ROOT_CAUSE_FOUND"
-        if root_cause == "unknown":
+        # P2-AR-09: status 语义——ROOT_CAUSE_FOUND / UNKNOWN（降级）/ TIMEOUT（预算耗尽）
+        if timed_out:
+            status = "TIMEOUT"
+        else:
+            status = "ROOT_CAUSE_FOUND"
+        if root_cause == "unknown" and not timed_out:
             # P0-01(ponytail): 规则兜底只作降级提示，不冒充根因、不改写置信度、不伪造证据。
             # 未知根因也不给修复建议，避免在不确定结论上触发自动修复。
             # 启发式何时可删：评测重做(P0-03)且真实 LLM 路径稳定后整体移除。
