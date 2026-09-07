@@ -36,11 +36,19 @@ def agent_headers() -> dict:
 
 
 def submit_diagnosis(cp_url: str, incident_id: int, diagnosis, task_id: int | None = None) -> None:
-    evidence = [{"source": e.source, "key": e.key, "content": e.content} for e in diagnosis.evidence]
+    # P2-AR-09: 证据带溯源字段（timestamp 由 CP 落库时补）
+    evidence = [{
+        "source": e.source,
+        "key": e.key,
+        "content": e.content,
+        "query": getattr(e, "query", None),
+        "timeRange": getattr(e, "time_range", None),
+    } for e in diagnosis.evidence]
     tool_calls = [{
         "toolName": t.name,
         "argumentsJson": json.dumps(t.arguments, ensure_ascii=False),
         "status": t.status,
+        "riskLevel": getattr(t, "risk_level", None) or "READ_ONLY",
         "resultSummary": t.result_summary,
         "durationMs": t.duration_ms,
         "error": t.error,

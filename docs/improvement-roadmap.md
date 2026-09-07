@@ -325,9 +325,14 @@
   Incident.report、updateRootCause、TimeoutLLMProvider 假超时包装（超时由 httpx +
   RetryLLMProvider 边界负责）。教训：删实体后必须 clean 重编译（增量编译残留 stale
   class 会骗过 schema validate）。
-- [ ] **P2-CP-23** Agent 链路关联（taskId 传递；riskLevel 由 RiskPolicy 填充）。
+- [x] **P2-CP-23** Agent 链路关联：✅ diagnosis/verification 均带 taskId →
+  Evidence/ToolCall 落库不再断链（原 null）；riskLevel 来源=agent 端 ToolSpec
+  （策略工件，执行时盖章 `call.risk_level=spec.risk_level`），CP 侧缺省 READ_ONLY。
 - [ ] **P2-CP-24** 随 P1-T-02 覆盖。
-- [ ] **P2-AR-09** Evidence 字段扩展（timestamp/query/time_range）；DiagnosisResult.status 语义（UNKNOWN/TIMEOUT）。
+- [x] **P2-AR-09** Evidence 字段扩展：✅ agent Evidence 加 query/time_range
+  （查询类工具自动提取 `[5m]` 类窗口），payload + CP V9 迁移（evidence.query/time_range），
+  timestamp 由 DTO 可选携带；DiagnosisResult.status 语义三分：ROOT_CAUSE_FOUND /
+  UNKNOWN（LLM 降级）/ **TIMEOUT**（预算耗尽，不再伪装 UNKNOWN，测试同步更新）。
 - [ ] **P2-AR-10** Planner 与 function calling 合并决策（随 AR-02 中期方案）。
 - [ ] **P2-AR-11** mcp_client 删除或接线。
 - [ ] **P2-FI-07** chaos YAML 删除或标注 experimental（K8s 实测后再启用）。

@@ -7,6 +7,7 @@ import java.util.List;
 public record VerificationRequest(
         @NotBlank String status,
         String detail,
-        List<EvidenceDTO> evidence
+        List<EvidenceDTO> evidence,
+        Long taskId
 ) {
 }

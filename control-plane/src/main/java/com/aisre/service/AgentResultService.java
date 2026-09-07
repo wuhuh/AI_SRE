@@ -95,11 +95,13 @@ public class AgentResultService {
             for (EvidenceDTO dto : request.evidence()) {
                 evidenceRepository.save(new Evidence(
                         incidentId,
-                        null,
+                        request.taskId(), // P2-CP-23: 链路关联（此前断链 null）
                         dto.source(),
                         dto.key(),
                         dto.content(),
-                        Instant.now()
+                        dto.query(),
+                        dto.timeRange(),
+                        dto.timestamp() != null ? dto.timestamp() : Instant.now() // P2-AR-09
                 ));
             }
         }
@@ -108,9 +110,10 @@ public class AgentResultService {
             for (ToolCallDTO dto : request.toolCalls()) {
                 toolCallRepository.save(new ToolCall(
                         incidentId,
-                        null,
+                        request.taskId(), // P2-CP-23: 链路关联（此前断链 null）
                         dto.toolName(),
-                        "READ_ONLY",
+                        // P2-CP-23: 风险来源=agent 端 ToolSpec（策略工件），缺省 READ_ONLY
+                        dto.riskLevel() != null ? dto.riskLevel() : "READ_ONLY",
                         dto.status() != null ? dto.status() : "SUCCESS",
                         dto.argumentsJson() != null ? dto.argumentsJson() : "{}",
                         dto.resultSummary(),
@@ -195,11 +198,13 @@ public class AgentResultService {
             for (EvidenceDTO dto : request.evidence()) {
                 evidenceRepository.save(new Evidence(
                         incidentId,
-                        null,
+                        request.taskId(), // P2-CP-23: 链路关联（此前断链 null）
                         dto.source(),
                         dto.key(),
                         dto.content(),
-                        Instant.now()
+                        dto.query(),
+                        dto.timeRange(),
+                        dto.timestamp() != null ? dto.timestamp() : Instant.now() // P2-AR-09
                 ));
             }
         }

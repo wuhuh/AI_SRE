@@ -46,13 +46,16 @@ class FallbackDegradationTest(unittest.TestCase):
         result = agent.run(AgentState(incident_id=1, alert=ALERT))
         self.assertFalse(any(e.source == "rule" for e in result.evidence))
 
-    def test_timeout_keeps_unknown_semantics(self):
+    def test_timeout_gets_distinct_timeout_semantics(self):
+        # P2-AR-09: 超时是独立语义（TIMEOUT），不再伪装成 UNKNOWN/降级；
+        # 不伪造根因的守卫不变：root 仍 unknown、不给修复建议
         agent = DiagnosticAgent(MockLLMProvider(), _registry(), max_duration_seconds=-1.0)
         state = AgentState(incident_id=2, alert=ALERT)
         result = agent.run(state)
         self.assertEqual(result.root_cause, "unknown")
-        self.assertLessEqual(result.confidence, 0.3)
-        self.assertTrue(result.fallback_used)
+        self.assertEqual(result.status, "TIMEOUT")
+        self.assertFalse(result.fallback_used)
+        self.assertEqual(result.recommended_actions, [])
         self.assertEqual(state.error, "diagnosis_timeout")
 
     def test_normal_llm_result_is_kept_as_is(self):

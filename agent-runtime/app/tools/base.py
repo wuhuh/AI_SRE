@@ -29,6 +29,7 @@ class Tool(ABC):
         from concurrent.futures import ThreadPoolExecutor
         start = time.perf_counter()
         call = ToolCall(name=self.spec.name, arguments=arguments, status="SUCCESS")
+        call.risk_level = self.spec.risk_level  # P2-CP-23: 风险随执行盖章
         try:
             if principal not in self.spec.allowed_principals:
                 raise PermissionError(f"{principal} is not allowed to call {self.spec.name}")
