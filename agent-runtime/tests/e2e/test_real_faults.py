@@ -27,6 +27,23 @@ AR_URL = os.getenv("AGENT_URL", "http://localhost:8081").rstrip("/")
 PAYMENT_URL = os.getenv("PAYMENT_URL", "http://localhost:8001").rstrip("/")
 INVENTORY_URL = os.getenv("INVENTORY_URL", "http://localhost:8003").rstrip("/")
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8000").rstrip("/")
+AGENT_TOKEN = os.getenv("AGENT_TOKEN", "local-dev-agent-token")
+WEBHOOK_TOKEN = os.getenv("WEBHOOK_TOKEN", "local-dev-webhook-token")
+JWT_TOKEN = os.getenv("JWT_TOKEN", "")  # P0-05 后 CP 只读端点也要 JWT
+
+
+def _login_jwt() -> str:
+    """admin 登录取 JWT（compose 默认 aisre-dev-admin-pw；可用 JWT_TOKEN 直给）。"""
+    global JWT_TOKEN
+    if JWT_TOKEN:
+        return JWT_TOKEN
+    status, body = request("POST", f"{CP_URL}/api/v1/auth/login", {
+        "username": os.getenv("ADMIN_USER", "admin"),
+        "password": os.getenv("ADMIN_PASSWORD", "aisre-dev-admin-pw"),
+    })
+    if status == 200:
+        JWT_TOKEN = body.get("token", "")
+    return JWT_TOKEN
 
 # P3-T-06: 诊断内容断言 —— root_cause 必须落在故障的期望标签集合内。
 # mock LLM 恒答 redis（AR-12 同源问题，已文档披露）：非 mock 时才做严格集合断言。
@@ -56,13 +73,18 @@ def _assert_recovery_faster(testcase, slow_duration: float, recovered_duration: 
         f"faulted path {slow_duration:.2f}s should be >=3x slower than recovered {recovered_duration:.2f}s")
 
 
-def request(method: str, url: str, payload: dict | None = None, timeout: float = 10.0):
+def request(method: str, url: str, payload: dict | None = None, timeout: float = 10.0,
+            headers: dict | None = None, auth: bool = True):
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    base_headers = {"Content-Type": "application/json"} if data else {}
+    # P0-05: CP 只读端点需 JWT（agent 端点用 X-Agent-Token，webhook 用 X-Webhook-Token）
+    if auth and "8080" in url and "auth/login" not in url and JWT_TOKEN:
+        base_headers["Authorization"] = f"Bearer {JWT_TOKEN}"
     req = urllib.request.Request(
         url,
         data=data,
         method=method,
-        headers={"Content-Type": "application/json"} if data else {},
+        headers={**base_headers, **(headers or {})},
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         body = resp.read().decode("utf-8")
@@ -123,6 +145,7 @@ class RealFaultE2ETest(unittest.TestCase):
                 raise RuntimeError(f"Docker Compose failed:\n{result.stderr}")
             wait_until(cls._core_health_ok, timeout=120, interval=5)
 
+        _login_jwt()
         for label, url in (("payment-service", PAYMENT_URL), ("inventory-service", INVENTORY_URL)):
             try:
                 request("GET", f"{url}/health", timeout=3)
@@ -135,15 +158,24 @@ class RealFaultE2ETest(unittest.TestCase):
         request("POST", f"{service_url}/faults?name={name}&enabled={str(enabled).lower()}", timeout=5)
 
     def _send_alert(self, service: str, resource: str, summary: str) -> int:
-        status, body = request("POST", f"{CP_URL}/api/v1/alerts", {
-            "service": service,
-            "alertName": "e2e_fault",
-            "resource": resource,
-            "severity": "P1",
-            "summary": summary,
-        })
+        status, body = request("POST", f"{CP_URL}/api/v1/alerts/alertmanager", {
+            "version": "4",
+            "status": "firing",
+            "alerts": [
+                {
+                    "labels": {
+                        "service": service,
+                        "alertname": "e2e_fault",
+                        "resource": resource,
+                        "severity": "P1",
+                    },
+                    "annotations": {"summary": summary},
+                }
+            ],
+        }, headers={"X-Webhook-Token": WEBHOOK_TOKEN})
         self.assertEqual(status, 202)
-        return body["incidentId"]
+        # v4 契约：{"results":[{"incidentId":...}],"skippedResolved":0}
+        return body["results"][0]["incidentId"]
 
     def _diagnose(self, incident_id: int, service: str) -> dict:
         status, body = request("POST", f"{AR_URL}/api/v1/agent/diagnose", {
@@ -154,7 +186,8 @@ class RealFaultE2ETest(unittest.TestCase):
                 "severity": "P1",
                 "summary": f"{service} real fault injected for e2e",
             },
-        }, timeout=30)
+        # 诊断端到端含真实工具链路（Prom/Tempo/Loki），30s 贴边易超——对齐 DIAG_BUDGET
+        }, timeout=180, headers={"X-Agent-Token": AGENT_TOKEN})
         self.assertEqual(status, 200)
         return body
 
@@ -167,7 +200,8 @@ class RealFaultE2ETest(unittest.TestCase):
                 "severity": "P1",
                 "summary": f"{service} real fault injected for e2e",
             },
-        }, timeout=30)
+        # 诊断端到端含真实工具链路（Prom/Tempo/Loki），30s 贴边易超——对齐 DIAG_BUDGET
+        }, timeout=180, headers={"X-Agent-Token": AGENT_TOKEN})
         self.assertEqual(status, 200)
         return body
 

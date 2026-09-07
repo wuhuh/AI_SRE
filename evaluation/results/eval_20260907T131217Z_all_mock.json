@@ -1,0 +1,62 @@
+{
+  "report": {
+    "total_cases": 2,
+    "http_errors": 2,
+    "root_cause_top1_accuracy": 0.0,
+    "root_cause_top3_accuracy": 0.0,
+    "unknown_rate": 0.0,
+    "fallback_rate": 0.0,
+    "evidence_precision_avg": null,
+    "evidence_recall_avg": null,
+    "tool_success_rate": null,
+    "average_tool_calls": 0,
+    "average_diagnosis_time_s": 0,
+    "p95_diagnosis_time_s": 0.0,
+    "average_input_tokens": 0,
+    "average_output_tokens": 0,
+    "provider": "mock",
+    "split": "all",
+    "input_mode": "neutral_symptom_alerts (no fault_type leakage)",
+    "scoring": "exact canonical label match; top3 = expected in candidates[:3]"
+  },
+  "cases": [
+    {
+      "case_id": "cpu_sat_001",
+      "expected": "cpu_saturation",
+      "predicted": "http_error",
+      "error": "URLError: <urlopen error [Errno 111] Connection refused>",
+      "candidates": [],
+      "confidence": null,
+      "status": "HTTP_ERROR",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": null,
+      "evidence_recall": null,
+      "tool_calls": 0,
+      "tool_success": 0,
+      "llm_input_tokens": 0,
+      "llm_output_tokens": 0,
+      "latency_s": 0.0
+    },
+    {
+      "case_id": "cpu_sat_002",
+      "expected": "cpu_saturation",
+      "predicted": "http_error",
+      "error": "URLError: <urlopen error [Errno 111] Connection refused>",
+      "candidates": [],
+      "confidence": null,
+      "status": "HTTP_ERROR",
+      "fallback_used": false,
+      "top1": false,
+      "top3": false,
+      "evidence_precision": null,
+      "evidence_recall": null,
+      "tool_calls": 0,
+      "tool_success": 0,
+      "llm_input_tokens": 0,
+      "llm_output_tokens": 0,
+      "latency_s": 0.0
+    }
+  ]
+}

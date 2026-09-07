@@ -422,20 +422,23 @@
   ⚠ 遗留：改动完成但 IT 42/42 未重跑、未 commit——WSL 服务崩
   （Wsl/Service/E_UNEXPECTED，同 3-4 轮前故障），bash 工具不可用；
   WSL 恢复后先 `mvn -Pintegration clean test` 验证再提交。
+  → **已收口（round 17）**：IT 42/42 绿（evidence `mvn_it_cp25_enum.log`），
+  链路测试断言改枚举常量后全过；commit `2693953`。
 - [x] **P3-FI-11** redis instrumentation span；access log traceId；gateway 生成
   X-Request-Id：✅ 代码完成——demo requirements 加
   `opentelemetry-instrumentation-redis`；shared/observability 在 setup 挂
   RedisInstrumentor + uvicorn.access 并入根格式（access log 带 traceId）；
   gateway 入站缺 X-Request-Id 时生成 + 回写响应头 + 透传 order-service。
-  ⚠ 待 WSL 恢复后重建 demo 镜像实测（span/日志/X-Request-Id 三点）。
+  → **已收口（round 17）**：promtool check rules 11 规则语法全过；compose
+  重建后 gateway 实测（见 P3 批注）。
 - [x] **P3-FI-12** AM 分组与标签粒度：✅ HighErrorRate/HighLatency 的
   resource 静态 `demo-service` → `{{ $labels.service }}`；HighCPU
   `avg by (instance)` → `by (instance, service)`（保留 service 维度）；
-  HighCPU/HighMemory 显式补 service 标签。⚠ 待 promtool 语法校验（WSL 恢复后）。
+  HighCPU/HighMemory 显式补 service 标签。→ 已收口：promtool check rules 11 规则全过（v2.54.1）。
 - [x] **P3-T-06** 真实 E2E 断言强化：✅ root_cause 落入故障期望集合
   （LLM_PROVIDER≠mock 时严格断言；mock 恒答 redis 系 AR-12 同源——如实降级为
   「非 unknown」）；恢复断言改比例阈值（≥3x 差距，cpu 烧 0.6s 后旧绝对
-  1.5s 断言已失真一并修正）。⚠ 待 compose 环境实测（WSL 恢复后）。
+  1.5s 断言已失真一并修正）。→ 已收口：compose 真实 E2E 3/3 过（round 17）。
 - [x] **P3-CI-04** 缓存/版本/去重：✅ ci.yml 加 m2 缓存（pom 哈希键）+ pip 缓存；
   Python 统一 3.11（与 Dockerfile python:3.11-slim 一致，写入 job 注释）；
   去重——删独立 unit-test 步骤（run_all_local_tests 已含 unittest discover）。
@@ -460,12 +463,13 @@
   严重度扰动（后 2/5 表述为 P2，不只训练 P1）。
 - [x] **P3-EV-02** incident_id 弃 `hash()`：✅ sha256 确定性（PYTHONHASHSEED
   不再影响重跑 id）。
-- [ ] **P3-备份演练** backup/restore 脚本自动化演练（compose 环境即可）并归档记录。
-  ⚠ 需 bash（WSL 恢复后执行 pg_dump→restore→计数校验）。
+- [x] **P3-备份演练** backup/restore 脚本自动化演练：✅ `scripts/backup-drill.sh`
+  （基线计数→pg_dump→DROP SCHEMA→pg_restore→计数比对，不一致 exit 1）；
+  实测 PASS：109/109/144 精确还原（round 17，docs/backup-restore.md 已记）。
 
-> **P3 批注（round 15）**：以上 ✅ 项为代码/文档完成态；因 WSL 服务崩溃
-> （round 14 起 bash 不可用），运行时验证（编译/IT/构建/实测）与 git 提交
-> 全部挂起，恢复后按 DoD 逐项实测再补勾证据、分批 commit。
+> **P3 批注（round 15）→ 已全部收口（round 17）**：WSL 恢复后逐项实测——
+> IT 42/42、agent 73、eval 冒烟、promtool 11 规则、vite build、Playwright 5/5、
+> 真实 E2E 3/3、备份演练均过；六批 commit（2693953…f7a05f2）落地。
 
 ---
 

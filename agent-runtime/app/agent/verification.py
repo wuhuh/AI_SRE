@@ -84,6 +84,11 @@ class VerificationAgent:
             state.tool_calls.append(call)
             state.step += 1
             value = parse_instant_value(call.result_summary) if call.status == "SUCCESS" else None
+            # P1-AR-06 修正（round 17）：rate(5xx)[5m] 空结果 = 窗口内没有 5xx 样本
+            # ——这是「无错误」的好状态，应记 0 而不是 UNKNOWN（否则完全恢复的服务
+            # 因无错误样本反而永远 UNKNOWN）。p95 空仍按无数据处理（没请求≠延迟好）。
+            if name == "error_rate" and value is None and call.status == "SUCCESS":
+                value = 0.0
             if value is not None:
                 sli[name] = value
         return sli

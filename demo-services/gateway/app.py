@@ -20,7 +20,10 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="api-gateway")
 setup("api-gateway", metrics_port=int(os.getenv("METRICS_PORT", "8005")))
-instrument_fastapi(app, "api-gateway")
+
+# P3-FI-11: uvicorn.access 的记录打在 middleware 之外（contextvar 已 reset，
+# traceId 恒 "-"）——gateway 用 middleware 内自己的 access 行替代
+logging.getLogger("uvicorn.access").disabled = True
 
 ORDER_URL = os.getenv("ORDER_URL", "http://order-service:8002")
 
@@ -38,6 +41,9 @@ async def set_request_id(request: Request, call_next):
             HTTP_LATENCY.labels(service="api-gateway", method=request.method).observe(time.perf_counter() - start)
         if HTTP_REQUESTS:
             HTTP_REQUESTS.labels(service="api-gateway", method=request.method, status=response.status_code).inc()
+        # access 行在 reset 前打（带 traceId/requestId）
+        logger.info("access %s %s -> %s dur_ms=%d", request.method, request.url.path,
+                    response.status_code, int((time.perf_counter() - start) * 1000))
         return response
     finally:
         request_id_var.reset(token)
@@ -57,3 +63,8 @@ def create_order():
             logger.error("order upstream failed status=%s body=%s", resp.status_code, resp.text)
             return JSONResponse(status_code=resp.status_code, content=resp.json())
     return resp.json()
+
+
+# P3-FI-11: instrument 必须在用户 middleware 注册之后 add（后 add 者在外层），
+# 这样 server span 包住 access 行——traceId 才不为 "-"
+instrument_fastapi(app, "api-gateway")
