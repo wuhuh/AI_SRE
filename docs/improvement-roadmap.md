@@ -333,7 +333,9 @@
     （fault→alert→轮询诊断→DB 落库 task_id/risk_level/query/time_range）。
   Evidence/ToolCall 落库不再断链（原 null）；riskLevel 来源=agent 端 ToolSpec
   （策略工件，执行时盖章 `call.risk_level=spec.risk_level`），CP 侧缺省 READ_ONLY。
-- [ ] **P2-CP-24** 随 P1-T-02 覆盖。
+- [x] **P2-CP-24** 随 P1-T-02 覆盖：✅ 已确认——ControlPlaneChainTest Order(2)
+  高风险审批+auth 矩阵、Order(3) REJECT 回退+非法转换 409、Order(4) 毒任务
+  回收→DEAD 全在（审计指出的「审批/修复/鉴权 0 测试」倒挂已消除）。
 - [x] **P2-AR-09** Evidence 字段扩展：✅ agent Evidence 加 query/time_range
   （查询类工具自动提取 `[5m]` 类窗口），payload + CP V9 迁移（evidence.query/time_range），
   timestamp 由 DTO 可选携带；DiagnosisResult.status 语义三分：ROOT_CAUSE_FOUND /
@@ -410,17 +412,60 @@
 
 # P3
 
-- [ ] **P3-CP-25** 状态枚举化；rocketmq.* 死配置清理；pom docker profile 说明。
-- [ ] **P3-FI-11** redis instrumentation span；access log traceId；gateway 生成 X-Request-Id。
-- [ ] **P3-FI-12** AM 分组与标签粒度（resource={{ $labels.service }}）。
-- [ ] **P3-T-06** 真实 E2E 断言 root_cause ∈ 期望集合；时长改比例阈值。
-- [ ] **P3-CI-04** 缓存/Python 版本统一/run_all_local_tests 去重。
-- [ ] **P3-CI-05** gitleaks（或 scan-secrets.ps1）+ kubeconform 接 CI。
-- [ ] **P3-FE-04** API base 注入点；timeline 用真实 createdAt。
-- [ ] **P3-DOC-11** 轮换 .env 中的真实 API key。
-- [ ] **P3-DOC-12** api-contract 补 2 端点；api.md 方向修正；configuration.md 默认值统一。
-- [ ] **P3-EV-01** case 模板多样化（每 fault ≥5 表述 + 服务/严重度扰动）。
+- [x] **P3-CP-25** 状态枚举化：✅ AgentTaskStatus（QUEUED/RUNNING/COMPLETED/FAILED/DEAD）、
+  ApprovalStatus（PENDING/APPROVED/REJECTED）、MqStatus（PENDING/SENT）三枚举 +
+  `@Enumerated(STRING)`；JPQL 字面量全改 FQN 枚举常量；7 文件调用点同步
+  （service/repo/producer/controller/tests）。AgentStep/RemediationAction/ToolCall
+  的展示型 status 留 String（ponytail: 无条件流转，收益低）。
+  rocketmq.* 死配置已删（producer 直读 env，group 唯一生产者硬编码）；
+  pom docker profile 补用途注释。
+  ⚠ 遗留：改动完成但 IT 42/42 未重跑、未 commit——WSL 服务崩
+  （Wsl/Service/E_UNEXPECTED，同 3-4 轮前故障），bash 工具不可用；
+  WSL 恢复后先 `mvn -Pintegration clean test` 验证再提交。
+- [x] **P3-FI-11** redis instrumentation span；access log traceId；gateway 生成
+  X-Request-Id：✅ 代码完成——demo requirements 加
+  `opentelemetry-instrumentation-redis`；shared/observability 在 setup 挂
+  RedisInstrumentor + uvicorn.access 并入根格式（access log 带 traceId）；
+  gateway 入站缺 X-Request-Id 时生成 + 回写响应头 + 透传 order-service。
+  ⚠ 待 WSL 恢复后重建 demo 镜像实测（span/日志/X-Request-Id 三点）。
+- [x] **P3-FI-12** AM 分组与标签粒度：✅ HighErrorRate/HighLatency 的
+  resource 静态 `demo-service` → `{{ $labels.service }}`；HighCPU
+  `avg by (instance)` → `by (instance, service)`（保留 service 维度）；
+  HighCPU/HighMemory 显式补 service 标签。⚠ 待 promtool 语法校验（WSL 恢复后）。
+- [x] **P3-T-06** 真实 E2E 断言强化：✅ root_cause 落入故障期望集合
+  （LLM_PROVIDER≠mock 时严格断言；mock 恒答 redis 系 AR-12 同源——如实降级为
+  「非 unknown」）；恢复断言改比例阈值（≥3x 差距，cpu 烧 0.6s 后旧绝对
+  1.5s 断言已失真一并修正）。⚠ 待 compose 环境实测（WSL 恢复后）。
+- [x] **P3-CI-04** 缓存/版本/去重：✅ ci.yml 加 m2 缓存（pom 哈希键）+ pip 缓存；
+  Python 统一 3.11（与 Dockerfile python:3.11-slim 一致，写入 job 注释）；
+  去重——删独立 unit-test 步骤（run_all_local_tests 已含 unittest discover）。
+- [x] **P3-CI-05** gitleaks + kubeconform 接 CI：✅ secret-scan job
+  （gitleaks v8.21.2 detect --redact，命中 exit 1）+ k8s-validate job
+  （kubeconform v0.6.7 -strict deploy/k8s）。
+- [x] **P3-FE-04** API base 注入点；timeline 真实 createdAt：✅ App.jsx
+  `API_BASE = import.meta.env.VITE_API_BASE || ''`（apiFetch + login 统一挂）；
+  Agent 步骤 Timeline 前缀 `new Date(s.createdAt)`（AgentStep.createdAt 实存）。
+  ⚠ 待 vite build + Playwright 回归（WSL 恢复后）。
+- [ ] **P3-DOC-11** 轮换 .env 中的真实 API key：scan 侧已由 CI-05 gitleaks 覆盖
+  （.env 在 gitignore，.env.example 模板完备）；**轮换需用户在 provider 侧
+  吊销现 key（sk-DEzoRK…）并重发**——待用户操作。
+- [x] **P3-DOC-12** api-contract 补端点；api.md 方向修正；configuration.md
+  默认值统一：✅ api-contract 补 4 端点（alertmanager v4 契约体、claim/fail、
+  approvals/incident、dashboard/services）+ 旧直连 /alerts 标注遗留；
+  api.md 调用方向改轮询拉取（原「CP→RocketMQ→AR 推送」与现实现相反）；
+  configuration.md 与代码对齐（补 management/strict/agent token/task 租约
+  等缺项，修 CONTROL_PLANE_URL 默认值）。
+- [x] **P3-EV-01** case 模板多样化：✅ 10 fault × 5 条中性表述
+  （ALERT_PROFILES → summaries 列表），按 case id sha256 确定性选变体 +
+  严重度扰动（后 2/5 表述为 P2，不只训练 P1）。
+- [x] **P3-EV-02** incident_id 弃 `hash()`：✅ sha256 确定性（PYTHONHASHSEED
+  不再影响重跑 id）。
 - [ ] **P3-备份演练** backup/restore 脚本自动化演练（compose 环境即可）并归档记录。
+  ⚠ 需 bash（WSL 恢复后执行 pg_dump→restore→计数校验）。
+
+> **P3 批注（round 15）**：以上 ✅ 项为代码/文档完成态；因 WSL 服务崩溃
+> （round 14 起 bash 不可用），运行时验证（编译/IT/构建/实测）与 git 提交
+> 全部挂起，恢复后按 DoD 逐项实测再补勾证据、分批 commit。
 
 ---
 
