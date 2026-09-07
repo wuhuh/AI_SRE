@@ -32,7 +32,8 @@ groups:
         labels:
           severity: P1
           alertName: high_error_rate
-          resource: demo-service
+          # P3-FI-12: 分组粒度对齐真实服务（原静态 demo-service 聚合到一起）
+          resource: "{{ $labels.service }}"
         annotations:
           summary: "{{ $labels.service }} high error rate"
 
@@ -44,7 +45,7 @@ groups:
         labels:
           severity: P2
           alertName: high_latency
-          resource: demo-service
+          resource: "{{ $labels.service }}"
         annotations:
           summary: "{{ $labels.service }} p95 latency too high"
 
@@ -62,12 +63,14 @@ groups:
         # P1-FI-03: 阈值对齐真实注入——busy-loop 实测 avg rate≈0.79-0.83，
         # 0.8 贴边易漏报，0.7 保证 cpu_saturation 故障可靠触发
         expr: |
-          avg by (instance) (rate(process_cpu_seconds_total[5m])) > 0.7
+          avg by (instance, service) (rate(process_cpu_seconds_total[5m])) > 0.7
         for: 5m
         labels:
           severity: P2
           alertName: high_cpu
+          # P3-FI-12: 保留 service 维度（原 avg by(instance) 丢 service → 分组落不到服务）
           resource: "{{ $labels.instance }}"
+          service: "{{ $labels.service }}"
         annotations:
           summary: "{{ $labels.instance }} CPU usage high"
 
@@ -79,6 +82,8 @@ groups:
           severity: P2
           alertName: high_memory
           resource: "{{ $labels.instance }}"
+          # P3-FI-12: 显式带 service（demo 抓取目标带 service 静态标签）
+          service: "{{ $labels.service }}"
         annotations:
           summary: "{{ $labels.instance }} memory usage high"
 

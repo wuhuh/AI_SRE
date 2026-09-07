@@ -82,6 +82,10 @@ def setup(service_name: str, otlp_endpoint: str | None = None, metrics_port: int
     )
     for handler in logging.root.handlers:
         handler.addFilter(ContextFilter(service_name))
+    # P3-FI-11: access log 走根格式——uvicorn.access 默认自带的 formatter 不带
+    # traceId/requestId（audit FI-11「access log 无 traceId」）
+    logging.getLogger("uvicorn.access").handlers = []
+    logging.getLogger("uvicorn.access").propagate = True
     if _OTEL_AVAILABLE:
         resource = Resource.create({
             SERVICE_NAME: service_name,
@@ -91,6 +95,12 @@ def setup(service_name: str, otlp_endpoint: str | None = None, metrics_port: int
         endpoint = otlp_endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
         provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint + "/v1/traces")))
         trace.set_tracer_provider(provider)
+        # P3-FI-11: redis 调用产生 span（支付链路 redis 慢命令/连接池问题进 trace）
+        try:
+            from opentelemetry.instrumentation.redis import RedisInstrumentor
+            RedisInstrumentor().instrument()
+        except Exception as exc:  # pragma: no cover - instrumentation optional
+            logger.warning("Redis OTel instrumentation failed: %s", exc)
         if _OTEL_METRICS_AVAILABLE:
             metrics.set_meter_provider(MeterProvider(
                 resource=resource,
