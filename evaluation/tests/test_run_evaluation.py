@@ -1,4 +1,5 @@
 """P0-03: 评测 runner 的离线单测（打分/输入构造/泄漏防护）。"""
+
 from __future__ import annotations
 
 import sys
@@ -11,7 +12,6 @@ from run_evaluation import (  # noqa: E402
     ALERT_PROFILES,
     build_alert,
     evidence_scores,
-    normalize_label,
     score,
     summarize,
 )
@@ -68,8 +68,10 @@ class ScoreTest(unittest.TestCase):
     def test_old_bidirectional_substring_bug_is_gone(self):
         # 旧打分逻辑把 "redis_connection_pool_exhausted" 与自然语言期望句判为命中；
         # 新逻辑（精确标签匹配）必须判为不中。
-        diagnosis = {"root_cause": "redis_connection_pool_exhausted",
-                     "candidate_root_causes": ["redis_connection_pool_exhausted"]}
+        diagnosis = {
+            "root_cause": "redis_connection_pool_exhausted",
+            "candidate_root_causes": ["redis_connection_pool_exhausted"],
+        }
         self.assertEqual(score(diagnosis, "Redis connection pool is exhausted causing timeouts"), (False, False))
 
     def test_unknown_never_matches(self):
@@ -77,16 +79,34 @@ class ScoreTest(unittest.TestCase):
 
 
 class EvidenceScoresTest(unittest.TestCase):
-    def test_precision_and_recall(self):
-        diagnosis = {"evidence": [
-            {"key": "redis_connection_usage_high"},
-            {"key": "redis_timeout_log"},
-            {"key": "noise_key"},
-        ]}
-        precision, recall = evidence_scores(diagnosis, {"expected_evidence": [
-            "redis_connection_usage_high", "redis_timeout_log", "redis_span_latency_high"]})
-        self.assertEqual(precision, round(2 / 3, 4))
-        self.assertEqual(recall, round(2 / 3, 4))
+    def test_tag_matches_key_source_and_content(self):
+        # P2-FI-10: 产出 key 是 tool:step 序号 —— 语义标签要在 key/source/content 上按词匹配
+        diagnosis = {
+            "evidence": [
+                {
+                    "key": "query_prometheus:3",
+                    "source": "prometheus",
+                    "content": "used_connections==maxclients redis pool exhausted",
+                },
+                {"key": "query_logs:2", "source": "logs", "content": "slowlog latency 120ms on redis"},
+                {"key": "query_trace:1", "source": "trace", "content": "span latency high"},
+            ]
+        }
+        precision, recall = evidence_scores(
+            diagnosis, {"expected_evidence": ["redis_pool_exhausted", "redis_slowlog", "span_latency_high"]}
+        )
+        self.assertEqual(recall, 1.0)
+        self.assertEqual(precision, 1.0)
+
+    def test_partial_recall_and_noise(self):
+        diagnosis = {
+            "evidence": [
+                {"key": "query_logs:1", "source": "logs", "content": "unrelated text"},
+            ]
+        }
+        precision, recall = evidence_scores(diagnosis, {"expected_evidence": ["redis_slowlog", "cpu_high"]})
+        self.assertEqual(recall, 0.0)
+        self.assertEqual(precision, 0.0)
 
     def test_no_expected_returns_none(self):
         self.assertEqual(evidence_scores({"evidence": []}, {"expected_evidence": []}), (None, None))
@@ -95,14 +115,34 @@ class EvidenceScoresTest(unittest.TestCase):
 class SummarizeTest(unittest.TestCase):
     def test_report_math(self):
         rows = [
-            {"top1": True, "top3": True, "fallback_used": False, "status": "ROOT_CAUSE_FOUND",
-             "predicted": "slow_sql", "evidence_precision": 0.5, "evidence_recall": 1.0,
-             "tool_calls": 2, "tool_success": 2, "llm_input_tokens": 10, "llm_output_tokens": 5,
-             "latency_s": 1.0},
-            {"top1": False, "top3": False, "fallback_used": True, "status": "UNKNOWN",
-             "predicted": "unknown", "evidence_precision": None, "evidence_recall": None,
-             "tool_calls": 0, "tool_success": 0, "llm_input_tokens": 0, "llm_output_tokens": 0,
-             "latency_s": 3.0},
+            {
+                "top1": True,
+                "top3": True,
+                "fallback_used": False,
+                "status": "ROOT_CAUSE_FOUND",
+                "predicted": "slow_sql",
+                "evidence_precision": 0.5,
+                "evidence_recall": 1.0,
+                "tool_calls": 2,
+                "tool_success": 2,
+                "llm_input_tokens": 10,
+                "llm_output_tokens": 5,
+                "latency_s": 1.0,
+            },
+            {
+                "top1": False,
+                "top3": False,
+                "fallback_used": True,
+                "status": "UNKNOWN",
+                "predicted": "unknown",
+                "evidence_precision": None,
+                "evidence_recall": None,
+                "tool_calls": 0,
+                "tool_success": 0,
+                "llm_input_tokens": 0,
+                "llm_output_tokens": 0,
+                "latency_s": 3.0,
+            },
         ]
         report = summarize(rows)
         self.assertEqual(report["total_cases"], 2)

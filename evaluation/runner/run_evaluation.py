@@ -13,6 +13,7 @@
     python run_evaluation.py --splits test --provider openai --agent-url http://localhost:8081
     python run_evaluation.py --splits all --limit 5   # 冒烟
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,7 +22,7 @@ import os
 import sys
 import time
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 try:
@@ -107,14 +108,33 @@ def score(diagnosis: dict, expected_label: str) -> tuple[bool, bool]:
     return top1, top3
 
 
+def _tag_matched(tag: str, evidence: dict) -> bool:
+    """P2-FI-10: 语义标签匹配 —— 期望标签（如 redis_slowlog）按关键词拆分，
+    在证据的 key+source+content 中逐词核对。旧实现只对 key 字符串精确匹配，
+    而产出 key 是 `tool:step` 序号 → recall 恒 0，指标失真。"""
+    text = " ".join(
+        [
+            str(evidence.get("key", "")),
+            str(evidence.get("source", "")),
+            str(evidence.get("content", "")),
+        ]
+    ).lower()
+    parts = [p for p in tag.lower().replace("-", "_").split("_") if p]
+    return bool(parts) and all(p in text for p in parts)
+
+
 def evidence_scores(diagnosis: dict, case: dict) -> tuple[float | None, float | None]:
-    """Evidence Precision / Recall：产出 key 与期望 key 归一化后的集合交集。"""
-    expected = {normalize_label(k) for k in (case.get("expected_evidence") or []) if normalize_label(k)}
-    produced = {normalize_label(e.get("key", "")) for e in (diagnosis.get("evidence") or []) if normalize_label(e)}
+    """Evidence Precision / Recall：期望语义标签 vs 产出证据（key/source/content）。"""
+    expected = [k for k in (case.get("expected_evidence") or []) if normalize_label(k)]
+    produced = [e for e in (diagnosis.get("evidence") or []) if e]
     if not expected:
         return None, None
-    precision = len(expected & produced) / len(produced) if produced else 0.0
-    recall = len(expected & produced) / len(expected)
+    if not produced:
+        return 0.0, 0.0
+    matched_tags = sum(1 for tag in expected if any(_tag_matched(tag, e) for e in produced))
+    recall = matched_tags / len(expected)
+    matched_evidence = sum(1 for e in produced if any(_tag_matched(tag, e) for tag in expected))
+    precision = matched_evidence / len(produced)
     return round(precision, 4), round(recall, 4)
 
 
@@ -169,40 +189,52 @@ def evaluate(cases: list[dict], agent_url: str = AGENT_URL) -> list[dict]:
         try:
             data, latency = call_diagnose(case, agent_url)
         except Exception as e:  # noqa: BLE001 - 单个 case 失败不炸全局，记为 error row
-            rows.append({
-                "case_id": case.get("id"),
-                "expected": case.get("fault_type"),
-                "predicted": "http_error",
-                "error": f"{type(e).__name__}: {e}",
-                "candidates": [], "confidence": None, "status": "HTTP_ERROR",
-                "fallback_used": False, "top1": False, "top3": False,
-                "evidence_precision": None, "evidence_recall": None,
-                "tool_calls": 0, "tool_success": 0,
-                "llm_input_tokens": 0, "llm_output_tokens": 0, "latency_s": 0.0,
-            })
+            rows.append(
+                {
+                    "case_id": case.get("id"),
+                    "expected": case.get("fault_type"),
+                    "predicted": "http_error",
+                    "error": f"{type(e).__name__}: {e}",
+                    "candidates": [],
+                    "confidence": None,
+                    "status": "HTTP_ERROR",
+                    "fallback_used": False,
+                    "top1": False,
+                    "top3": False,
+                    "evidence_precision": None,
+                    "evidence_recall": None,
+                    "tool_calls": 0,
+                    "tool_success": 0,
+                    "llm_input_tokens": 0,
+                    "llm_output_tokens": 0,
+                    "latency_s": 0.0,
+                }
+            )
             continue
         diagnosis = data.get("diagnosis", {})
         top1, top3 = score(diagnosis, case.get("fault_type", ""))
         precision, recall = evidence_scores(diagnosis, case)
         tool_calls = diagnosis.get("tool_calls", []) or []
-        rows.append({
-            "case_id": case.get("id"),
-            "expected": case.get("fault_type"),
-            "predicted": diagnosis.get("root_cause", ""),
-            "candidates": diagnosis.get("candidate_root_causes", []),
-            "confidence": diagnosis.get("confidence"),
-            "status": diagnosis.get("status", ""),
-            "fallback_used": diagnosis.get("fallback_used", False),
-            "top1": top1,
-            "top3": top3,
-            "evidence_precision": precision,
-            "evidence_recall": recall,
-            "tool_calls": len(tool_calls),
-            "tool_success": sum(1 for t in tool_calls if t.get("status") == "SUCCESS"),
-            "llm_input_tokens": diagnosis.get("llm_input_tokens", 0),
-            "llm_output_tokens": diagnosis.get("llm_output_tokens", 0),
-            "latency_s": round(latency, 3),
-        })
+        rows.append(
+            {
+                "case_id": case.get("id"),
+                "expected": case.get("fault_type"),
+                "predicted": diagnosis.get("root_cause", ""),
+                "candidates": diagnosis.get("candidate_root_causes", []),
+                "confidence": diagnosis.get("confidence"),
+                "status": diagnosis.get("status", ""),
+                "fallback_used": diagnosis.get("fallback_used", False),
+                "top1": top1,
+                "top3": top3,
+                "evidence_precision": precision,
+                "evidence_recall": recall,
+                "tool_calls": len(tool_calls),
+                "tool_success": sum(1 for t in tool_calls if t.get("status") == "SUCCESS"),
+                "llm_input_tokens": diagnosis.get("llm_input_tokens", 0),
+                "llm_output_tokens": diagnosis.get("llm_output_tokens", 0),
+                "latency_s": round(latency, 3),
+            }
+        )
     return rows
 
 
@@ -241,14 +273,13 @@ def summarize(rows: list[dict]) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--splits", default="test", choices=["dev", "validation", "test", "all"])
-    parser.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "mock"),
-                        help="报告元数据：本次评测使用的 LLM provider")
+    parser.add_argument(
+        "--provider", default=os.getenv("LLM_PROVIDER", "mock"), help="报告元数据：本次评测使用的 LLM provider"
+    )
     parser.add_argument("--agent-url", default=AGENT_URL)
     parser.add_argument("--limit", type=int, default=0, help="只跑前 N 个 case（冒烟用）")
-    parser.add_argument("--types", default="",
-                        help="逗号分隔 fault_type 过滤（P0-08：只跑已注入真实故障的类型）")
-    parser.add_argument("--services", default="",
-                        help="逗号分隔 service 过滤（P0-08：只跑部署栈里真实存在故障的服务）")
+    parser.add_argument("--types", default="", help="逗号分隔 fault_type 过滤（P0-08：只跑已注入真实故障的类型）")
+    parser.add_argument("--services", default="", help="逗号分隔 service 过滤（P0-08：只跑部署栈里真实存在故障的服务）")
     parser.add_argument("--tag", default="", help="结果文件名附加标记（如 real-fault）")
     args = parser.parse_args()
 
@@ -283,7 +314,7 @@ def main() -> int:
 
     results_dir = base / "results"
     results_dir.mkdir(exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     suffix = f"_{args.tag}" if args.tag else ""
     out = results_dir / f"eval_{stamp}_{args.splits}_{args.provider}{suffix}.json"
     out.write_text(json.dumps({"report": report, "cases": rows}, indent=2, ensure_ascii=False), encoding="utf-8")
