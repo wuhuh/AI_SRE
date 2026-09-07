@@ -54,9 +54,6 @@ public class Incident {
 
     private Instant resolvedAt;
 
-    @Column(length = 4096)
-    private String report;
-
     @Column(nullable = false)
     private int alertCount = 0;
 
@@ -154,13 +151,6 @@ public class Incident {
         this.resolvedAt = resolvedAt;
     }
 
-    public String getReport() {
-        return report;
-    }
-
-    public void setReport(String report) {
-        this.report = report;
-    }
 
     public int getAlertCount() {
         return alertCount;

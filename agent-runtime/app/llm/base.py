@@ -26,14 +26,5 @@ class LLMProvider(ABC):
         raise NotImplementedError
 
 
-class TimeoutLLMProvider(LLMProvider):
-    """Provider wrapper that raises if a call exceeds budget."""
-
-    def __init__(self, inner: LLMProvider, timeout_seconds: float = 30.0):
-        self._inner = inner
-        self._timeout_seconds = timeout_seconds
-
-    def complete(self, messages, tools=None):
-        # In a real HTTP implementation this would use asyncio.wait_for / httpx timeout.
-        # The wrapper exists as an explicit retry/timeout boundary.
-        return self._inner.complete(messages, tools=tools)
+# P2-CP-22: TimeoutLLMProvider 已删——假超时包装（只透传）。超时由
+# OpenAICompatibleLLMProvider 的 httpx timeout 与 RetryLLMProvider 边界负责。
