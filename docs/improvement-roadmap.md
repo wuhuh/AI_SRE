@@ -403,6 +403,9 @@
   `34146753562`（2026-09-07 in_progress 时已确认）。仓库设为 private——
   匿名 API 读不到最终结论，testing.md 已记录 run id 与待回填说明；
   job 步骤的本地等价实测全部通过（见 docs/ci-activation.md 对照表）。
+  → **真实记录回填（round 20）**：run1 5 过 2 挂；ruff 版本漂移已 pin
+  修复并经 run2 验证（6 过）；java-integration 连挂待 Actions 日志定位
+  （本地同镜像 42/42 ×2 绿——CI 环境差异，需维护者贴日志）。
 - [x] **P2-DOC-08/09/10** 文档三连：✅ 测试计数统一为实测口径
   （agent 73 + eval 12 + Java IT 42 + Playwright 5 = 132，基线值标注「历史」）；
   故障表补 `memory_pressure` + cpu_saturation 改「真实 CPU 烧（P0-08）」+

@@ -54,9 +54,13 @@ python -m unittest tests.e2e.test_real_faults -v
 ```
 ## CI（GitHub Actions，P2-CI-03）
 
-- 首次真实运行：run `34146753562`（2026-09-07，push main 触发；远程仓库
-  `wuhuh/AI_SRE`，已设 private——匿名 API 读不到结论，待维护者在 Actions
-  页面确认或在本地配 gh token 后回填各 job 结果）。
+- 真实运行记录（2026-09-07）：
+  - run `34146753562`（a273d56）：**5 过**（java-build / web-build /
+    secret-scan / k8s-validate / docker-build），2 挂——ruff 版本漂移
+    （已 pin 0.16.6 修复）；java-integration 待日志定位。
+  - run `34147717090`（7f5a9bc）：**6 过**（ruff 修复生效），
+    java-integration 仍挂——本地同镜像 42/42 绿两次，属 CI 环境差异，
+    待 Actions 页日志定位（logs 下载需 admin 权限，匿名不可读）。
 - push 触发的 job：java-build / java-integration / python-lint-and-test /
   web-build / secret-scan / k8s-validate / docker-build；nightly-integration
   由 schedule cron（每日 03:00 UTC）触发。
