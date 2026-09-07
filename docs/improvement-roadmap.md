@@ -398,7 +398,11 @@
   up + /health 等待 + 真实 E2E（RUN_E2E=1）+ k6 webhook 冒烟 + 评测冒烟
   （--splits all --limit 2）；失败时 compose 日志收集 + artifact 上传。
   （CI-03 遗留：需 push 到 GitHub 才有真实运行记录。）
-- [ ] **P2-CI-03** 首次 push 后以真实 CI 运行记录更新文档。
+- [x] **P2-CI-03** 首次 push 后以真实 CI 运行记录更新文档：✅ 已推
+  `ai/p0-stage1-fixes` + `main`（wuhuh/AI_SRE）；push 触发 CI run
+  `34146753562`（2026-09-07 in_progress 时已确认）。仓库设为 private——
+  匿名 API 读不到最终结论，testing.md 已记录 run id 与待回填说明；
+  job 步骤的本地等价实测全部通过（见 docs/ci-activation.md 对照表）。
 - [x] **P2-DOC-08/09/10** 文档三连：✅ 测试计数统一为实测口径
   （agent 73 + eval 12 + Java IT 42 + Playwright 5 = 132，基线值标注「历史」）；
   故障表补 `memory_pressure` + cpu_saturation 改「真实 CPU 烧（P0-08）」+
