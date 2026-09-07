@@ -8,6 +8,7 @@ pipeline.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 import urllib.request
@@ -27,6 +28,9 @@ def _request_json(method: str, url: str, payload: dict | None = None, timeout: f
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         body = resp.read().decode("utf-8")
         return json.loads(body) if body else None
+
+
+logger = logging.getLogger(__name__)
 
 
 def agent_headers() -> dict:
@@ -86,7 +90,10 @@ def _worker_id() -> str:
 
 
 def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> int:
-    tasks = _request_json("GET", f"{cp_url}/api/v1/tasks/pending", timeout=10) or []
+    # P2-CP-23 补链：轮询也要带 agent token（P1-CP-14 读门控后无头轮询一直 401，
+    # 且循环 except: pass 吞掉了错误 —— 现在至少 WARN 一行）
+    tasks = _request_json("GET", f"{cp_url}/api/v1/tasks/pending", timeout=10,
+                          headers=agent_headers()) or []
     processed = 0
     worker = _worker_id()
     for task in tasks:
@@ -141,6 +148,6 @@ def consumer_loop(runner: AgentRunner, cp_url: str, interval: float = 3.0, idemp
     while True:
         try:
             consume_once(runner, cp_url, store)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("consume_once failed: %s", exc)
         time.sleep(interval)
