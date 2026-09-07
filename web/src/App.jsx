@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Button,
   Card,
   Col,
@@ -34,19 +35,37 @@ export default function App() {
   const [remediations, setRemediations] = useState([]);
   const [steps, setSteps] = useState([]);
   const [loading, setLoading] = useState(false);
+  // P2-FE-03: 统一错误态（React 此前无 error 展示）
+  const [error, setError] = useState('');
+
+  // P2-FE-03: 统一 fetch —— 401 清 token 提示重登，非 2xx 抛错由调用方提示
+  const apiFetch = async (url, opts = {}) => {
+    const res = await fetch(url, { ...opts, headers: { ...authHeaders(), ...(opts.headers || {}) } });
+    if (res.status === 401) {
+      setAuthToken('');
+      localStorage.removeItem('aisre_token');
+      setError('登录已过期或未登录，请重新登录');
+      throw new Error('401');
+    }
+    return res;
+  };
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/incidents', { headers: authHeaders() });
+      const res = await apiFetch('/api/v1/incidents');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
       setIncidents(await res.json());
+      setError('');
+    } catch (e) {
+      if (String(e.message) !== '401') setError('加载事故列表失败：' + e.message);
     } finally {
       setLoading(false);
     }
   };
 
   const loadServices = async () => {
-    const res = await fetch('/api/v1/dashboard/services', { headers: authHeaders() });
+    const res = await apiFetch('/api/v1/dashboard/services');
     if (res.ok) {
       setServices(await res.json());
     }
@@ -76,7 +95,7 @@ export default function App() {
 
   const loadApprovals = async (id) => {
     if (!id) return;
-    const res = await fetch(`/api/v1/approvals/incident/${id}`, { headers: authHeaders() });
+    const res = await apiFetch(`/api/v1/approvals/incident/${id}`);
     if (res.ok) {
       setApprovals(await res.json());
     }
@@ -85,10 +104,10 @@ export default function App() {
   const loadDetails = async (id) => {
     if (!id) return;
     const [ev, tc, rm, st] = await Promise.all([
-      fetch(`/api/v1/incidents/${id}/evidence`, { headers: authHeaders() }),
-      fetch(`/api/v1/incidents/${id}/tool-calls`, { headers: authHeaders() }),
-      fetch(`/api/v1/incidents/${id}/remediations`, { headers: authHeaders() }),
-      fetch(`/api/v1/incidents/${id}/steps`, { headers: authHeaders() }),
+      apiFetch(`/api/v1/incidents/${id}/evidence`),
+      apiFetch(`/api/v1/incidents/${id}/tool-calls`),
+      apiFetch(`/api/v1/incidents/${id}/remediations`),
+      apiFetch(`/api/v1/incidents/${id}/steps`),
     ]);
     if (ev.ok) setEvidence(await ev.json());
     if (tc.ok) setToolCalls(await tc.json());
@@ -99,11 +118,28 @@ export default function App() {
   useEffect(() => {
     load();
     loadServices();
-    const es = new EventSource('/api/v1/stream/incidents');
-    es.onmessage = () => load();
+    // P2-FE-03: SSE 断线自动重连（指数退避，封顶 10s）；卸载时彻底清理
+    let es = null;
+    let retryTimer = null;
+    let attempt = 0;
+    let disposed = false;
+    const connect = () => {
+      if (disposed) return;
+      es = new EventSource('/api/v1/stream/incidents');
+      es.onmessage = () => load();
+      es.onopen = () => { attempt = 0; };
+      es.onerror = () => {
+        if (es) es.close();
+        attempt += 1;
+        retryTimer = setTimeout(connect, Math.min(1000 * 2 ** attempt, 10000));
+      };
+    };
+    connect();
     const timer = setInterval(loadServices, 10000);
     return () => {
-      es.close();
+      disposed = true;
+      if (es) es.close();
+      if (retryTimer) clearTimeout(retryTimer);
       clearInterval(timer);
     };
   }, []);
@@ -120,13 +156,18 @@ export default function App() {
       window.alert('请先登录');
       return;
     }
-    const res = await fetch(`/api/v1/approvals/${id}/decision`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ decision: decisionType, operator: 'frontend-user' }),
-    });
+    let res;
+    try {
+      res = await apiFetch(`/api/v1/approvals/${id}/decision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: decisionType, operator: 'frontend-user' }),
+      });
+    } catch (e) {
+      return; // 401 已由 apiFetch 统一提示
+    }
     if (!res.ok) {
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       window.alert('操作失败：' + (data.message || res.status));
       return;
     }
@@ -248,6 +289,9 @@ export default function App() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#F7F8FA' }}>
+      {error && (
+        <Alert type='error' message={error} showIcon closable onClose={() => setError('')} />
+      )}
       <Header style={{
         background: '#FFFFFF',
         borderBottom: '1px solid #E5E7EB',

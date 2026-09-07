@@ -369,8 +369,15 @@
 - [x] **P2-T-05** 契约对真 CP：✅ 由 ControlPlaneChainTest 承担（agent 的
   diagnosis/verification/approval/tasks 载荷全部经 testcontainers 真 CP HTTP 走通，
   含 auth 矩阵）；Python mock 契约测试保留为本地快速反馈（不建第二套 harness）。
-- [ ] **P2-FE-02** Playwright 冒烟（3-5 用例：列表/详情/审批 401）。
-- [ ] **P2-FE-03** EventSource 去手动 close；统一 fetch 错误+401 处理。
+- [x] **P2-FE-02** Playwright 冒烟：✅ 5 用例对齐真实 React UI
+  （summary 指标 / incidents 真数据表 / 登录入口 / **401 统一错误** / 登录落 token），
+  对 compose 真 CP 跑（frontend :8083，nginx 代理）；mcr playwright docker 运行
+  （本机无浏览器且 cdn 超时）。5/5 通过（4s）。
+- [x] **P2-FE-03** 前端健壮性：✅ apiFetch 统一 fetch（401 → 清 token +
+  统一错误 Alert「登录已过期或未登录」；decision 401 不再 unhandled rejection）；
+  React 新增 error 态（antd Alert，可关闭）；SSE onerror 断线**自动重连**
+  （指数退避封顶 10s，卸载时彻底清理）。window.prompt 登录保留（换成 Modal
+  属体验升级，未列入本项）。
 - [ ] **P2-E2E-01** local_e2e_runner 更名"契约冒烟"；文档定位改写。
 - [x] **P2-BM-02** agent-benchmark 重写：✅ `--url/--output/--provider` +
   `--max-p95-s/--max-error-rate` 阈值门禁（超限 exit 1 可接 CI）+ 逐请求错误处理

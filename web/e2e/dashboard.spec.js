@@ -1,13 +1,50 @@
 import { test, expect } from '@playwright/test';
 
-test('dashboard renders service health and incidents', async ({ page }) => {
+// P2-FE-02: 冒烟对齐真实 React UI（compose frontend :8083，nginx 代理 /api → CP）
+// 前置：docker compose up（frontend + control-plane）
+
+test('dashboard renders summary metrics', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByText('系统概览')).toBeVisible();
-  await expect(page.getByText('Service Health').first()).toBeVisible();
-  await expect(page.getByText('Recent Incidents').first()).toBeVisible();
+  await expect(page.getByText('Incident', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Recovered').first()).toBeVisible();
+  await expect(page.getByText('Pending Approval').first()).toBeVisible();
 });
 
-test('login flow shows login button', async ({ page }) => {
+test('incidents table loads from real CP', async ({ page }) => {
+  await page.goto('/');
+  // IncidentTable 数据表渲染（真实数据列）
+  await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });
+});
+
+test('login entry exists', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: '登录' })).toBeVisible();
+});
+
+test('401 clears token and surfaces unified error', async ({ page }) => {
+  // 预置一个坏 token → incidents 请求 401 → 统一错误提示出现
+  await page.addInitScript(() => localStorage.setItem('aisre_token', 'invalid-token'));
+  await page.goto('/');
+  await expect(page.getByText('登录已过期或未登录，请重新登录')).toBeVisible({ timeout: 15000 });
+});
+
+test('login via admin stores token', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: '登录' })).toBeVisible();
+  const adminPw = process.env.ADMIN_PW || 'aisre-dev-admin-pw';
+  // prompt 会阻塞页面主线程 —— click 用 noWaitAfter，两个 dialog 逐个等事件再处理
+  const clickPromise = page
+    .getByRole('button', { name: '登录' })
+    .click({ noWaitAfter: true, timeout: 10000 })
+    .catch(() => {});
+  const d1 = await page.waitForEvent('dialog', { timeout: 10000 });
+  await d1.accept('admin');
+  const d2 = await page.waitForEvent('dialog', { timeout: 10000 });
+  await d2.accept(adminPw);
+  await clickPromise;
+  await page.waitForTimeout(1500);
+  // 登录成功后 token 落库，后续请求带 Authorization（不再 401）
+  const token = await page.evaluate(() => localStorage.getItem('aisre_token'));
+  expect(token && token.length > 20).toBeTruthy();
 });
