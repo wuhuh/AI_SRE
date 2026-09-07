@@ -13,30 +13,73 @@ spec:
       labels:
         app: agent-runtime
     spec:
+      volumes:
+        # P2-K8S-01: 镜像内 /tmp/checkpoints、/tmp/idempotency 为 root 所有，
+        # 非 root（uid 1000）运行时用 emptyDir 覆盖（运行态可写）
+        - name: checkpoints
+          emptyDir: {}
+        - name: idempotency
+          emptyDir: {}
       containers:
         - name: agent-runtime
-          image: aisre/agent-runtime:latest
+          image: aisre-agent-runtime:k8s01
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           env:
             - name: LLM_PROVIDER
               value: mock
+            # P1-MQ-02 生产消费路径：轮询 /tasks/pending + claim
+            - name: AUTO_CONSUME
+              value: "true"
             - name: PROMETHEUS_URL
               value: http://prometheus:9090
             - name: LOKI_URL
               value: http://loki:3100
             - name: TEMPO_URL
               value: http://jaeger:16686
+            # 非 root 运行：幂等/断点目录指向挂载的 emptyDir（默认相对 CWD 不可写）
+            - name: IDEMPOTENCY_DIR
+              value: /tmp/idempotency
+            - name: CHECKPOINT_DIR
+              value: /tmp/checkpoints
             # P0-05: 与 control-plane 的 AISRE_AGENT_TOKEN 同值
             - name: AGENT_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: db-secret
                   key: agentToken
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /health
               port: 8080
+            initialDelaySeconds: 10
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000   # 镜像内命名用户 app（kubelet 需数字 uid）
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: checkpoints
+              mountPath: /tmp/checkpoints
+            - name: idempotency
+              mountPath: /tmp/idempotency
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
 ---
 apiVersion: v1
 kind: Service

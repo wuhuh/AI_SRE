@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: control-plane
-          image: aisre/control-plane:latest
+          image: aisre-control-plane:k8s01
           ports:
             - containerPort: 8080
           env:
@@ -66,10 +66,32 @@ spec:
                 secretKeyRef:
                   name: db-secret
                   key: agentToken
+            # P1-CP-14: 管理端点独立端口（探针走 8085，业务 8080 不暴露管理面）
+            - name: MANAGEMENT_PORT
+              value: "8085"
+          ports:
+            - containerPort: 8085
+          # P2-K8S-01: liveness/readiness 分离（P2-CP-21 已有端点）
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8085
+            initialDelaySeconds: 40
+            periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /actuator/health
-              port: 8080
+              path: /actuator/health/readiness
+              port: 8085
+            initialDelaySeconds: 20
+          # P2-K8S-01: 容器加固
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
           resources:
             requests:
               cpu: 250m
@@ -116,13 +138,15 @@ metadata:
   name: db-secret
   namespace: ai-sre
 type: Opaque
+# P2-K8S-01: 以下为本地 kind 演练值（与 compose .env 默认一致，无真实凭据）。
+# 生产必须替换并改用外部 Secret 管理（sealed-secrets/vault），不得入仓。
 stringData:
-  username: REPLACE_WITH_DB_USER
-  password: REPLACE_WITH_DB_PASSWORD
-  # P0-06: 认证凭据（jwtSecret 必须 >=32 字节；口令支持明文或 BCrypt 哈希）
-  jwtSecret: REPLACE_WITH_JWT_SECRET_MIN_32_BYTES
-  adminPassword: REPLACE_WITH_ADMIN_PASSWORD
-  operatorPassword: REPLACE_WITH_OPERATOR_PASSWORD
-  viewerPassword: REPLACE_WITH_VIEWER_PASSWORD
-  # P0-05: Agent 回调共享 token
-  agentToken: REPLACE_WITH_AGENT_TOKEN
+  toolServerToken: local-dev-token
+  username: aisre
+  password: aisre
+  # dev 固定值（>=32B）；生产用 openssl rand -base64 32 轮换
+  jwtSecret: dev-only-jwt-secret-0123456789abcdef0123456789abcdef
+  adminPassword: aisre-dev-admin-pw
+  operatorPassword: aisre-dev-operator-pw
+  viewerPassword: aisre-dev-viewer-pw
+  agentToken: local-dev-agent-token

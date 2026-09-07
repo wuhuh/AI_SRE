@@ -68,4 +68,47 @@ spec:
               app: agent-runtime
       ports:
         - protocol: TCP
-          port: 8080
+          port: 8080---
+# P2-K8S-01: DNS egress——default-deny 下不放行 53 端口，所有 Pod 的
+# 服务发现（CoreDNS）都被拒，这是原清单断网的首因
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dns-egress
+  namespace: ai-sre
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# P2-K8S-01: 同 namespace 业务互通（demo 链路 gateway→order→inventory/payment、
+# payment→redis、agent→CP、tool-server→数据层）；跨 namespace 仍默认拒绝
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: intra-namespace
+  namespace: ai-sre
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}

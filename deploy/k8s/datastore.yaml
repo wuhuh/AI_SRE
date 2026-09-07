@@ -1,0 +1,122 @@
+# P2-K8S-01: 数据层 manifest（postgres + redis；RocketMQ 声明 compose-only——
+# producer 起不来不炸启动，任务留 outbox 由扫描器补发，见 RocketMqAgentJobProducer）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: ai-sre
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate   # PVC 单挂载点
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          # 网络受限环境：docker.io 直连超时——用 daocloud 镜像全名（kind 节点直连可达）
+          image: docker.m.daocloud.io/library/postgres:16-alpine
+          env:
+            - name: POSTGRES_USER
+              value: aisre
+            - name: POSTGRES_PASSWORD
+              value: aisre
+            - name: POSTGRES_DB
+              value: aisre
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "aisre"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "aisre"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: data
+          emptyDir: {}   # 演练级存储；生产需 PVC（kind 需装 local-path 默认有）
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: ai-sre
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: ai-sre
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: redis
+          image: docker.m.daocloud.io/library/redis:7-alpine
+          ports:
+            - containerPort: 6379
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 3
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: ai-sre
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379

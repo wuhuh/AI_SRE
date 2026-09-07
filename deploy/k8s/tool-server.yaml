@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tool-server
+  namespace: ai-sre
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tool-server
+  template:
+    metadata:
+      labels:
+        app: tool-server
+    spec:
+      # P0-10: 最小 RBAC（tool-server-rbac.yaml）——restart_pod 走 docker.sock 的
+      # 方案仅适用于 compose 单机；k8s 内降级为只读工具（写动作需 k8s API 改造，见 audit）
+      serviceAccountName: tool-server
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: tool-server
+          image: aisre-tool-server:k8s01
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          env:
+            - name: REDIS_URL
+              value: redis://redis:6379/0
+            # P0-04: 与 control-plane 的 AISRE_TOOL_SERVER_TOKEN 同值
+            - name: APPROVAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: toolServerToken
+            # P0-10: k8s 内不挂 docker.sock——db 工具走集群内 postgres
+            - name: DATABASE_DSN
+              value: postgres://aisre:aisre@postgres:5432/aisre?sslmode=disable
+            - name: DOCKER_SOCKET
+              value: ""  # 显式空：无 sock → k8s 动作 dryRun（如实降级，不假装可重启）
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000   # 镜像内命名用户 app（kubelet 需数字 uid 验证非 root）
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tool-server
+  namespace: ai-sre
+spec:
+  selector:
+    app: tool-server
+  ports:
+    - port: 8081
+      targetPort: 8081

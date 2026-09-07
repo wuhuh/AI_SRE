@@ -13,9 +13,14 @@ spec:
       labels:
         app: gateway
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
         - name: gateway
-          image: aisre/gateway:latest
+          image: aisre-gateway:k8s01
           ports:
             - containerPort: 8000
           env:
@@ -49,9 +54,14 @@ spec:
       labels:
         app: order-service
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
         - name: order
-          image: aisre/order-service:latest
+          image: aisre-order-service:k8s01
           ports:
             - containerPort: 8002
           env:
@@ -87,9 +97,14 @@ spec:
       labels:
         app: inventory-service
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
         - name: inventory
-          image: aisre/inventory-service:latest
+          image: aisre-inventory-service:k8s01
           ports:
             - containerPort: 8003
 ---
@@ -120,9 +135,14 @@ spec:
       labels:
         app: payment-service
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
         - name: payment
-          image: aisre/payment-service:latest
+          image: aisre-payment-service:k8s01
           ports:
             - containerPort: 8001
             - containerPort: 8004

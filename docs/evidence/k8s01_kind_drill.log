@@ -1,0 +1,30 @@
+# K8S-01 kind drill — 2026-09-07
+
+## cluster
+aisre
+
+## pods (all Running)
+NAME                                 READY   STATUS    RESTARTS      AGE
+agent-runtime-9df97c84c-dzwvg        1/1     Running   0             101s
+control-plane-5ff96b766f-5ph6t       1/1     Running   8 (16m ago)   28m
+frontend-6f4f6b5df5-tmvps            1/1     Running   0             18m
+gateway-79fc946cc5-ck7rx             1/1     Running   0             28m
+inventory-service-6b879dd674-bjb4d   1/1     Running   0             28m
+order-service-c58c968b8-479rc        1/1     Running   0             28m
+payment-service-5c958458f5-tjcxb     1/1     Running   0             28m
+postgres-f66444658-czpff             1/1     Running   0             21m
+redis-686578c874-jgpjc               1/1     Running   0             20m
+tool-server-74b74c66dd-7vtbb         1/1     Running   0             15m
+
+## network policies
+NAME                        POD-SELECTOR   AGE
+default-deny                <none>         28m
+dns-egress                  <none>         28m
+frontend-to-control-plane   app=frontend   28m
+intra-namespace             <none>         28m
+
+## closed loop (in-cluster CP + agent consumer)
+alert -> 202 results incidentId=1
+2026-09-07 14:52:24,572 INFO agent.diagnostic diagnosis start: incident=1 plan=['query_prometheus', 'query_logs', 'query_trace', 'retrieve_runbook'] resumed_pending=True
+
+incident 1 status: ROOT_CAUSE_FOUND (mock provider; prometheus compose-only so root=unknown per no-data-honesty design)
