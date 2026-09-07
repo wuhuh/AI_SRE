@@ -52,3 +52,12 @@ cd agent-runtime
 $env:RUN_E2E = "1"
 python -m unittest tests.e2e.test_real_faults -v
 ```
+## CI（GitHub Actions，P2-CI-03）
+
+- 首次真实运行：run `34146753562`（2026-09-07，push main 触发；远程仓库
+  `wuhuh/AI_SRE`，已设 private——匿名 API 读不到结论，待维护者在 Actions
+  页面确认或在本地配 gh token 后回填各 job 结果）。
+- push 触发的 job：java-build / java-integration / python-lint-and-test /
+  web-build / secret-scan / k8s-validate / docker-build；nightly-integration
+  由 schedule cron（每日 03:00 UTC）触发。
+- 各 job 关键步骤的本地等价实测对照见 `docs/ci-activation.md`。
