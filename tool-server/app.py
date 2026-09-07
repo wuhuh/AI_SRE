@@ -11,7 +11,6 @@ import json
 import os
 from typing import Any
 
-import httpx
 from fastapi import FastAPI, Header, HTTPException
 
 app = FastAPI(title="AI SRE Tool Gateway", version="0.1.0")
@@ -23,6 +22,25 @@ WRITE_ACTIONS = ("restart_pod", "scale_deployment", "delete_pod", "rollback_depl
 def _token_ok(provided: str | None) -> bool:
     # P0-04: 精确匹配 + 常量时间比较（旧实现 len>=8 即放行等于没有校验）
     return bool(provided) and hmac.compare_digest(provided.encode(), APPROVAL_TOKEN.encode())
+
+
+# P2-FI-08: 平台自监控（同端口 /metrics + 请求计数）
+from prometheus_client import Counter as _Counter
+from prometheus_client import make_asgi_app
+
+TOOLSERVER_REQUESTS = _Counter(
+    "aisre_toolserver_requests_total", "请求计数", ["path", "status"]
+)
+
+
+@app.middleware("http")
+async def _count_requests(request, call_next):
+    response = await call_next(request)
+    TOOLSERVER_REQUESTS.labels(path=request.url.path, status=str(response.status_code)).inc()
+    return response
+
+
+app.mount("/metrics", make_asgi_app())
 
 
 @app.get("/health")

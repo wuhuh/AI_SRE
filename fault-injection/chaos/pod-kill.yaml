@@ -1,3 +1,5 @@
+# EXPERIMENTAL（P2-FI-07）：Chaos Mesh 未在真实集群实测，勿当已验证能力引用；
+# 启用条件：P2-K8S-01 完成后于 kind 实测通过再转正。
 apiVersion: chaos-mesh.org/v1alpha1
 kind: PodChaos
 metadata:

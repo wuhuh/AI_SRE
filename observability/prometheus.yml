@@ -33,11 +33,24 @@ scrape_configs:
         labels:
           service: payment-service
 
+  # P2-FI-08: actuator 分端口后 scrape 目标同步改 8085（原 8080 已 404 —— 静默断链修复）
   - job_name: 'control-plane'
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
-          - 'control-plane:8080'
+          - 'control-plane:8085'
+
+  - job_name: 'agent-runtime'
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - 'agent-runtime:8080'
+
+  - job_name: 'tool-server'
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - 'tool-server:8081'
         labels:
           service: control-plane
 

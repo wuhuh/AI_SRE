@@ -340,8 +340,16 @@
   UNKNOWN（LLM 降级）/ **TIMEOUT**（预算耗尽，不再伪装 UNKNOWN，测试同步更新）。
 - [ ] **P2-AR-10** Planner 与 function calling 合并决策（随 AR-02 中期方案）。
 - [ ] **P2-AR-11** mcp_client 删除或接线。
-- [ ] **P2-FI-07** chaos YAML 删除或标注 experimental（K8s 实测后再启用）。
-- [ ] **P2-FI-08** self-monitoring：agent-runtime/tool-server `/metrics`（prometheus_client）+ scrape job + up 告警 + ≥1 张 Grafana dashboard；补平台自身指标（诊断时延、tool 失败率、任务积压、DB 池）。
+- [x] **P2-FI-07** chaos YAML 标注 EXPERIMENTAL：✅ 三份 Chaos Mesh YAML 头部注明
+  未在真实集群实测、启用条件（P2-K8S-01 后实测转正）。
+- [x] **P2-FI-08** self-monitoring 从 0 到 1：✅ agent-runtime/tool-server 挂载
+  /metrics（prometheus_client，同端口零新端口）；平台指标：aisre_tool_calls_total{tool,status}、
+  aisre_diagnosis_duration_seconds（直方图）、aisre_diagnoses_total{status}、
+  aisre_tasks_pending、aisre_toolserver_requests_total；修复 control-plane scrape
+  静默断链（actuator 分端口后仍打 8080→已改 8085）；新增 agent-runtime/tool-server
+  scrape job；ServiceDown(up==0) 自动覆盖新 job；Grafana 面板「AI SRE Platform
+  Overview」已 provisioning（up/诊断时延 p90/诊断状态/工具失败/任务积压/5xx/Hikari）。
+  实测：9/9 targets up；真实故障 21 次工具调用 + 3 次诊断 + p90 0.9s 全部入库。
   验证：Grafana 有平台面板；停 agent-runtime 有 ServiceDown 告警。
 - [ ] **P2-FI-09** SLO recording rules（availability/p95/error rate）+ 最小 error budget 面板。
 - [ ] **P2-FI-10** 评估期望证据与真实机制对齐（随 P0-08）。

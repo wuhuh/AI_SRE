@@ -53,6 +53,9 @@ class Tool(ABC):
             call.error = str(e)
         finally:
             call.duration_ms = int((time.perf_counter() - start) * 1000)
+        # P2-FI-08: 按最终状态计数（成功/超时/拒绝/错误）
+        from app.metrics import TOOL_CALLS_TOTAL
+        TOOL_CALLS_TOTAL.labels(tool=self.spec.name, status=call.status).inc()
         return call
 
 

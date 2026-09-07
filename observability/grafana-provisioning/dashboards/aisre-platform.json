@@ -1,0 +1,59 @@
+{
+  "title": "AI SRE Platform Overview",
+  "uid": "aisre-platform",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-3h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Scrape Targets Up",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "count(up == 1)", "refId": "A" }, { "expr": "count(up == 0)", "refId": "B" }]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "诊断时延 p90（agent-runtime）",
+      "gridPos": { "x": 6, "y": 0, "w": 9, "h": 8 },
+      "targets": [{ "expr": "histogram_quantile(0.9, sum(rate(aisre_diagnosis_duration_seconds_bucket[1h])) by (le))", "refId": "A" }]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "诊断状态分布",
+      "gridPos": { "x": 15, "y": 0, "w": 9, "h": 8 },
+      "targets": [{ "expr": "sum(rate(aisre_diagnoses_total[1h])) by (status)", "refId": "A" }]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "工具调用（按状态）",
+      "gridPos": { "x": 0, "y": 4, "w": 6, "h": 8 },
+      "targets": [{ "expr": "sum(rate(aisre_tool_calls_total[5m])) by (status)", "refId": "A" }]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "任务积压（pending）",
+      "gridPos": { "x": 0, "y": 12, "w": 8, "h": 8 },
+      "targets": [{ "expr": "aisre_tasks_pending", "refId": "A" }]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "demo 服务 5xx 率",
+      "gridPos": { "x": 8, "y": 12, "w": 8, "h": 8 },
+      "targets": [{ "expr": "sum by (service) (rate(http_requests_total{status=~\"5..\"}[5m]))", "refId": "A" }]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "CP 连接池活跃（Hikari）",
+      "gridPos": { "x": 16, "y": 12, "w": 8, "h": 8 },
+      "targets": [{ "expr": "hikaricp_connections_active", "refId": "A" }]
+    }
+  ]
+}
