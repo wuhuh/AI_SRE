@@ -1,8 +1,8 @@
-"""Optional RocketMQ consumer.
+"""Optional RocketMQ consumer (EXPERIMENTAL — P1-MQ-01).
 
-If the `rocketmq-client-python` package is installed, this module can consume
-diagnosis tasks directly from RocketMQ. Otherwise the runtime falls back to the
-Control Plane polling consumer in `consumer.py`.
+生产路径是 `consumer.py` 的控制面轮询消费（compose AUTO_CONSUME=true 启用），
+本模块从未被 main.py 接线，仅作直连 RocketMQ 的实验备选。
+若启用需补：毒消息重试/死信语义与轮询路径对齐（见 P1-MQ-03）。
 """
 from __future__ import annotations
 

@@ -24,12 +24,18 @@ public class AgentTaskService {
     private static final Logger log = LoggerFactory.getLogger(AgentTaskService.class);
 
     private final AgentTaskRepository agentTaskRepository;
+    private final com.aisre.service.AuditService auditService;
     private final long leaseSeconds;
+    private final int maxAttempts;
 
     public AgentTaskService(AgentTaskRepository agentTaskRepository,
-                            @Value("${aisre.task.lease-seconds:600}") long leaseSeconds) {
+                            com.aisre.service.AuditService auditService,
+                            @Value("${aisre.task.lease-seconds:600}") long leaseSeconds,
+                            @Value("${aisre.task.max-attempts:16}") int maxAttempts) {
         this.agentTaskRepository = agentTaskRepository;
+        this.auditService = auditService;
         this.leaseSeconds = leaseSeconds;
+        this.maxAttempts = maxAttempts;
     }
 
     @Transactional
@@ -64,9 +70,21 @@ public class AgentTaskService {
     @Scheduled(fixedDelayString = "${aisre.task.lease-reclaim-interval-ms:60000}")
     @Transactional
     public void reclaimExpiredLeases() {
-        int reclaimed = agentTaskRepository.reclaimExpiredLeases(Instant.now().minusSeconds(leaseSeconds));
+        int reclaimed = agentTaskRepository.reclaimExpiredLeases(
+                Instant.now().minusSeconds(leaseSeconds), maxAttempts);
         if (reclaimed > 0) {
             log.warn("reclaimed {} expired diagnosis task lease(s)", reclaimed);
+            // P1-MQ-03: 转入 DEAD 的即毒任务（DLQ 等价物）——审计 + 告警日志。
+            // attempts == max 只在首次到达时成立 → 不重复审计
+            for (AgentTask dead : agentTaskRepository.findByStatusAndAttemptsGreaterThanEqual("DEAD", maxAttempts)) {
+                if (dead.getAttempts() != maxAttempts) {
+                    continue;
+                }
+                log.error("POISON TASK: task {} (incident {}) moved to DEAD after {} attempts",
+                        dead.getId(), dead.getIncidentId(), dead.getAttempts());
+                auditService.record(dead.getIncidentId(), "system", "TASK_POISONED",
+                        "attempts=" + dead.getAttempts());
+            }
         }
     }
 

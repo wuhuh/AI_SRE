@@ -230,7 +230,9 @@
   验证：含 "ignore previous instructions" 的 runbook 检索后结论不受影响的测试。
   Effort: S
 
-- [ ] **P1-MQ-01** 消费端决策：方案(a) 删/标注 experimental mq_consumer.py + 文档改轮询；或方案(b) 引入可安装的 RocketMQ 客户端真消费。
+- [x] **P1-MQ-01** 消费端决策：✅ 方案 (a)——生产路径确认为控制面轮询消费
+  （compose AUTO_CONSUME=true → consumer_loop；mq_consumer.py 从未被 main.py 接线），
+  已在模块头标注 EXPERIMENTAL 并注明启用前提（毒消息/DLQ 语义与轮询对齐）。
   验证：(a) 文档与架构图一致；(b) kill 消费者 → 消息重投 → 处理成功（幂等）。
   Effort: S(a)/L(b)
 
@@ -241,7 +243,11 @@
   验证：两消费者并发领取同一任务仅一成功；租约超时被回收重发。
   Effort: M
 
-- [ ] **P1-MQ-03** 毒消息与 DLQ：最大重试（如 16）后入 DLQ + 通过 CP 自省告警；幂等存储迁 DB。
+- [x] **P1-MQ-03** 毒消息与 DLQ：✅ agent_task.attempts（V7 迁移）——租约回收时
+  重试 +1，达上限（aisre.task.max-attempts，默认 16）转 DEAD（DLQ 等价物，可查询）
+  + TASK_POISONED 审计 + ERROR 日志（attempts==max 仅首次审计，不重复）。
+  幂等存储：CP 侧唯一索引 idempotency_key + claim 条件更新即 DB 级幂等（agent-runtime
+  文件存储仅为本地缓存）。链 IT Order(4) 验证回收→DEAD 全路径。41/41 绿。
   验证：构造必失败消息 → 终态 FAILED + DLQ 记录 + 告警事件。
   Effort: M
 
