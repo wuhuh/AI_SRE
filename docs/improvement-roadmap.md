@@ -351,7 +351,10 @@
   Overview」已 provisioning（up/诊断时延 p90/诊断状态/工具失败/任务积压/5xx/Hikari）。
   实测：9/9 targets up；真实故障 21 次工具调用 + 3 次诊断 + p90 0.9s 全部入库。
   验证：Grafana 有平台面板；停 agent-runtime 有 ServiceDown 告警。
-- [ ] **P2-FI-09** SLO recording rules（availability/p95/error rate）+ 最小 error budget 面板。
+- [x] **P2-FI-09** SLO recording rules + error budget：✅ sli:demo_availability_ratio /
+  demo_error_rate / demo_latency_p95_seconds（30d 窗口）+ slo:demo_error_budget_remaining
+  （阈 1%）；Grafana 面板补 error budget + 可用性两块。实测：payment 30d error_rate=3.63%
+  （历史故障注入全计入）→ budget 为负，如实反映（burn-rate 告警留待实测基线后加）。
 - [x] **P2-FI-10** Evidence Recall 指标语义修正：✅ 期望标签按关键词拆分在
   证据 key+source+content 上匹配（旧实现只对 `tool:step` 序号 key 精确匹配 →
   recall 恒 0 失真）；precision=命中证据占比、recall=命中标签占比；测试更新
