@@ -16,8 +16,6 @@ spec:
       containers:
         - name: control-plane
           image: aisre-control-plane:k8s01
-          ports:
-            - containerPort: 8080
           env:
             - name: DB_URL
               value: jdbc:postgresql://postgres:5432/aisre

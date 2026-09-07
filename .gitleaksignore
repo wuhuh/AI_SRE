@@ -1,0 +1,5 @@
+# 本仓误报白名单（均为非真实凭据）：
+# HPA scaleTargetRef（generic-api-key 规则对 k8s 字段误报）
+2421e183c32c8993a4502dce327d47935d96b3d5:deploy/k8s/control-plane.yaml:generic-api-key:117
+# 测试用假 key 样本（断言脱敏行为）
+33392f3a5a061f26f99536f2295bff1e4fe607fc:agent-runtime/tests/test_masking.py:generic-api-key:8
