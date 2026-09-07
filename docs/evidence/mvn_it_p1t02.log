@@ -34,36 +34,36 @@
 [INFO] -------------------------------------------------------
 [INFO] Running com.aisre.api.AuthControllerTest
 Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
-[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.436 s -- in com.aisre.api.AuthControllerTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.359 s -- in com.aisre.api.AuthControllerTest
 [INFO] Running com.aisre.api.dto.DtoValidationTest
-01:50:44.929 [main] INFO org.hibernate.validator.internal.util.Version -- HV000001: Hibernate Validator 8.0.1.Final
-[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.301 s -- in com.aisre.api.dto.DtoValidationTest
+02:43:35.511 [main] INFO org.hibernate.validator.internal.util.Version -- HV000001: Hibernate Validator 8.0.1.Final
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.316 s -- in com.aisre.api.dto.DtoValidationTest
 [INFO] Running com.aisre.integration.ControlPlaneChainTest
-01:50:46.206 [main] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
-01:50:46.220 [main] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
-01:50:46.251 [main] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 1.20.4
-01:50:48.287 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
-01:50:48.325 [main] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is 172.17.0.1
-01:50:48.356 [main] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
+02:43:36.804 [main] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+02:43:36.817 [main] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+02:43:36.848 [main] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 1.20.4
+02:43:38.880 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+02:43:38.917 [main] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is 172.17.0.1
+02:43:38.953 [main] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
   Server Version: 29.8.0
   API Version: 1.56
   Operating System: Ubuntu 26.04 LTS
   Total Memory: 15507 MB
-01:50:48.361 [main] WARN org.testcontainers.utility.ResourceReaper -- 
+02:43:38.959 [main] WARN org.testcontainers.utility.ResourceReaper -- 
 ********************************************************************************
 Ryuk has been disabled. This can cause unexpected behavior in your environment.
 ********************************************************************************
-01:50:48.371 [main] INFO org.testcontainers.DockerClientFactory -- Checking the system...
-01:50:48.372 [main] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
-01:50:48.493 [main] INFO tc.redis:7-alpine -- Creating container for image: redis:7-alpine
-01:50:48.510 [main] INFO org.testcontainers.utility.RegistryAuthLocator -- Failure when attempting to lookup auth config. Please ignore if you don't have images in an authenticated registry. Details: (dockerImageName: redis:7-alpine, configFile: /root/.docker/config.json, configEnv: DOCKER_AUTH_CONFIG). Falling back to docker-java default behaviour. Exception message: Status 404: No config supplied. Checked in order: /root/.docker/config.json (file not found), DOCKER_AUTH_CONFIG (not set)
-01:50:48.854 [main] INFO tc.redis:7-alpine -- Container redis:7-alpine is starting: ef814b28f0d6ddae26e0d274a39835bfd9d26b27aa272c3d1ecdbf4af9b80ba2
-01:50:49.878 [main] INFO tc.redis:7-alpine -- Container redis:7-alpine started in PT1.385263539S
-01:50:49.879 [main] INFO tc.postgres:16-alpine -- Creating container for image: postgres:16-alpine
-01:50:49.966 [main] INFO tc.postgres:16-alpine -- Container postgres:16-alpine is starting: a17c460d7c5e4959d1fceec4c1b70acf19fffebcde0086b0c9b78ea2f47d4d5c
-01:50:51.755 [main] INFO tc.postgres:16-alpine -- Container postgres:16-alpine started in PT1.875989023S
-01:50:51.756 [main] INFO tc.postgres:16-alpine -- Container is started (JDBC URL: jdbc:postgresql://172.17.0.1:43276/aisre?loggerLevel=OFF)
-01:50:52.404 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.aisre.AiSreApplication for test class com.aisre.integration.ControlPlaneChainTest
+02:43:38.972 [main] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+02:43:38.973 [main] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
+02:43:39.095 [main] INFO tc.redis:7-alpine -- Creating container for image: redis:7-alpine
+02:43:39.113 [main] INFO org.testcontainers.utility.RegistryAuthLocator -- Failure when attempting to lookup auth config. Please ignore if you don't have images in an authenticated registry. Details: (dockerImageName: redis:7-alpine, configFile: /root/.docker/config.json, configEnv: DOCKER_AUTH_CONFIG). Falling back to docker-java default behaviour. Exception message: Status 404: No config supplied. Checked in order: /root/.docker/config.json (file not found), DOCKER_AUTH_CONFIG (not set)
+02:43:39.457 [main] INFO tc.redis:7-alpine -- Container redis:7-alpine is starting: ed7f6a3320428c1a862dc7ca3abfd15e184f184090f9381841e3db9aba526b21
+02:43:40.476 [main] INFO tc.redis:7-alpine -- Container redis:7-alpine started in PT1.381531421S
+02:43:40.477 [main] INFO tc.postgres:16-alpine -- Creating container for image: postgres:16-alpine
+02:43:40.566 [main] INFO tc.postgres:16-alpine -- Container postgres:16-alpine is starting: a16011d5dadef728e342482f0770bb0805b6e92064a2fd34731b17e5e7fdd166
+02:43:42.165 [main] INFO tc.postgres:16-alpine -- Container postgres:16-alpine started in PT1.688108195S
+02:43:42.166 [main] INFO tc.postgres:16-alpine -- Container is started (JDBC URL: jdbc:postgresql://172.17.0.1:43284/aisre?loggerLevel=OFF)
+02:43:42.806 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.aisre.AiSreApplication for test class com.aisre.integration.ControlPlaneChainTest
 
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -74,52 +74,52 @@ Ryuk has been disabled. This can cause unexpected behavior in your environment.
 
  :: Spring Boot ::                (v3.4.0)
 
-2026-09-07T01:50:53.859Z  INFO 127 --- [control-plane] [           main] c.a.integration.ControlPlaneChainTest    : Starting ControlPlaneChainTest using Java 17.0.20 with PID 127 (started by root in /work)
-2026-09-07T01:50:53.860Z  INFO 127 --- [control-plane] [           main] c.a.integration.ControlPlaneChainTest    : No active profile set, falling back to 1 default profile: "default"
-2026-09-07T01:50:56.438Z  INFO 127 --- [control-plane] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
-2026-09-07T01:50:56.445Z  INFO 127 --- [control-plane] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
-2026-09-07T01:50:57.303Z  INFO 127 --- [control-plane] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 834 ms. Found 9 JPA repository interfaces.
-2026-09-07T01:50:57.349Z  INFO 127 --- [control-plane] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
-2026-09-07T01:50:57.352Z  INFO 127 --- [control-plane] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
-2026-09-07T01:50:57.470Z  INFO 127 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.AgentStepRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
-2026-09-07T01:50:57.470Z  INFO 127 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.AgentTaskRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
-2026-09-07T01:50:57.470Z  INFO 127 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.AlertRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
-2026-09-07T01:50:57.471Z  INFO 127 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.ApprovalRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
-2026-09-07T01:50:57.471Z  INFO 127 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.AuditLogRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
-2026-09-07T01:50:57.471Z  INFO 127 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.EvidenceRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
-2026-09-07T01:50:57.472Z  INFO 127 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.IncidentRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
-2026-09-07T01:50:57.472Z  INFO 127 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.RemediationActionRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
-2026-09-07T01:50:57.473Z  INFO 127 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.ToolCallRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
-2026-09-07T01:50:57.473Z  INFO 127 --- [control-plane] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 93 ms. Found 0 Redis repository interfaces.
-2026-09-07T01:50:58.852Z  INFO 127 --- [control-plane] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 0 (http)
-2026-09-07T01:50:58.884Z  INFO 127 --- [control-plane] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
-2026-09-07T01:50:58.884Z  INFO 127 --- [control-plane] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.33]
-2026-09-07T01:50:58.990Z  INFO 127 --- [control-plane] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
-2026-09-07T01:50:58.990Z  INFO 127 --- [control-plane] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 5076 ms
+2026-09-07T02:43:44.265Z  INFO 130 --- [control-plane] [           main] c.a.integration.ControlPlaneChainTest    : Starting ControlPlaneChainTest using Java 17.0.20 with PID 130 (started by root in /work)
+2026-09-07T02:43:44.267Z  INFO 130 --- [control-plane] [           main] c.a.integration.ControlPlaneChainTest    : No active profile set, falling back to 1 default profile: "default"
+2026-09-07T02:43:46.884Z  INFO 130 --- [control-plane] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-09-07T02:43:46.891Z  INFO 130 --- [control-plane] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-09-07T02:43:47.759Z  INFO 130 --- [control-plane] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 842 ms. Found 9 JPA repository interfaces.
+2026-09-07T02:43:47.808Z  INFO 130 --- [control-plane] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-09-07T02:43:47.811Z  INFO 130 --- [control-plane] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-09-07T02:43:47.929Z  INFO 130 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.AgentStepRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-09-07T02:43:47.929Z  INFO 130 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.AgentTaskRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-09-07T02:43:47.930Z  INFO 130 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.AlertRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-09-07T02:43:47.930Z  INFO 130 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.ApprovalRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-09-07T02:43:47.930Z  INFO 130 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.AuditLogRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-09-07T02:43:47.930Z  INFO 130 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.EvidenceRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-09-07T02:43:47.931Z  INFO 130 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.IncidentRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-09-07T02:43:47.931Z  INFO 130 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.RemediationActionRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-09-07T02:43:47.931Z  INFO 130 --- [control-plane] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.aisre.repo.ToolCallRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-09-07T02:43:47.931Z  INFO 130 --- [control-plane] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 96 ms. Found 0 Redis repository interfaces.
+2026-09-07T02:43:49.380Z  INFO 130 --- [control-plane] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 0 (http)
+2026-09-07T02:43:49.409Z  INFO 130 --- [control-plane] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-07T02:43:49.410Z  INFO 130 --- [control-plane] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.33]
+2026-09-07T02:43:49.510Z  INFO 130 --- [control-plane] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-09-07T02:43:49.511Z  INFO 130 --- [control-plane] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 5186 ms
 Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
-2026-09-07T01:50:59.754Z  INFO 127 --- [control-plane] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-2026-09-07T01:51:00.096Z  INFO 127 --- [control-plane] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@662061e3
-2026-09-07T01:51:00.104Z  INFO 127 --- [control-plane] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
-2026-09-07T01:51:00.166Z  INFO 127 --- [control-plane] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://172.17.0.1:43276/aisre?loggerLevel=OFF (PostgreSQL 16.15)
-2026-09-07T01:51:00.339Z  INFO 127 --- [control-plane] [           main] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table "public"."flyway_schema_history" does not exist yet
-2026-09-07T01:51:00.346Z  INFO 127 --- [control-plane] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 9 migrations (execution time 00:00.127s)
-2026-09-07T01:51:00.367Z  INFO 127 --- [control-plane] [           main] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table "public"."flyway_schema_history" ...
-2026-09-07T01:51:00.437Z  INFO 127 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "public": << Empty Schema >>
-2026-09-07T01:51:00.480Z  INFO 127 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "1 - initial schema"
-2026-09-07T01:51:00.595Z  INFO 127 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "2 - approval execution token"
-2026-09-07T01:51:00.632Z  INFO 127 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "3 - agent task claim"
-2026-09-07T01:51:00.655Z  INFO 127 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "4 - approval expires at"
-2026-09-07T01:51:00.707Z  INFO 127 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "5 - agent task outbox"
-2026-09-07T01:51:00.747Z  INFO 127 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "6 - incident version"
-2026-09-07T01:51:00.783Z  INFO 127 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "7 - agent task attempts"
-2026-09-07T01:51:00.814Z  INFO 127 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "8 - drop unused tables"
-2026-09-07T01:51:00.853Z  INFO 127 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "9 - evidence trace fields"
-2026-09-07T01:51:00.864Z  INFO 127 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Successfully applied 9 migrations to schema "public", now at version v9 (execution time 00:00.096s)
-2026-09-07T01:51:01.154Z  INFO 127 --- [control-plane] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
-2026-09-07T01:51:01.435Z  INFO 127 --- [control-plane] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.2.Final
-2026-09-07T01:51:01.578Z  INFO 127 --- [control-plane] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
-2026-09-07T01:51:02.703Z  INFO 127 --- [control-plane] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
-2026-09-07T01:51:03.002Z  INFO 127 --- [control-plane] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+2026-09-07T02:43:50.283Z  INFO 130 --- [control-plane] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-07T02:43:50.636Z  INFO 130 --- [control-plane] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@1921b43c
+2026-09-07T02:43:50.644Z  INFO 130 --- [control-plane] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-07T02:43:50.708Z  INFO 130 --- [control-plane] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://172.17.0.1:43284/aisre?loggerLevel=OFF (PostgreSQL 16.15)
+2026-09-07T02:43:50.892Z  INFO 130 --- [control-plane] [           main] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table "public"."flyway_schema_history" does not exist yet
+2026-09-07T02:43:50.898Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 9 migrations (execution time 00:00.131s)
+2026-09-07T02:43:50.919Z  INFO 130 --- [control-plane] [           main] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table "public"."flyway_schema_history" ...
+2026-09-07T02:43:50.987Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "public": << Empty Schema >>
+2026-09-07T02:43:51.038Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "1 - initial schema"
+2026-09-07T02:43:51.153Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "2 - approval execution token"
+2026-09-07T02:43:51.190Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "3 - agent task claim"
+2026-09-07T02:43:51.214Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "4 - approval expires at"
+2026-09-07T02:43:51.272Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "5 - agent task outbox"
+2026-09-07T02:43:51.312Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "6 - incident version"
+2026-09-07T02:43:51.348Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "7 - agent task attempts"
+2026-09-07T02:43:51.380Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "8 - drop unused tables"
+2026-09-07T02:43:51.424Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "9 - evidence trace fields"
+2026-09-07T02:43:51.436Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Successfully applied 9 migrations to schema "public", now at version v9 (execution time 00:00.095s)
+2026-09-07T02:43:51.724Z  INFO 130 --- [control-plane] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-09-07T02:43:51.996Z  INFO 130 --- [control-plane] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.2.Final
+2026-09-07T02:43:52.136Z  INFO 130 --- [control-plane] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-09-07T02:43:53.286Z  INFO 130 --- [control-plane] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-09-07T02:43:53.589Z  INFO 130 --- [control-plane] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
 	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
 	Database driver: undefined/unknown
 	Database version: 16.15
@@ -127,88 +127,103 @@ Standard Commons Logging discovery in action with spring-jcl: please remove comm
 	Isolation level: undefined/unknown
 	Minimum pool size: undefined/unknown
 	Maximum pool size: undefined/unknown
-2026-09-07T01:51:06.090Z  INFO 127 --- [control-plane] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-2026-09-07T01:51:06.197Z  INFO 127 --- [control-plane] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
-2026-09-07T01:51:06.793Z  INFO 127 --- [control-plane] [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-09-07T02:43:56.743Z  INFO 130 --- [control-plane] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-09-07T02:43:56.851Z  INFO 130 --- [control-plane] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-09-07T02:43:57.462Z  INFO 130 --- [control-plane] [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
 RocketMQLog:WARN No appenders could be found for logger (io.netty.channel.nio.NioEventLoop).
 RocketMQLog:WARN Please initialize the logger system properly.
-2026-09-07T01:51:09.967Z  INFO 127 --- [control-plane] [           main] c.a.service.RocketMqAgentJobProducer     : RocketMQ producer started
-2026-09-07T01:51:10.142Z  INFO 127 --- [control-plane] [lientSelector_1] RocketmqRemoting                         : closeChannel: close the connection to remote address[127.0.0.1:9876] result: true
-2026-09-07T01:51:11.030Z  INFO 127 --- [control-plane] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 45251 (http) with context path '/'
-2026-09-07T01:51:11.047Z  INFO 127 --- [control-plane] [           main] c.a.integration.ControlPlaneChainTest    : Started ControlPlaneChainTest in 18.041 seconds (process running for 28.794)
-2026-09-07T01:51:32.660Z  INFO 127 --- [control-plane] [o-auto-1-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
-2026-09-07T01:51:32.660Z  INFO 127 --- [control-plane] [o-auto-1-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
-2026-09-07T01:51:32.661Z  INFO 127 --- [control-plane] [o-auto-1-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
-2026-09-07T01:51:32.705Z  WARN 127 --- [control-plane] [o-auto-1-exec-1] com.aisre.security.AuthInterceptor       : aisre.webhook.secret is EMPTY: alert webhooks accept unauthenticated calls (dev only)
-2026-09-07T01:51:33.117Z  INFO 127 --- [control-plane] [o-auto-1-exec-1] com.aisre.service.AlertService           : alert ingested: fingerprint=payment-service:HighErrorRate:payment-service-1, duplicate=false, incidentId=2, alertName=HighErrorRate
-2026-09-07T01:51:33.117Z  INFO 127 --- [control-plane] [   scheduling-1] com.aisre.service.AlertService           : alert ingested: fingerprint=api-gateway:service_down:health-check, duplicate=false, incidentId=1, alertName=service_down
+2026-09-07T02:44:00.676Z  INFO 130 --- [control-plane] [           main] c.a.service.RocketMqAgentJobProducer     : RocketMQ producer started
+2026-09-07T02:44:00.868Z  INFO 130 --- [control-plane] [lientSelector_1] RocketmqRemoting                         : closeChannel: close the connection to remote address[127.0.0.1:9876] result: true
+2026-09-07T02:44:01.834Z  INFO 130 --- [control-plane] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 42767 (http) with context path '/'
+2026-09-07T02:44:01.852Z  INFO 130 --- [control-plane] [           main] c.a.integration.ControlPlaneChainTest    : Started ControlPlaneChainTest in 18.459 seconds (process running for 28.931)
+2026-09-07T02:44:23.965Z  INFO 130 --- [control-plane] [o-auto-1-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-07T02:44:23.965Z  INFO 130 --- [control-plane] [o-auto-1-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-09-07T02:44:23.966Z  INFO 130 --- [control-plane] [o-auto-1-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-09-07T02:44:24.014Z  WARN 130 --- [control-plane] [o-auto-1-exec-1] com.aisre.security.AuthInterceptor       : aisre.webhook.secret is EMPTY: alert webhooks accept unauthenticated calls (dev only)
+2026-09-07T02:44:24.411Z  INFO 130 --- [control-plane] [   scheduling-1] com.aisre.service.AlertService           : alert ingested: fingerprint=api-gateway:service_down:health-check, duplicate=false, incidentId=1, alertName=service_down
+2026-09-07T02:44:24.411Z  INFO 130 --- [control-plane] [o-auto-1-exec-1] com.aisre.service.AlertService           : alert ingested: fingerprint=payment-service:HighErrorRate:payment-service-1, duplicate=false, incidentId=2, alertName=HighErrorRate
 [chain-it] first ingest body={"results":[{"incidentId":2,"duplicate":false}],"skippedResolved":0}
 [chain-it] replay ingest http=202 ACCEPTED body={"results":[{"incidentId":2,"duplicate":true}],"skippedResolved":0}
-2026-09-07T01:51:33.384Z  INFO 127 --- [control-plane] [o-auto-1-exec-7] com.aisre.service.AgentResultService     : diagnosis saved: incidentId=2, rootCause=redis_connection_pool_exhausted, taskId=1
-2026-09-07T01:51:33.448Z  INFO 127 --- [control-plane] [o-auto-1-exec-7] com.aisre.service.RemediationExecutor    : remediation restart_pod for incident 2: HTTP 200
-2026-09-07T01:51:33.597Z  INFO 127 --- [control-plane] [o-auto-1-exec-3] com.aisre.service.AlertService           : alert ingested: fingerprint=order-service:HighLatency:order-service-1, duplicate=false, incidentId=3, alertName=HighLatency
-2026-09-07T01:51:33.631Z  INFO 127 --- [control-plane] [o-auto-1-exec-6] com.aisre.service.AgentResultService     : diagnosis saved: incidentId=3, rootCause=capacity_shortage, taskId=2
-2026-09-07T01:51:33.704Z  INFO 127 --- [control-plane] [o-auto-1-exec-4] com.aisre.service.RemediationExecutor    : remediation scale_deployment for incident 3: HTTP 200
-2026-09-07T01:51:33.787Z  INFO 127 --- [control-plane] [o-auto-1-exec-7] com.aisre.service.AlertService           : alert ingested: fingerprint=inventory-service:HighMemory:inventory-service-1, duplicate=false, incidentId=4, alertName=HighMemory
-2026-09-07T01:51:33.816Z  INFO 127 --- [control-plane] [-auto-1-exec-10] com.aisre.service.AgentResultService     : diagnosis saved: incidentId=4, rootCause=memory_leak, taskId=3
-2026-09-07T01:51:33.880Z  WARN 127 --- [control-plane] [o-auto-1-exec-7] com.aisre.api.GlobalExceptionHandler     : conflict: Invalid incident transition: ROOT_CAUSE_FOUND -> RESOLVED
-2026-09-07T01:51:33.897Z  INFO 127 --- [control-plane] [           main] com.aisre.service.AgentTaskService       : task 1 claimed by it-worker-crash
-2026-09-07T01:51:33.907Z  WARN 127 --- [control-plane] [           main] com.aisre.service.AgentTaskService       : reclaimed 1 expired diagnosis task lease(s)
-2026-09-07T01:51:33.914Z  INFO 127 --- [control-plane] [           main] com.aisre.service.AgentTaskService       : task 1 claimed by it-worker-crash
-2026-09-07T01:51:33.922Z  WARN 127 --- [control-plane] [           main] com.aisre.service.AgentTaskService       : reclaimed 1 expired diagnosis task lease(s)
-2026-09-07T01:51:33.924Z ERROR 127 --- [control-plane] [           main] com.aisre.service.AgentTaskService       : POISON TASK: task 1 (incident 999) moved to DEAD after 2 attempts
-[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 48.80 s -- in com.aisre.integration.ControlPlaneChainTest
+2026-09-07T02:44:24.694Z  INFO 130 --- [control-plane] [o-auto-1-exec-7] com.aisre.service.AgentResultService     : diagnosis saved: incidentId=2, rootCause=redis_connection_pool_exhausted, taskId=1
+2026-09-07T02:44:24.755Z  INFO 130 --- [control-plane] [o-auto-1-exec-7] com.aisre.service.RemediationExecutor    : remediation restart_pod for incident 2: HTTP 200
+2026-09-07T02:44:24.900Z  INFO 130 --- [control-plane] [o-auto-1-exec-3] com.aisre.service.AlertService           : alert ingested: fingerprint=order-service:HighLatency:order-service-1, duplicate=false, incidentId=3, alertName=HighLatency
+2026-09-07T02:44:24.933Z  INFO 130 --- [control-plane] [o-auto-1-exec-6] com.aisre.service.AgentResultService     : diagnosis saved: incidentId=3, rootCause=capacity_shortage, taskId=2
+2026-09-07T02:44:25.004Z  INFO 130 --- [control-plane] [o-auto-1-exec-4] com.aisre.service.RemediationExecutor    : remediation scale_deployment for incident 3: HTTP 200
+2026-09-07T02:44:25.079Z  INFO 130 --- [control-plane] [o-auto-1-exec-7] com.aisre.service.AlertService           : alert ingested: fingerprint=inventory-service:HighMemory:inventory-service-1, duplicate=false, incidentId=4, alertName=HighMemory
+2026-09-07T02:44:25.107Z  INFO 130 --- [control-plane] [-auto-1-exec-10] com.aisre.service.AgentResultService     : diagnosis saved: incidentId=4, rootCause=memory_leak, taskId=3
+2026-09-07T02:44:25.169Z  WARN 130 --- [control-plane] [o-auto-1-exec-7] com.aisre.api.GlobalExceptionHandler     : conflict: Invalid incident transition: ROOT_CAUSE_FOUND -> RESOLVED
+2026-09-07T02:44:25.186Z  INFO 130 --- [control-plane] [           main] com.aisre.service.AgentTaskService       : task 1 claimed by it-worker-crash
+2026-09-07T02:44:25.195Z  WARN 130 --- [control-plane] [           main] com.aisre.service.AgentTaskService       : reclaimed 1 expired diagnosis task lease(s)
+2026-09-07T02:44:25.202Z  INFO 130 --- [control-plane] [           main] com.aisre.service.AgentTaskService       : task 1 claimed by it-worker-crash
+2026-09-07T02:44:25.210Z  WARN 130 --- [control-plane] [           main] com.aisre.service.AgentTaskService       : reclaimed 1 expired diagnosis task lease(s)
+2026-09-07T02:44:25.212Z ERROR 130 --- [control-plane] [           main] com.aisre.service.AgentTaskService       : POISON TASK: task 1 (incident 999) moved to DEAD after 2 attempts
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 49.50 s -- in com.aisre.integration.ControlPlaneChainTest
 [INFO] Running com.aisre.integration.ControlPlaneIntegrationTest
-2026-09-07T01:51:36.315Z  INFO 127 --- [control-plane] [           main] tc.redis:7-alpine                        : Creating container for image: redis:7-alpine
-2026-09-07T01:51:36.406Z  INFO 127 --- [control-plane] [           main] tc.redis:7-alpine                        : Container redis:7-alpine is starting: 89d1511c7961c887d22b5fdcc57469a9bdac1d4c2e9bd94439f1304b17ca192b
-2026-09-07T01:51:37.090Z  INFO 127 --- [control-plane] [           main] tc.redis:7-alpine                        : Container redis:7-alpine started in PT0.775081937S
-2026-09-07T01:51:37.091Z  INFO 127 --- [control-plane] [           main] tc.postgres:16-alpine                    : Creating container for image: postgres:16-alpine
-2026-09-07T01:51:37.175Z  INFO 127 --- [control-plane] [           main] tc.postgres:16-alpine                    : Container postgres:16-alpine is starting: e8b541bc09e009255b59adda7a9e2a6b3235d8bc4b8fb61a2142bd23ca9a2307
-2026-09-07T01:51:38.946Z  INFO 127 --- [control-plane] [           main] tc.postgres:16-alpine                    : Container postgres:16-alpine started in PT1.855402947S
-2026-09-07T01:51:38.946Z  INFO 127 --- [control-plane] [           main] tc.postgres:16-alpine                    : Container is started (JDBC URL: jdbc:postgresql://172.17.0.1:43278/aisre?loggerLevel=OFF)
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.581 s -- in com.aisre.integration.ControlPlaneIntegrationTest
+2026-09-07T02:44:27.682Z  INFO 130 --- [control-plane] [           main] tc.redis:7-alpine                        : Creating container for image: redis:7-alpine
+2026-09-07T02:44:27.768Z  INFO 130 --- [control-plane] [           main] tc.redis:7-alpine                        : Container redis:7-alpine is starting: 57eb0bd16b4de4d73e4058541276400b319a4508204bae590f899c7eda185264
+2026-09-07T02:44:28.459Z  INFO 130 --- [control-plane] [           main] tc.redis:7-alpine                        : Container redis:7-alpine started in PT0.77665422S
+2026-09-07T02:44:28.459Z  INFO 130 --- [control-plane] [           main] tc.postgres:16-alpine                    : Creating container for image: postgres:16-alpine
+2026-09-07T02:44:28.547Z  INFO 130 --- [control-plane] [           main] tc.postgres:16-alpine                    : Container postgres:16-alpine is starting: c12b1e0b12b0a4d39ea88339411966ba0aa57860021e4632e7fa9ba27309adf6
+2026-09-07T02:44:30.295Z  INFO 130 --- [control-plane] [           main] tc.postgres:16-alpine                    : Container postgres:16-alpine started in PT1.835093009S
+2026-09-07T02:44:30.295Z  INFO 130 --- [control-plane] [           main] tc.postgres:16-alpine                    : Container is started (JDBC URL: jdbc:postgresql://172.17.0.1:43286/aisre?loggerLevel=OFF)
+2026-09-07T02:44:30.369Z  INFO 130 --- [control-plane] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://172.17.0.1:43286/aisre?loggerLevel=OFF (PostgreSQL 16.15)
+2026-09-07T02:44:30.458Z  INFO 130 --- [control-plane] [           main] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table "public"."flyway_schema_history" does not exist yet
+2026-09-07T02:44:30.459Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 9 migrations (execution time 00:00.081s)
+2026-09-07T02:44:30.468Z  INFO 130 --- [control-plane] [           main] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table "public"."flyway_schema_history" ...
+2026-09-07T02:44:30.491Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "public": << Empty Schema >>
+2026-09-07T02:44:30.524Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "1 - initial schema"
+2026-09-07T02:44:30.620Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "2 - approval execution token"
+2026-09-07T02:44:30.654Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "3 - agent task claim"
+2026-09-07T02:44:30.673Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "4 - approval expires at"
+2026-09-07T02:44:30.674Z  INFO 130 --- [control-plane] [lientSelector_1] RocketmqRemoting                         : closeChannel: close the connection to remote address[127.0.0.1:9876] result: true
+2026-09-07T02:44:30.726Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "5 - agent task outbox"
+2026-09-07T02:44:30.766Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "6 - incident version"
+2026-09-07T02:44:30.802Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "7 - agent task attempts"
+2026-09-07T02:44:30.835Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "8 - drop unused tables"
+2026-09-07T02:44:30.875Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "9 - evidence trace fields"
+2026-09-07T02:44:30.882Z  INFO 130 --- [control-plane] [           main] o.f.core.internal.command.DbMigrate      : Successfully applied 9 migrations to schema "public", now at version v9 (execution time 00:00.084s)
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.238 s -- in com.aisre.integration.ControlPlaneIntegrationTest
 [INFO] Running com.aisre.security.AuthInterceptorTest
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.021 s -- in com.aisre.security.AuthInterceptorTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.022 s -- in com.aisre.security.AuthInterceptorTest
 [INFO] Running com.aisre.security.AuthServiceTest
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in com.aisre.security.AuthServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.aisre.security.AuthServiceTest
 [INFO] Running com.aisre.security.RiskPolicyTest
 [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.aisre.security.RiskPolicyTest
 [INFO] Running com.aisre.service.AlertmanagerAdapterTest
-2026-09-07T01:51:39.968Z  INFO 127 --- [control-plane] [lientSelector_1] RocketmqRemoting                         : closeChannel: close the connection to remote address[127.0.0.1:9876] result: true
-2026-09-07T01:51:40.199Z  INFO 127 --- [control-plane] [           main] com.aisre.service.AlertService           : alert ingested: fingerprint=s:HighLatency:s, duplicate=false, incidentId=1, alertName=HighLatency
-2026-09-07T01:51:40.207Z  INFO 127 --- [control-plane] [           main] com.aisre.service.AlertService           : alert ingested: fingerprint=payment-service:ServiceLatencyHigh:10.0.0.5:8080, duplicate=false, incidentId=1, alertName=ServiceLatencyHigh
-2026-09-07T01:51:40.209Z  INFO 127 --- [control-plane] [           main] com.aisre.service.AlertService           : alert ingested: fingerprint=order-service:HighErrorRate:order-service, duplicate=false, incidentId=1, alertName=HighErrorRate
-2026-09-07T01:51:40.209Z  INFO 127 --- [control-plane] [           main] com.aisre.service.AlertService           : alert ingested: fingerprint=order-service:HighErrorRate:order-service, duplicate=true, incidentId=1, alertName=HighErrorRate
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.287 s -- in com.aisre.service.AlertmanagerAdapterTest
+2026-09-07T02:44:32.234Z  INFO 130 --- [control-plane] [           main] com.aisre.service.AlertService           : alert ingested: fingerprint=s:HighLatency:s, duplicate=false, incidentId=1, alertName=HighLatency
+2026-09-07T02:44:32.243Z  INFO 130 --- [control-plane] [           main] com.aisre.service.AlertService           : alert ingested: fingerprint=payment-service:ServiceLatencyHigh:10.0.0.5:8080, duplicate=false, incidentId=1, alertName=ServiceLatencyHigh
+2026-09-07T02:44:32.245Z  INFO 130 --- [control-plane] [           main] com.aisre.service.AlertService           : alert ingested: fingerprint=order-service:HighErrorRate:order-service, duplicate=false, incidentId=1, alertName=HighErrorRate
+2026-09-07T02:44:32.246Z  INFO 130 --- [control-plane] [           main] com.aisre.service.AlertService           : alert ingested: fingerprint=order-service:HighErrorRate:order-service, duplicate=true, incidentId=1, alertName=HighErrorRate
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.300 s -- in com.aisre.service.AlertmanagerAdapterTest
 [INFO] Running com.aisre.service.InMemoryDeduplicationStoreTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.aisre.service.InMemoryDeduplicationStoreTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in com.aisre.service.InMemoryDeduplicationStoreTest
 [INFO] Running com.aisre.service.RemediationExecutorBodyTest
-[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in com.aisre.service.RemediationExecutorBodyTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in com.aisre.service.RemediationExecutorBodyTest
 [INFO] Running com.aisre.state.IncidentStateMachineTest
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.aisre.state.IncidentStateMachineTest
-2026-09-07T01:51:40.952Z  INFO 127 --- [control-plane] [ionShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
-2026-09-07T01:51:40.954Z  INFO 127 --- [control-plane] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
-2026-09-07T01:51:43.152Z  WARN 127 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@662061e3 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
-2026-09-07T01:51:43.153Z  WARN 127 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@645ba8ee (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
-2026-09-07T01:51:43.153Z  WARN 127 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@5e344de (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
-2026-09-07T01:51:43.153Z  WARN 127 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@70f27b3 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
-2026-09-07T01:51:43.154Z  WARN 127 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@6578670 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
-2026-09-07T01:51:43.154Z  WARN 127 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@3f72528c (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
-2026-09-07T01:51:43.154Z  WARN 127 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@20a83408 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
-2026-09-07T01:51:43.154Z  WARN 127 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@5e64ad11 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
-2026-09-07T01:51:43.155Z  WARN 127 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@643ac4ab (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
-2026-09-07T01:51:43.155Z  WARN 127 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@49f11c92 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
-2026-09-07T01:52:09.968Z  INFO 127 --- [control-plane] [lientSelector_1] RocketmqRemoting                         : closeChannel: close the connection to remote address[127.0.0.1:9876] result: true
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in com.aisre.state.IncidentStateMachineTest
+2026-09-07T02:44:33.001Z  INFO 130 --- [control-plane] [ionShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2026-09-07T02:44:33.003Z  INFO 130 --- [control-plane] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2026-09-07T02:44:34.446Z  WARN 130 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@1921b43c (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-09-07T02:44:34.447Z  WARN 130 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@421b79a1 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-09-07T02:44:34.447Z  WARN 130 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@5cfd69db (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-09-07T02:44:34.448Z  WARN 130 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@58ba4230 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-09-07T02:44:34.448Z  WARN 130 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@18926a71 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-09-07T02:44:34.448Z  WARN 130 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@15ddeb3 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-09-07T02:44:34.448Z  WARN 130 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@36d9ccf2 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-09-07T02:44:34.452Z  WARN 130 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@97bfc54 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-09-07T02:44:34.452Z  WARN 130 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@35c7cbb9 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-09-07T02:44:34.452Z  WARN 130 --- [control-plane] [   scheduling-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@cac00cc (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-09-07T02:45:00.675Z  INFO 130 --- [control-plane] [lientSelector_1] RocketmqRemoting                         : closeChannel: close the connection to remote address[127.0.0.1:9876] result: true
 [ERROR] Surefire is going to kill self fork JVM. The exit has elapsed 30 seconds after System.exit(0).
 [INFO] 
 [INFO] Results:
 [INFO] 
-[INFO] Tests run: 41, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 42, Failures: 0, Errors: 0, Skipped: 0
 [INFO] 
-[WARNING] Corrupted channel by directly writing to native stream in forked JVM 1. See FAQ web page and the dump file /work/target/surefire-reports/2026-09-07T01-50-42_008-jvmRun1.dumpstream
+[WARNING] Corrupted channel by directly writing to native stream in forked JVM 1. See FAQ web page and the dump file /work/target/surefire-reports/2026-09-07T02-43-32_684-jvmRun1.dumpstream
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  01:39 min
-[INFO] Finished at: 2026-09-07T01:52:10Z
+[INFO] Total time:  01:41 min
+[INFO] Finished at: 2026-09-07T02:45:02Z
 [INFO] ------------------------------------------------------------------------
