@@ -76,6 +76,8 @@
     </build>
 
     <profiles>
+        <!-- P3-CP-25 说明：docker profile 供容器内镜像构建启用（postgres 驱动 +
+             prometheus registry 运行时依赖）；本地 mvn test/testcontainers 不激活 -->
         <profile>
             <id>docker</id>
             <dependencies>

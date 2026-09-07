@@ -1,6 +1,8 @@
 package com.aisre.service;
 
 import com.aisre.domain.AgentTask;
+import com.aisre.domain.AgentTaskStatus;
+import com.aisre.domain.MqStatus;
 import com.aisre.repo.AgentTaskRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -83,7 +85,7 @@ public class RocketMqAgentJobProducer implements AgentJobProducer {
         // P1-CP-08: 幂等键去 UUID——首键 diag-<incidentId>，重试键带序号
         String baseKey = "diag-" + incidentId;
         AgentTask existing = agentTaskRepository.findTopByIdempotencyKeyOrderByIdDesc(baseKey).orElse(null);
-        if (existing != null && !"FAILED".equals(existing.getStatus())) {
+        if (existing != null && existing.getStatus() != AgentTaskStatus.FAILED) {
             log.info("diagnosis task for incident {} already exists ({}), skip re-dispatch",
                     incidentId, existing.getStatus());
             return;
@@ -95,11 +97,11 @@ public class RocketMqAgentJobProducer implements AgentJobProducer {
         AgentTask task = new AgentTask(
                 incidentId,
                 AgentTask.TaskType.DIAGNOSIS,
-                "QUEUED",
+                AgentTaskStatus.QUEUED,
                 idempotencyKey,
                 Instant.now()
         );
-        task.setMqStatus("PENDING");
+        task.setMqStatus(MqStatus.PENDING);
         task = agentTaskRepository.save(task);
         final Long taskId = task.getId();
         // P1-CP-07: 提交后再发；发送失败/提交后崩溃由扫描器补发。
@@ -140,7 +142,7 @@ public class RocketMqAgentJobProducer implements AgentJobProducer {
             Message message = new Message(DIAGNOSIS_TOPIC, String.valueOf(task.getId()),
                     objectMapper.writeValueAsBytes(payload));
             producer.send(message);
-            task.setMqStatus("SENT");
+            task.setMqStatus(MqStatus.SENT);
             agentTaskRepository.save(task);
         } catch (Exception e) {
             task.setMqAttempts(task.getMqAttempts() + 1);
@@ -152,7 +154,7 @@ public class RocketMqAgentJobProducer implements AgentJobProducer {
 
     @Scheduled(fixedDelayString = "${aisre.task.outbox-scan-interval-ms:10000}")
     public void flushOutbox() {
-        List<AgentTask> pending = agentTaskRepository.findByMqStatusAndMqAttemptsLessThan("PENDING", maxSendAttempts);
+        List<AgentTask> pending = agentTaskRepository.findByMqStatusAndMqAttemptsLessThan(MqStatus.PENDING, maxSendAttempts);
         for (AgentTask task : pending) {
             attemptSend(task.getId());
         }

@@ -1,6 +1,7 @@
 package com.aisre.service;
 
 import com.aisre.domain.AgentTask;
+import com.aisre.domain.AgentTaskStatus;
 import com.aisre.repo.AgentTaskRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +53,7 @@ public class AgentTaskService {
     @Transactional
     public AgentTask complete(Long taskId) {
         AgentTask task = getTask(taskId);
-        task.setStatus("COMPLETED");
+        task.setStatus(AgentTaskStatus.COMPLETED);
         task.setFinishedAt(Instant.now());
         return agentTaskRepository.save(task);
     }
@@ -60,7 +61,7 @@ public class AgentTaskService {
     @Transactional
     public AgentTask fail(Long taskId, String error) {
         AgentTask task = getTask(taskId);
-        task.setStatus("FAILED");
+        task.setStatus(AgentTaskStatus.FAILED);
         task.setError(error == null ? "unknown error" : error.substring(0, Math.min(error.length(), 4000)));
         task.setFinishedAt(Instant.now());
         log.warn("task {} failed: {}", taskId, task.getError());
@@ -76,7 +77,7 @@ public class AgentTaskService {
             log.warn("reclaimed {} expired diagnosis task lease(s)", reclaimed);
             // P1-MQ-03: 转入 DEAD 的即毒任务（DLQ 等价物）——审计 + 告警日志。
             // attempts == max 只在首次到达时成立 → 不重复审计
-            for (AgentTask dead : agentTaskRepository.findByStatusAndAttemptsGreaterThanEqual("DEAD", maxAttempts)) {
+            for (AgentTask dead : agentTaskRepository.findByStatusAndAttemptsGreaterThanEqual(AgentTaskStatus.DEAD, maxAttempts)) {
                 if (dead.getAttempts() != maxAttempts) {
                     continue;
                 }

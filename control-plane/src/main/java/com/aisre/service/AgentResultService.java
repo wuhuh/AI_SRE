@@ -7,6 +7,7 @@ import com.aisre.api.dto.ToolCallDTO;
 import com.aisre.api.dto.VerificationRequest;
 import com.aisre.domain.AgentStep;
 import com.aisre.domain.Approval;
+import com.aisre.domain.ApprovalStatus;
 import com.aisre.domain.Evidence;
 import com.aisre.domain.Incident;
 import com.aisre.domain.IncidentStatus;
@@ -145,12 +146,12 @@ public class AgentResultService {
                     // P1-CP-12: 同 incident+action 已有 PENDING 则复用，不重复建审批单
                     if (approvalRepository
                             .findFirstByIncidentIdAndActionTypeAndStatusOrderByIdDesc(
-                                    incidentId, action, "PENDING").isEmpty()) {
+                                    incidentId, action, ApprovalStatus.PENDING).isEmpty()) {
                         approvalRepository.save(new Approval(
                                 incidentId,
                                 action,
                                 payload,
-                                "PENDING",
+                                ApprovalStatus.PENDING,
                                 "agent",
                                 Instant.now()
                         ));
@@ -160,7 +161,7 @@ public class AgentResultService {
                             incidentId,
                             action,
                             payload,
-                            "APPROVED",
+                            ApprovalStatus.APPROVED,
                             "auto-policy",
                             Instant.now()
                     );

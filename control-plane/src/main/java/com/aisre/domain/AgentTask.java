@@ -35,8 +35,10 @@ public class AgentTask {
     @Column(nullable = false, length = 32)
     private TaskType type;
 
+    // P3-CP-25: 状态枚举化
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
-    private String status;
+    private AgentTaskStatus status;
 
     @Column(nullable = false, length = 64)
     private String idempotencyKey;
@@ -61,8 +63,9 @@ public class AgentTask {
     private Instant claimedAt;
 
     // P1-CP-07: outbox 投递状态（PENDING→SENT；发送失败/崩溃由扫描器补发）
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
-    private String mqStatus = "PENDING";
+    private MqStatus mqStatus = MqStatus.PENDING;
 
     @Column(nullable = false)
     private int mqAttempts = 0;
@@ -79,11 +82,11 @@ public class AgentTask {
         this.attempts = attempts;
     }
 
-    public String getMqStatus() {
+    public MqStatus getMqStatus() {
         return mqStatus;
     }
 
-    public void setMqStatus(String mqStatus) {
+    public void setMqStatus(MqStatus mqStatus) {
         this.mqStatus = mqStatus;
     }
 
@@ -98,7 +101,7 @@ public class AgentTask {
     public AgentTask() {
     }
 
-    public AgentTask(Long incidentId, TaskType type, String status, String idempotencyKey, Instant createdAt) {
+    public AgentTask(Long incidentId, TaskType type, AgentTaskStatus status, String idempotencyKey, Instant createdAt) {
         this.incidentId = incidentId;
         this.type = type;
         this.status = status;
@@ -130,11 +133,11 @@ public class AgentTask {
         this.type = type;
     }
 
-    public String getStatus() {
+    public AgentTaskStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(AgentTaskStatus status) {
         this.status = status;
     }
 

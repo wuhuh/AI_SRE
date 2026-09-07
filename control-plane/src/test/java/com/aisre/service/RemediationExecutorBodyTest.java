@@ -18,7 +18,7 @@ class RemediationExecutorBodyTest {
     }
 
     private Approval approval(String action, String payload) {
-        Approval approval = new Approval(1L, action, payload, "APPROVED", "test", null);
+        Approval approval = new Approval(1L, action, payload, com.aisre.domain.ApprovalStatus.APPROVED, "test", null);
         return approval;
     }
 
