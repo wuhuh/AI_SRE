@@ -374,10 +374,15 @@
   incidents+JWT）——旧脚本曾 100% 401；benchmark.md 如实披露：旧 8-31 数据
   p95=682ms 已击穿 500ms 阈值未披露、口径错高估，新数据（alert 46k req p95 231ms
   ✅ / incidents 56k req p95 4.4ms ✅）原始 summary 入仓。
-- [ ] **P2-CI-02** nightly integration job：compose up + RUN_E2E=1 + k6 smoke + run_evaluation。
+- [x] **P2-CI-02** nightly integration job：✅ schedule cron 触发；compose 全栈
+  up + /health 等待 + 真实 E2E（RUN_E2E=1）+ k6 webhook 冒烟 + 评测冒烟
+  （--splits all --limit 2）；失败时 compose 日志收集 + artifact 上传。
+  （CI-03 遗留：需 push 到 GitHub 才有真实运行记录。）
 - [ ] **P2-CI-03** 首次 push 后以真实 CI 运行记录更新文档。
 - [ ] **P2-DOC-08/09/10** 测试计数统一、故障表/Tool 说明更新、README Future Work/limitations/runbooks 清理。
-- [ ] **P2-GIT-02** 调试产物归档（`archive/` 或删除）+ ignore。
+- [x] **P2-GIT-02** 调试产物归档：✅ 根目录 67 个 `.docker_*/.k6_*/.dind_*/`
+  等隐藏调试产物 → `archive/debug-2026-08/`（README 说明）；同类新产物已入
+  .gitignore。
 - [ ] **P2-K8S-01** K8s 修复与实测：default-deny 加 DNS egress；补 tool-server/frontend Deployment；数据层 manifest（或明确 compose-only）；镜像 pin；liveness/securityContext；kind/minikube 部署演练并归档。
   验证：kind 部署后全链路 smoke 通过。
 

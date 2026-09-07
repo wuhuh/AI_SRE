@@ -4,6 +4,9 @@ on:
   push:
     branches: [ main ]
   pull_request:
+  # P2-CI-02: nightly 真实集成（compose + E2E + k6 冒烟 + 评测冒烟）
+  schedule:
+    - cron: '0 3 * * *'
 
 jobs:
   java-build:
@@ -67,6 +70,46 @@ jobs:
         run: |
           npm ci
           npm run build
+
+  # P2-CI-02: nightly —— 全栈 compose + 真实 E2E + k6 冒烟 + 评测冒烟
+  # （CI-03 遗留：需用户 push 到 GitHub 后才会产生真实运行记录）
+  nightly-integration:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compose up (full stack)
+        run: docker compose up -d --build
+      - name: Wait for control-plane health
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/health | grep -q '"status":"ok"' && exit 0
+            sleep 5
+          done
+          docker compose logs control-plane | tail -50
+          exit 1
+      - name: Real-fault E2E (compose)
+        env:
+          RUN_E2E: '1'
+          WEBHOOK_TOKEN: local-dev-webhook-token
+          AGENT_TOKEN: local-dev-agent-token
+        run: python e2e/local_e2e_runner.py
+      - name: k6 smoke (webhook ingestion)
+        run: |
+          docker run --rm --network host -v "$PWD/benchmark":/scripts             grafana/k6:0.53.0 run --vus 5 --duration 15s /scripts/alert-ingestion.js
+      - name: Evaluation smoke (mock, 2 cases)
+        run: |
+          pip install -q pyyaml
+          python evaluation/runner/run_evaluation.py --splits all --limit 2 --provider mock
+      - name: Collect logs on failure
+        if: failure()
+        run: docker compose logs --tail 100 > compose-failure.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: nightly-logs
+          path: compose-failure.log
 
   docker-build:
     runs-on: ubuntu-latest
