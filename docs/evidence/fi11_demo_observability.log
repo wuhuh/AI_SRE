@@ -1,0 +1,11 @@
+# P3-FI-11 实测证据（2026-09-07，compose 重建后）
+
+## gateway access 行（middleware 内打，带 traceId/requestId）
+2026-09-07 15:13:21,801 service=api-gateway level=INFO traceId=5c6f1e94a99e3910c099dc8ced401e34 spanId=131df6dc241196a4 requestId=req-6c6db4db03d4 message=access POST /api/orders -> 200 dur_ms=251
+
+## X-Request-Id 响应头（入站无 ID 时生成 + 回写）
+x-request-id: req-408b12141626
+
+## redis instrumentation span（Jaeger 查询 payment-service，INCRBY 为 redis-py 命令 span）
+span ops containing redis commands: []
+redis command spans (fresh /payments call): ['INCRBY']
