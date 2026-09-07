@@ -326,6 +326,11 @@
   RetryLLMProvider 边界负责）。教训：删实体后必须 clean 重编译（增量编译残留 stale
   class 会骗过 schema validate）。
 - [x] **P2-CP-23** Agent 链路关联：✅ diagnosis/verification 均带 taskId →
+  - 追加发现（真实 E2E）：consume_once 轮询 GET 未带 agent token（P1-CP-14 读门控
+    后一直 401，循环 `except: pass` 静默吞错）→ 已修复 + WARN 日志；另发现手工
+    告警（无 instance/pod 标签）resource=null 被 DB 拒收 → AlertmanagerAdapter
+    resource 兜底（instance→pod→resource→service）。均实测：incident 77 全链路
+    （fault→alert→轮询诊断→DB 落库 task_id/risk_level/query/time_range）。
   Evidence/ToolCall 落库不再断链（原 null）；riskLevel 来源=agent 端 ToolSpec
   （策略工件，执行时盖章 `call.risk_level=spec.risk_level`），CP 侧缺省 READ_ONLY。
 - [ ] **P2-CP-24** 随 P1-T-02 覆盖。

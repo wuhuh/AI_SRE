@@ -57,7 +57,9 @@ public class AlertmanagerAdapter {
         String alertName = firstNonBlank(labels.get("alertname"), "unknown");
         String service = firstNonBlank(labels.get("service"), labels.get("service_name"),
                 labels.get("job"), "unknown");
-        String resource = firstNonBlank(labels.get("instance"), labels.get("pod"), "");
+        // P2-CP-23 收尾：非标准告警（无 instance/pod）不再因 resource=null 被 DB 拒收
+        String resource = firstNonBlank(labels.get("instance"), labels.get("pod"),
+                labels.get("resource"), labels.get("service"), "");
         String severity = firstNonBlank(labels.get("severity"), "P2");
         String summary = firstNonBlank(annotations.get("summary"), annotations.get("description"), alertName);
         return new AlertRequest(service, alertName, resource, severity, summary, labels, parseStartsAt(alert));
