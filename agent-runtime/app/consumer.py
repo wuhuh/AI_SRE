@@ -96,6 +96,7 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
                           headers=agent_headers()) or []
     processed = 0
     worker = _worker_id()
+    from app.metrics import DIAGNOSES_TOTAL, DIAGNOSIS_DURATION
     for task in tasks:
         incident_id = task.get("incidentId")
         task_id = task.get("id")
@@ -123,7 +124,11 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
                 "severity": incident.get("severity", "P1"),
                 "summary": incident.get("summary", ""),
             }
+            import time as _time
+            _t0 = _time.monotonic()
             result = runner.run_diagnosis(incident_id, alert)
+            DIAGNOSIS_DURATION.observe(_time.monotonic() - _t0)
+            DIAGNOSES_TOTAL.labels(status=result.diagnosis.status).inc()
             submit_diagnosis(cp_url, incident_id, result.diagnosis, task_id=task_id)
             if task_id is not None:
                 _request_json("POST", f"{cp_url}/api/v1/tasks/{task_id}/complete", {},

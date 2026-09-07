@@ -76,6 +76,12 @@ def _build_runner() -> AgentRunner:
                        max_steps=max_steps, max_duration_seconds=budget)
 
 
+# P2-FI-08: 平台自监控（同端口挂载 /metrics，无需新开管理端口）
+from prometheus_client import make_asgi_app
+
+app.mount("/metrics", make_asgi_app())
+
+
 @app.on_event("startup")
 def start_consumer() -> None:
     if os.getenv("AUTO_CONSUME", "false") == "true":

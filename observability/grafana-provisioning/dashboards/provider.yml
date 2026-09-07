@@ -1,0 +1,9 @@
+# P2-FI-08: 仪表盘自动加载
+apiVersion: 1
+providers:
+  - name: default
+    orgId: 1
+    folder: AI SRE
+    type: file
+    options:
+      path: /etc/grafana/provisioning/dashboards
