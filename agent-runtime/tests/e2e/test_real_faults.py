@@ -28,6 +28,33 @@ PAYMENT_URL = os.getenv("PAYMENT_URL", "http://localhost:8001").rstrip("/")
 INVENTORY_URL = os.getenv("INVENTORY_URL", "http://localhost:8003").rstrip("/")
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8000").rstrip("/")
 
+# P3-T-06: 诊断内容断言 —— root_cause 必须落在故障的期望标签集合内。
+# mock LLM 恒答 redis（AR-12 同源问题，已文档披露）：非 mock 时才做严格集合断言。
+EXPECTED_ROOT_CAUSES = {
+    "redis_pool_exhausted": {"redis_connection_pool_exhausted", "redis_pool_exhausted"},
+    "slow_sql": {"slow_sql", "database_slow_query", "slow_database_query"},
+    "cpu_saturation": {"cpu_saturation", "container_cpu_saturation", "high_cpu"},
+}
+
+
+def _assert_root_cause(testcase, diag, fault_type: str) -> None:
+    root = (diag["diagnosis"].get("root_cause") or "").strip().lower()
+    testcase.assertTrue(root, "diagnosis must produce a root_cause label")
+    if os.getenv("LLM_PROVIDER", "mock") == "mock":
+        # mock 与 case 期望同源：只能断言「非 unknown 的规范标签」，不冒充真实能力
+        testcase.assertNotEqual(root, "unknown")
+        return
+    testcase.assertIn(root, EXPECTED_ROOT_CAUSES[fault_type],
+                      f"root_cause {root!r} not in expected set for {fault_type}")
+
+
+def _assert_recovery_faster(testcase, slow_duration: float, recovered_duration: float) -> None:
+    """P3-T-06: 恢复断言改比例阈值（绝对秒数对负载/CI 波动 flaky）。"""
+    testcase.assertEqual(True, recovered_duration < slow_duration)
+    testcase.assertGreaterEqual(
+        slow_duration, recovered_duration * 3,
+        f"faulted path {slow_duration:.2f}s should be >=3x slower than recovered {recovered_duration:.2f}s")
+
 
 def request(method: str, url: str, payload: dict | None = None, timeout: float = 10.0):
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
@@ -163,7 +190,7 @@ class RealFaultE2ETest(unittest.TestCase):
             log("run agent diagnosis")
             diag = self._diagnose(incident_id, "payment-service")
             log(f"diagnosis root_cause={diag['diagnosis']['root_cause']}")
-            self.assertIn("root_cause", diag["diagnosis"])
+            _assert_root_cause(self, diag, "redis_pool_exhausted")
             self.assertGreater(len(diag["diagnosis"]["tool_calls"]), 0)
 
             # Real recovery: disable fault and verify the service is healthy again.
@@ -201,7 +228,7 @@ class RealFaultE2ETest(unittest.TestCase):
             log("run agent diagnosis")
             diag = self._diagnose(incident_id, "inventory-service")
             log(f"diagnosis root_cause={diag['diagnosis']['root_cause']}")
-            self.assertIn("root_cause", diag["diagnosis"])
+            _assert_root_cause(self, diag, "slow_sql")
             self.assertGreater(len(diag["diagnosis"]["tool_calls"]), 0)
 
             # Real recovery: disable slow SQL fault.
@@ -214,7 +241,7 @@ class RealFaultE2ETest(unittest.TestCase):
             self.assertEqual(status, 200)
             # The key signal is that the slow path is gone; local/CI socket overhead
             # can add a small constant delay, so compare against the faulted duration.
-            self.assertLess(recovered_duration, slow_duration)
+            _assert_recovery_faster(self, slow_duration, recovered_duration)
 
             log("run agent verification")
             verification = self._verify(incident_id, "inventory-service")
@@ -238,12 +265,13 @@ class RealFaultE2ETest(unittest.TestCase):
             request("POST", f"{INVENTORY_URL}/inventory/check", {"items": ["sku-1"]}, timeout=10)
             slow_duration = time.time() - start
             log(f"degraded_duration={slow_duration:.2f}s")
-            self.assertGreaterEqual(slow_duration, 1.5)
+            # P3-T-06: cpu burn=0.6s（P0-08 真实化后非绝对 1.5s 延迟）——
+            # 降级幅度由恢复后的比例断言（_assert_recovery_faster ≥3x）承担
 
             log("run agent diagnosis")
             diag = self._diagnose(incident_id, "inventory-service")
             log(f"diagnosis root_cause={diag['diagnosis']['root_cause']}")
-            self.assertIn("root_cause", diag["diagnosis"])
+            _assert_root_cause(self, diag, "cpu_saturation")
             self.assertGreater(len(diag["diagnosis"]["tool_calls"]), 0)
 
             log("disable cpu_saturation fault")
@@ -253,7 +281,7 @@ class RealFaultE2ETest(unittest.TestCase):
             recovered_duration = time.time() - start
             log(f"recovered_duration={recovered_duration:.2f}s")
             self.assertEqual(status, 200)
-            self.assertLess(recovered_duration, slow_duration)
+            _assert_recovery_faster(self, slow_duration, recovered_duration)
 
             log("run agent verification")
             verification = self._verify(incident_id, "inventory-service")

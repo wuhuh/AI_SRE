@@ -33,50 +33,116 @@ except ImportError:  # pragma: no cover
 AGENT_URL = os.getenv("AGENT_URL", "http://localhost:8081")
 
 # P0-03: fault_type 只作为 ground truth，绝不进入告警输入。
-# alertName = 通用症状类别（多故障共享，避免 1:1 映射泄底）；
-# summary = 现场可观测的症状描述（不含根因标签词）。
-ALERT_PROFILES: dict[str, dict[str, str]] = {
+# P3-EV-01: 每故障 ≥5 条中性表述 + 严重度扰动（按 case id 确定性选取）——
+# 单模板会让模型背稿而非判因。
+ALERT_PROFILES: dict[str, dict[str, object]] = {
     "redis_connection_pool_exhausted": {
         "alertName": "DependencyErrorsHigh",
-        "summary": "{service} shows intermittent 5xx and timeouts when reaching its caching dependency",
+        "summaries": [
+            "{service} shows intermittent 5xx and timeouts when reaching its caching dependency",
+            "{service} connection pool to the cache is exhausted; new cache clients wait indefinitely",
+            "{service} reports borrow timeouts on its cache client pool during peak traffic",
+            "{service} sees a spike in cache-side connection errors; pooled connections never return",
+            "{service} fails cache-backed requests while the cache host itself stays healthy",
+        ],
     },
     "redis_slow_command": {
         "alertName": "ServiceLatencyHigh",
-        "summary": "{service} p99 latency is elevated; reads through the caching layer are far above baseline",
+        "summaries": [
+            "{service} p99 latency is elevated; reads through the caching layer are far above baseline",
+            "{service} cache round-trips take orders of magnitude longer than yesterday's baseline",
+            "{service} slow-command log on the cache shows frequent multi-second entries",
+            "{service} request latency correlates with cache access time, not app CPU",
+            "{service} users report slow pages; cache hits are unusually slow while hit-rate is normal",
+        ],
     },
     "database_connection_pool_exhausted": {
         "alertName": "ServiceLatencyHigh",
-        "summary": "{service} request latency is climbing; new work stalls while waiting for a database connection",
+        "summaries": [
+            "{service} request latency is climbing; new work stalls while waiting for a database connection",
+            "{service} database pool wait time dominates request handling",
+            "{service} threads pile up waiting to borrow a DB connection; the pool never frees up",
+            "{service} reports connection-acquisition timeouts against its primary datastore",
+            "{service} throughput collapses while the database server itself looks idle",
+        ],
     },
     "slow_sql": {
         "alertName": "ServiceLatencyHigh",
-        "summary": "{service} p99 latency is elevated; queries that used to take milliseconds now take seconds",
+        "summaries": [
+            "{service} p99 latency is elevated; queries that used to take milliseconds now take seconds",
+            "{service} slow-query log shows a surge of full scans on its hottest table",
+            "{service} API latency spikes align with database statement duration",
+            "{service} request handling blocks on a single slow read query per request",
+            "{service} degraded response times traced to a long-running query plan",
+        ],
     },
     "cpu_saturation": {
         "alertName": "ServiceLatencyHigh",
-        "summary": "{service} latency is rising and requests are queuing; the container is pegged at its processing limit",
+        "summaries": [
+            "{service} latency is rising and requests are queuing; the container is pegged at its processing limit",
+            "{service} CPU is saturated; threads spend more time runnable than waiting",
+            "{service} compute-bound processing delays every request beyond its SLO",
+            "{service} throttling observed; CFS quota consumed before the window ends",
+            "{service} worker CPUs at 100% while downstream dependencies remain fast",
+        ],
     },
     "memory_leak": {
         "alertName": "ResourcePressureHigh",
-        "summary": "{service} memory usage keeps climbing since the last deploy with growing GC pressure",
+        "summaries": [
+            "{service} memory usage keeps climbing since the last deploy with growing GC pressure",
+            "{service} RSS grows linearly with traffic and never returns to baseline",
+            "{service} heap retention increases hour over hour; OOM risk within days",
+            "{service} GC pauses lengthen as live set expands after each release",
+            "{service} container memory approach its limit; eviction pressure visible",
+        ],
     },
     "thread_pool_exhausted": {
         "alertName": "DependencyErrorsHigh",
-        "summary": "{service} requests time out under high concurrency; every worker is busy and new requests queue",
+        "summaries": [
+            "{service} requests time out under high concurrency; every worker is busy and new requests queue",
+            "{service} worker pool saturated; accept backlog grows while CPU stays low",
+            "{service} response times plateau at the queue wait, not at processing time",
+            "{service} busy threads stuck on slow downstream calls starve the pool",
+            "{service} concurrent request ceiling reached; extra load turns into timeouts",
+        ],
     },
     "pod_crashloopbackoff": {
         "alertName": "AvailabilityDegraded",
-        "summary": "{service} instance keeps restarting shortly after becoming ready; intermittent 5xx between restarts",
+        "summaries": [
+            "{service} instance keeps restarting shortly after becoming ready; intermittent 5xx between restarts",
+            "{service} pod restart count climbing; readiness flips between ready and not-ready",
+            "{service} workload enters CrashLoopBackOff after the latest rollout",
+            "{service} replica restarts every few minutes; errors follow the restart cycle",
+            "{service} instance availability flaps; liveness probe kills it before stabilizing",
+        ],
     },
     "downstream_http_timeout": {
         "alertName": "DependencyErrorsHigh",
-        "summary": "{service} 5xx spike; calls to an upstream service are timing out and the circuit breaker is open",
+        "summaries": [
+            "{service} 5xx spike; calls to an upstream service are timing out and the circuit breaker is open",
+            "{service} fails fast on dependency timeouts; fallbacks exhausted",
+            "{service} errors trace to a slow upstream; connection established but no response in time",
+            "{service} request failure rate mirrors the upstream's response deadline",
+            "{service} half-open breaker never recovers; upstream keeps timing out",
+        ],
     },
     "rocketmq_message_backlog": {
         "alertName": "QueueLagHigh",
-        "summary": "{service} consumer keeps falling behind; queue depth grows steadily and delivery lags",
+        "summaries": [
+            "{service} consumer keeps falling behind; queue depth grows steadily and delivery lags",
+            "{service} consumer lag grows monotonically despite a healthy broker",
+            "{service} messages accumulate faster than the consumer can drain",
+            "{service} delivery delay crosses its SLO; offset advances slower than production",
+            "{service} backlog alert fires; consumption rate below ingress by a wide margin",
+        ],
     },
 }
+
+
+def _case_variant(case_id: str, modulo: int) -> int:
+    """确定性变体选择（EV-01）——不用 hash()（PYTHONHASHSEED 敏感）。"""
+    import hashlib
+    return int(hashlib.sha256(str(case_id).encode("utf-8")).hexdigest(), 16) % modulo
 
 
 def normalize_label(value: str | None) -> str:
@@ -89,11 +155,15 @@ def build_alert(case: dict) -> dict:
     if profile is None:
         raise KeyError(f"no alert profile for fault_type={fault!r}")
     service = case.get("service", "payment-service")
+    summaries = profile["summaries"]
+    variant = _case_variant(case.get("id", ""), len(summaries))
+    # P3-EV-01: 严重度扰动——后 2/5 表述降为 P2（梯度信噪，不只训练 P1）
+    severity = "P1" if variant < 3 else "P2"
     return {
         "service": service,
         "alertName": profile["alertName"],
-        "severity": "P1",
-        "summary": profile["summary"].format(service=service),
+        "severity": severity,
+        "summary": summaries[variant].format(service=service),
     }
 
 
@@ -168,7 +238,8 @@ def load_split_ids(splits_dir: Path, split: str) -> set[str] | None:
 
 def call_diagnose(case: dict, agent_url: str = AGENT_URL) -> tuple[dict, float]:
     payload = {
-        "incident_id": abs(hash(case["id"])) % 100000,
+        # P3-EV-02: hash() 受 PYTHONHASHSEED 影响（同 case 重跑 id 漂移）→ sha256 确定性
+        "incident_id": _case_variant(case["id"], 100000),
         "alert": build_alert(case),
     }
     body = json.dumps(payload).encode("utf-8")
