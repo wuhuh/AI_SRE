@@ -321,7 +321,8 @@ class ControlPlaneChainTest {
     void expiredLeaseReclaimCountsAttemptsAndPoisonTasksTurnDead() {
         // P1-MQ-03: 崩溃 worker 的任务回收重试；达上限转 DEAD（DLQ 等价物）
         com.aisre.domain.AgentTask task = agentTaskRepository.save(new com.aisre.domain.AgentTask(
-                999L, com.aisre.domain.AgentTask.TaskType.DIAGNOSIS, "QUEUED",
+                999L, com.aisre.domain.AgentTask.TaskType.DIAGNOSIS,
+                com.aisre.domain.AgentTaskStatus.QUEUED,
                 "diag-poison-it", java.time.Instant.now()));
 
         for (int round = 1; round <= 2; round++) {
@@ -334,10 +335,12 @@ class ControlPlaneChainTest {
             agentTaskService.reclaimExpiredLeases();
             com.aisre.domain.AgentTask after = agentTaskRepository.findById(task.getId()).orElseThrow();
             if (round == 1) {
-                assertEquals("QUEUED", after.getStatus(), "attempt 1: back to QUEUED for retry");
+                assertEquals(com.aisre.domain.AgentTaskStatus.QUEUED, after.getStatus(),
+                        "attempt 1: back to QUEUED for retry");
                 assertEquals(1, after.getAttempts());
             } else {
-                assertEquals("DEAD", after.getStatus(), "attempt 2 (max-attempts=2): poison → DEAD");
+                assertEquals(com.aisre.domain.AgentTaskStatus.DEAD, after.getStatus(),
+                        "attempt 2 (max-attempts=2): poison → DEAD");
                 assertEquals(2, after.getAttempts());
             }
         }

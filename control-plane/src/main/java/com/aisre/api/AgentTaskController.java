@@ -1,6 +1,7 @@
 package com.aisre.api;
 
 import com.aisre.domain.AgentTask;
+import com.aisre.domain.AgentTaskStatus;
 import com.aisre.repo.AgentTaskRepository;
 import com.aisre.service.AgentTaskService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +29,7 @@ public class AgentTaskController {
 
     @GetMapping("/pending")
     public List<AgentTask> pending() {
-        return agentTaskRepository.findByStatusOrderByCreatedAtAsc("QUEUED");
+        return agentTaskRepository.findByStatusOrderByCreatedAtAsc(AgentTaskStatus.QUEUED);
     }
 
     /**

@@ -2,6 +2,8 @@ package com.aisre.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -30,8 +32,10 @@ public class Approval {
     @Column(nullable = false, length = 4096)
     private String actionPayload;
 
+    // P3-CP-25: 状态枚举化
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
-    private String status;
+    private ApprovalStatus status;
 
     @Column(length = 64)
     private String requestedBy;
@@ -64,7 +68,7 @@ public class Approval {
         this.expiresAt = expiresAt;
     }
 
-    public Approval(Long incidentId, String actionType, String actionPayload, String status,
+    public Approval(Long incidentId, String actionType, String actionPayload, ApprovalStatus status,
                     String requestedBy, Instant createdAt) {
         this.incidentId = incidentId;
         this.actionType = actionType;
@@ -106,11 +110,11 @@ public class Approval {
         this.actionPayload = actionPayload;
     }
 
-    public String getStatus() {
+    public ApprovalStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(ApprovalStatus status) {
         this.status = status;
     }
 

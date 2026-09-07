@@ -2,6 +2,7 @@ package com.aisre.service;
 
 import com.aisre.api.dto.ApprovalRequest;
 import com.aisre.domain.Approval;
+import com.aisre.domain.ApprovalStatus;
 import com.aisre.domain.IncidentStatus;
 import com.aisre.repo.ApprovalRepository;
 import com.aisre.repo.IncidentRepository;
@@ -50,7 +51,7 @@ public class ApprovalService {
                 incidentId,
                 actionType,
                 actionPayload,
-                "PENDING",
+                ApprovalStatus.PENDING,
                 requestedBy,
                 Instant.now()
         );
@@ -74,7 +75,8 @@ public class ApprovalService {
             throw new IllegalStateException("Approval expired at " + approval.getExpiresAt());
         }
         // P1-CP-12: 终态与 auto-policy 对齐（APPROVED/REJECTED）
-        String terminalStatus = decision.equals("APPROVE") ? "APPROVED" : "REJECTED";
+        ApprovalStatus terminalStatus =
+                decision.equals("APPROVE") ? ApprovalStatus.APPROVED : ApprovalStatus.REJECTED;
         String decidedBy = request.operator() == null || request.operator().isBlank()
                 ? "unknown" : request.operator();
         Instant decidedAt = Instant.now();
@@ -112,7 +114,7 @@ public class ApprovalService {
         // P0-07: operator 缺省时不能让审计表 NOT NULL 约束把整个决策事务炸掉
         String operator = request.operator() == null || request.operator().isBlank()
                 ? "unknown-operator" : request.operator();
-        auditService.record(incidentId, operator, "APPROVAL_DECIDED", terminalStatus);
+        auditService.record(incidentId, operator, "APPROVAL_DECIDED", terminalStatus.name());
         return approval;
     }
 
