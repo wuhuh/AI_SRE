@@ -1,4 +1,26 @@
 groups:
+  # P2-FI-09: SLO recording rules（30d 窗口 burn rate）—— 指标本身不加告警，
+  # 供 Grafana error budget 面板与未来 burn-rate 告警取数
+  - name: ai-sre-slo
+    interval: 30s
+    rules:
+      - record: sli:demo_availability_ratio
+        expr: |
+          1 - (
+            sum by (service) (rate(http_requests_total{status=~"5.."}[30d]))
+            / clamp_min(sum by (service) (rate(http_requests_total[30d])), 1)
+          )
+      - record: sli:demo_error_rate
+        expr: |
+          sum by (service) (rate(http_requests_total{status=~"5.."}[30d]))
+          / clamp_min(sum by (service) (rate(http_requests_total[30d])), 1)
+      - record: sli:demo_latency_p95_seconds
+        expr: |
+          histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket[30d])))
+      - record: slo:demo_error_budget_remaining
+        expr: |
+          1 - (sli:demo_error_rate / 0.01)
+
   - name: ai-sre-demo
     rules:
       - alert: HighErrorRate
