@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 
 from app.agent.diagnostic import MAX_STEPS, DiagnosticAgent
-from app.agent.planner import Planner
+from app.agent.planner import DEFAULT_PLAN
 from app.agent.verification import VerificationAgent
 from app.llm.base import LLMProvider
 from app.models import AgentState, DiagnosisResult, VerificationResult
@@ -23,7 +23,6 @@ class AgentRunResult:
 class AgentRunner:
     def __init__(self, llm: LLMProvider, registry: ToolRegistry, retriever=None, checkpoint_store=None,
                  max_steps: int = MAX_STEPS, max_duration_seconds: float = 15.0):
-        self.planner = Planner(llm)
         # P0-03: 预算可调 —— 慢 LLM/慢工具下默认 15s 会把大部分诊断打成超时降级
         self.diagnostic = DiagnosticAgent(llm, registry, retriever,
                                           max_steps=max_steps, max_duration_seconds=max_duration_seconds)
@@ -50,7 +49,9 @@ class AgentRunner:
                 resumed = True
         if state is None:
             state = AgentState(incident_id=incident_id, alert=alert, status="PLANNING")
-            state.plan = self.planner.plan(state)
+            # P2-AR-10: 固定初始计划（原 Planner 用 LLM 预规划属装饰调用——
+            # 与逐步 LLM 决策重复，且其输出未经校验。真规划随 function calling 方案重做）
+            state.plan = list(DEFAULT_PLAN)
             state.status = "DIAGNOSING"
         diagnosis = self.diagnostic.run(state)
         state.status = "DIAGNOSIS_COMPLETE"
