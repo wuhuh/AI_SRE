@@ -91,6 +91,7 @@ export default function App() {
     if (res.ok && data.token) {
       setAuthToken(data.token);
       localStorage.setItem('aisre_token', data.token);
+      setError(''); // 登录前轮询 401 留下的提示条要清掉，否则误导「仍未登录」
       window.alert('登录成功');
     } else {
       window.alert(data.message || '登录失败');
