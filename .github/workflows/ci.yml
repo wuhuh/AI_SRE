@@ -46,15 +46,24 @@ jobs:
         env:
           TESTCONTAINERS_RYUK_DISABLED: 'true'
           DOCKER_API_VERSION: '1.44'
-        run: mvn -B -ntp -Pintegration -DargLine="-Dapi.version=1.44" test
-      # CI 诊断：失败时归档 surefire 报告（匿名可下载，免 admin 权限读日志）
-      - name: Upload failure diagnostics
+        # PIPESTATUS 取回 mvn 真实退出码（tee 只看管道尾）
+        run: |
+          mvn -B -ntp -Pintegration -DargLine="-Dapi.version=1.44" test 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
+      # CI 诊断：失败摘要通过 ::error:: 注解回传（annotations 匿名可读，
+      # 免去 job log 的 admin 权限墙）
+      - name: Annotate failure summary
         if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: it-diagnostics
-          path: control-plane/target/surefire-reports/
-          retention-days: 7
+        run: |
+          cd control-plane
+          if [ -d target/surefire-reports ]; then
+            grep -h -B1 -A4 "AssertionFailedError\|ERROR\!" target/surefire-reports/*.txt 2>/dev/null | head -30 | while IFS= read -r line; do
+              echo "::error ::$line"
+            done
+          fi
+          grep "\[ERROR\]" build.log 2>/dev/null | tail -10 | while IFS= read -r line; do
+            echo "::error ::$line"
+          done
 
   # P3-CI-04: Python 版本统一 3.11（与 agent Dockerfile python:3.11-slim 一致）+ pip 缓存
   python-lint-and-test:
