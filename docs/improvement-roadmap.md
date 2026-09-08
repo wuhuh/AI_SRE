@@ -474,7 +474,10 @@
   `API_BASE = import.meta.env.VITE_API_BASE || ''`（apiFetch + login 统一挂）；
   Agent 步骤 Timeline 前缀 `new Date(s.createdAt)`（AgentStep.createdAt 实存）。
   ⚠ 待 vite build + Playwright 回归（WSL 恢复后）。
-- [ ] **P3-DOC-11** 轮换 .env 中的真实 API key：scan 侧已由 CI-05 gitleaks 覆盖
+- [x] **P3-DOC-11** 轮换 .env 中的真实 API key（用户 2026-09-08 完成：旧
+  key 已吊销、新 key 仅写本地 .env——git 历史无泄（log -S 为空）、gitleaks
+  全史 0 leak；会话 transcript 中的旧 key 随吊销失效）。scan 侧已由 CI-05
+  gitleaks 覆盖
   （.env 在 gitignore，.env.example 模板完备）；**轮换需用户在 provider 侧
   吊销现 key（sk-DEzoRK…）并重发**——待用户操作。
 - [x] **P3-DOC-12** api-contract 补端点；api.md 方向修正；configuration.md
