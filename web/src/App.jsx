@@ -17,6 +17,7 @@ import {
   Tag,
   Timeline,
   Typography,
+  message,
 } from 'antd';
 import { LoginOutlined, ReloadOutlined } from '@ant-design/icons';
 import MetricCard from './components/MetricCard';
@@ -104,9 +105,9 @@ export default function App() {
       setLoginOpen(false);
       load();           // 登录前那轮 401 已把列表打空——立即重拉（SSE 无新事件不会自动刷）
       loadServices();
-      window.alert('登录成功');
+      message.success('登录成功');
     } else {
-      window.alert(data.message || '登录失败');
+      message.error(data.message || '登录失败');
     }
   };
 
@@ -187,7 +188,8 @@ export default function App() {
 
   const decision = async (id, decisionType) => {
     if (!authToken) {
-      window.alert('请先登录');
+      message.warning('请先登录');
+      setLoginOpen(true);
       return;
     }
     let res;
@@ -202,10 +204,10 @@ export default function App() {
     }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      window.alert('操作失败：' + (data.message || res.status));
+      message.error('操作失败：' + (data.message || res.status));
       return;
     }
-    window.alert(decisionType === 'APPROVE' ? '已批准并执行' : '已拒绝');
+    message.success(decisionType === 'APPROVE' ? '已批准并执行' : '已拒绝');
     if (selected) {
       loadApprovals(selected.id);
       load();
