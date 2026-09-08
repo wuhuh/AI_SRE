@@ -102,6 +102,9 @@ class ControlPlaneChainTest {
         registry.add("spring.data.redis.host", redis::getHost);
         registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
         registry.add("aisre.tool-server.url", () -> mockBackends.url("/").toString());
+        // CI runner 无 compose demo 服务：HealthCheckScheduler 探活失败会发
+        // service_down 告警，把测试 incident 的 alertCount 顶成 2（本地绿 CI 红根因）
+        registry.add("health.monitor.enabled", () -> "false");
         registry.add("aisre.agent-runtime.url", () -> mockBackends.url("/").toString());
         registry.add("AISRE_TOOL_SERVER_TOKEN", () -> "it-tool-token");
         registry.add("aisre.agent.token", () -> "it-agent-token");

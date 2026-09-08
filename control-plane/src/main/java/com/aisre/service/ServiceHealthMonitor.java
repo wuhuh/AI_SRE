@@ -13,7 +13,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+// health.monitor.enabled=false 可关（CI/IT 中无 compose demo 服务，
+// 探活失败会发告警污染测试的 incident 计数断言）
 @Service
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+        name = "health.monitor.enabled", havingValue = "true", matchIfMissing = true)
 public class ServiceHealthMonitor {
 
     private final HttpClient httpClient = HttpClient.newBuilder()
