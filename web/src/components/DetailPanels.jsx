@@ -6,9 +6,14 @@ import { Card, List, Space, Tag, Typography } from 'antd';
 
 const { Text, Paragraph } = Typography;
 
-function tryParse(str) {
-  if (typeof str !== 'string') return str ?? null;
-  try { return JSON.parse(str); } catch { return null; }
+// content 可能被双重（或更多层）JSON 编码（agent 序列化 + DB 再存一层）——
+// 循环 parse 到非字符串为止
+function tryParse(v) {
+  let out = v;
+  for (let i = 0; i < 3 && typeof out === 'string'; i++) {
+    try { out = JSON.parse(out); } catch { return null; }
+  }
+  return typeof out === 'string' ? null : out;
 }
 
 /** Loki streams 结果 → [{level, container, line}] */
@@ -164,7 +169,7 @@ export function EvidenceItem({ item }) {
         )}
         <details style={{ fontSize: 12, color: '#98A2B3' }}>
           <summary style={{ cursor: 'pointer' }}>原始 JSON</summary>
-          <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: '4px 0 0' }}>
+          <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: '4px 0 0', maxHeight: 260, overflow: 'auto' }}>
             {typeof item.content === 'string' ? item.content : JSON.stringify(item.content, null, 2)}
           </pre>
         </details>
@@ -213,7 +218,7 @@ export function ToolCallItem({ item }) {
         )}
         <details style={{ fontSize: 12, color: '#98A2B3' }}>
           <summary style={{ cursor: 'pointer' }}>原始返回</summary>
-          <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: '4px 0 0' }}>
+          <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: '4px 0 0', maxHeight: 260, overflow: 'auto' }}>
             {item.resultSummary || ''}
           </pre>
         </details>
@@ -247,7 +252,7 @@ export function RemediationItem({ item }) {
         {item.resultSummary && (
           <details style={{ fontSize: 12, color: '#98A2B3' }}>
             <summary style={{ cursor: 'pointer' }}>执行详情</summary>
-            <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: '4px 0 0' }}>
+            <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: '4px 0 0', maxHeight: 260, overflow: 'auto' }}>
               {item.resultSummary}
             </pre>
           </details>
