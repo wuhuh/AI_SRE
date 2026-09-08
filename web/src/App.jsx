@@ -13,6 +13,7 @@ import {
   DatePicker,
   Row,
   Space,
+  Steps,
   Tabs,
   Tag,
   Timeline,
@@ -27,6 +28,7 @@ import IncidentOverview from './components/IncidentOverview';
 import IncidentTable from './components/IncidentTable';
 import { formatRootCause } from './theme';
 import { EvidenceItem, ToolCallItem, RemediationItem } from './components/DetailPanels';
+import ToolFlow from './components/ToolFlow';
 
 const { Header, Content } = Layout;
 
@@ -278,14 +280,8 @@ export default function App() {
     },
     {
       key: 'tools',
-      label: 'Tool 调用',
-      children: toolCalls.length === 0 ? <Typography.Text type="secondary">暂无 Tool 调用</Typography.Text> : (
-        <List
-          size="small"
-          dataSource={toolCalls}
-          renderItem={(t) => <ToolCallItem item={t} />}
-        />
-      ),
+      label: '诊断流程',
+      children: <ToolFlow toolCalls={toolCalls} />,
     },
     {
       key: 'remediation',

@@ -8,7 +8,7 @@ const { Text, Paragraph } = Typography;
 
 // content 可能被双重（或更多层）JSON 编码（agent 序列化 + DB 再存一层）——
 // 循环 parse 到非字符串为止；仍失败时尝试抢救「尾部截断」的 JSON
-function tryParse(v) {
+export function tryParse(v) {
   let out = v;
   for (let i = 0; i < 3 && typeof out === 'string'; i++) {
     let parsed;
@@ -54,7 +54,7 @@ function salvageTruncated(s) {
 }
 
 /** Loki streams 结果 → [{level, container, line}] */
-function lokiRows(parsed) {
+export function lokiRows(parsed) {
   const streams = parsed?.data?.result || [];
   const rows = [];
   for (const st of streams) {
@@ -67,7 +67,7 @@ function lokiRows(parsed) {
 }
 
 /** Prometheus vector/matrix → [{labels, value}] */
-function promRows(parsed) {
+export function promRows(parsed) {
   const result = parsed?.data?.result || [];
   return result.map((r) => {
     const labels = r.metric || {};
@@ -77,7 +77,7 @@ function promRows(parsed) {
 }
 
 /** Jaeger traces → [{service, operation, durationMs, error}] */
-function traceRows(parsed) {
+export function traceRows(parsed) {
   const out = [];
   for (const tr of parsed?.data || []) {
     for (const sp of tr.spans || []) {
@@ -215,7 +215,7 @@ export function EvidenceItem({ item }) {
   );
 }
 
-const TOOL_LABEL = {
+export const TOOL_LABEL = {
   query_prometheus: '查询 Prometheus 指标',
   query_logs: '查询 Loki 日志',
   query_trace: '查询 Jaeger 链路',
