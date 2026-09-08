@@ -5,8 +5,10 @@ import {
   Card,
   Col,
   Descriptions,
+  Input,
   Layout,
   List,
+  Modal,
   Row,
   Space,
   Tabs,
@@ -34,6 +36,9 @@ export default function App() {
   const [selected, setSelected] = useState(null);
   const [approvals, setApprovals] = useState([]);
   const [authToken, setAuthToken] = useState(() => localStorage.getItem('aisre_token') || '');
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [loginUser, setLoginUser] = useState('');
+  const [loginPass, setLoginPass] = useState('');
   const [evidence, setEvidence] = useState([]);
   const [toolCalls, setToolCalls] = useState([]);
   const [remediations, setRemediations] = useState([]);
@@ -77,11 +82,7 @@ export default function App() {
     }
   };
 
-  const login = async () => {
-    const username = window.prompt('用户名');
-    if (!username) return;
-    const password = window.prompt('密码');
-    if (!password) return;
+  const login = async (username, password) => {
     const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -92,10 +93,16 @@ export default function App() {
       setAuthToken(data.token);
       localStorage.setItem('aisre_token', data.token);
       setError(''); // 登录前轮询 401 留下的提示条要清掉，否则误导「仍未登录」
+      setLoginOpen(false);
       window.alert('登录成功');
     } else {
       window.alert(data.message || '登录失败');
     }
+  };
+
+  const logout = () => {
+    setAuthToken('');
+    localStorage.removeItem('aisre_token');
   };
 
   // token 以 localStorage 为 SSOT：轮询定时器/SSE 回调持有的是初始渲染闭包，
@@ -318,8 +325,30 @@ export default function App() {
           <span style={{ fontSize: 16, fontWeight: 600, color: '#111827' }}>AI SRE</span>
           <span style={{ fontSize: 12, color: '#667085' }}>Intelligent Reliability Platform</span>
         </div>
-        <Button icon={<LoginOutlined />} onClick={login}>登录</Button>
+        <Space>
+          {authToken && <span style={{ fontSize: 12, color: '#667085' }}>admin 已登录</span>}
+          {authToken ? (
+            <Button onClick={logout}>退出</Button>
+          ) : (
+            <Button type="primary" icon={<LoginOutlined />} onClick={() => setLoginOpen(true)}>登录</Button>
+          )}
+        </Space>
       </Header>
+      <Modal
+        title="登录 AI SRE 控制台"
+        open={loginOpen}
+        okText="登录"
+        cancelText="取消"
+        onOk={() => login(loginUser, loginPass)}
+        onCancel={() => setLoginOpen(false)}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size={12}>
+          <Input placeholder="用户名（本地默认 admin）" value={loginUser}
+                 onChange={(e) => setLoginUser(e.target.value)} onPressEnter={() => login(loginUser, loginPass)} />
+          <Input.Password placeholder="密码" value={loginPass}
+                 onChange={(e) => setLoginPass(e.target.value)} onPressEnter={() => login(loginUser, loginPass)} />
+        </Space>
+      </Modal>
       <Content style={{ padding: '24px 32px', maxWidth: 1440, width: '100%', margin: '0 auto' }}>
         <Row justify="space-between" align="middle" style={{ marginBottom: 20 }}>
           <Col>
