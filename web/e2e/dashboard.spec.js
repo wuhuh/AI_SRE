@@ -33,16 +33,13 @@ test('login via admin stores token', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: '登录' })).toBeVisible();
   const adminPw = process.env.ADMIN_PW || 'aisre-dev-admin-pw';
-  // prompt 会阻塞页面主线程 —— click 用 noWaitAfter，两个 dialog 逐个等事件再处理
-  const clickPromise = page
-    .getByRole('button', { name: '登录' })
-    .click({ noWaitAfter: true, timeout: 10000 })
-    .catch(() => {});
-  const d1 = await page.waitForEvent('dialog', { timeout: 10000 });
-  await d1.accept('admin');
-  const d2 = await page.waitForEvent('dialog', { timeout: 10000 });
-  await d2.accept(adminPw);
-  await clickPromise;
+  // 预挂 dialog 监听（waitForEvent 与 SSE 重渲染竞态会漏掉 prompt）：
+  // 第 1 个 prompt=用户名、第 2 个=密码，弹出即 accept
+  let seen = 0;
+  page.on('dialog', async (d) => {
+    try { await d.accept(seen++ === 0 ? 'admin' : adminPw); } catch { /* 已关闭 */ }
+  });
+  await page.getByRole('button', { name: '登录' }).click({ timeout: 10000 });
   await page.waitForTimeout(1500);
   // 登录成功后 token 落库，后续请求带 Authorization（不再 401）
   const token = await page.evaluate(() => localStorage.getItem('aisre_token'));

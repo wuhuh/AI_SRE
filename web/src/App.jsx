@@ -97,7 +97,12 @@ export default function App() {
     }
   };
 
-  const authHeaders = () => (authToken ? { Authorization: `Bearer ${authToken}` } : {});
+  // token 以 localStorage 为 SSOT：轮询定时器/SSE 回调持有的是初始渲染闭包，
+  // 读 state 会拿到登录前的空值 → 401 → 误清刚存的 token（死循环「未登录」）
+  const authHeaders = () => {
+    const t = localStorage.getItem('aisre_token') || authToken;
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  };
 
   const loadApprovals = async (id) => {
     if (!id) return;
