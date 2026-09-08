@@ -66,3 +66,30 @@ test('incident detail tabs show real data', async ({ page }) => {
   // 基本信息 Tab 至少渲染了开始时间字段（详情接口通）
   await expect(page.getByText('开始时间').first()).toBeVisible();
 });
+
+test('evidence tab renders structured summary not raw json', async ({ page }) => {
+  await page.goto('/');
+  let seen = 0;
+  page.on('dialog', async (d) => {
+    try { await d.accept(seen++ === 0 ? 'admin' : 'aisre-dev-admin-pw'); } catch { /* noop */ }
+  });
+  await page.getByRole('button', { name: '登录' }).click();
+  await page.getByPlaceholder(/用户名/).fill('admin');
+  await page.getByPlaceholder('密码').fill(process.env.ADMIN_PW || 'aisre-dev-admin-pw');
+  await page.getByRole('button', { name: /登\s*录/ }).last().click();
+  await expect(page.getByText('Incidents', { exact: true })).toBeVisible({ timeout: 10000 });
+  await page.waitForTimeout(1200);
+  // 选一个 RESOLVED 行（必有诊断证据）——取 Root Cause 列非空的行
+  const row = page.locator('.ant-table-row', { hasText: 'RESOLVED' }).first();
+  await row.click();
+  await expect(page.getByText(/详情 —/)).toBeVisible({ timeout: 10000 });
+  await page.getByRole('tab', { name: /证据/ }).click();
+  await page.waitForTimeout(800);
+  // 结构化渲染：有结论句/折叠控件；不再以原始 JSON 起始长文
+  await expect(page.getByText('原始 JSON').first()).toBeVisible();
+  const rawJsonExposed = await page.evaluate(() => {
+    const tabPane = document.querySelector('.ant-tabs-tabpane-active');
+    return tabPane ? tabPane.textContent.trimStart().startsWith('{"status"') : false;
+  });
+  expect(rawJsonExposed).toBe(false);
+});

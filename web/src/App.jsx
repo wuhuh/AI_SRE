@@ -25,6 +25,7 @@ import ServiceHealthPanel from './components/ServiceHealthPanel';
 import IncidentOverview from './components/IncidentOverview';
 import IncidentTable from './components/IncidentTable';
 import { formatRootCause } from './theme';
+import { EvidenceItem, ToolCallItem, RemediationItem } from './components/DetailPanels';
 
 const { Header, Content } = Layout;
 
@@ -269,19 +270,7 @@ export default function App() {
         <List
           size="small"
           dataSource={evidence}
-          renderItem={(e) => (
-            <List.Item>
-              <Space direction="vertical" size={0} style={{ width: '100%' }}>
-                <Space>
-                  <Tag color="blue">{e.source}</Tag>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>{e.evidenceKey || e.key}</Typography.Text>
-                </Space>
-                <Typography.Paragraph style={{ marginBottom: 0 }} ellipsis={{ rows: 2, expandable: true, symbol: '展开' }}>
-                  {typeof e.content === 'string' ? e.content : JSON.stringify(e.content)}
-                </Typography.Paragraph>
-              </Space>
-            </List.Item>
-          )}
+          renderItem={(e) => <EvidenceItem item={e} />}
         />
       ),
     },
@@ -292,15 +281,7 @@ export default function App() {
         <List
           size="small"
           dataSource={toolCalls}
-          renderItem={(t) => (
-            <List.Item>
-              <Space>
-                <Tag color={t.status === 'SUCCESS' ? 'green' : 'red'}>{t.status}</Tag>
-                <span>{t.toolName}</span>
-                <span>{t.resultSummary || t.error || ''}</span>
-              </Space>
-            </List.Item>
-          )}
+          renderItem={(t) => <ToolCallItem item={t} />}
         />
       ),
     },
@@ -311,15 +292,7 @@ export default function App() {
         <List
           size="small"
           dataSource={remediations}
-          renderItem={(r) => (
-            <List.Item>
-              <Space>
-                <Tag color={r.status === 'SUCCESS' ? 'green' : 'orange'}>{r.status}</Tag>
-                <span>{r.toolName}</span>
-                <span>{r.resultSummary}</span>
-              </Space>
-            </List.Item>
-          )}
+          renderItem={(r) => <RemediationItem item={r} />}
         />
       ),
     },
