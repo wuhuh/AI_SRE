@@ -57,11 +57,12 @@ jobs:
         run: |
           cd control-plane
           if [ -d target/surefire-reports ]; then
-            grep -h -B1 -A4 "AssertionFailedError\|ERROR\!" target/surefire-reports/*.txt 2>/dev/null | head -30 | while IFS= read -r line; do
+            grep -h -B1 -A4 "AssertionFailedError\|ERROR\!" target/surefire-reports/*.txt 2>/dev/null | head -20 | while IFS= read -r line; do
               echo "::error ::$line"
             done
           fi
-          grep "\[ERROR\]" build.log 2>/dev/null | tail -10 | while IFS= read -r line; do
+          # 诊断证据：两次 ingest 的响应体（duplicate 字段一锤定音）+ dedup 线索
+          grep -E "chain-it\]|alert ingested|dedup unavailable|probe" build.log 2>/dev/null | head -14 | while IFS= read -r line; do
             echo "::error ::$line"
           done
 
