@@ -41,6 +41,15 @@ class Tool(ABC):
                 result = future.result(timeout=self.spec.timeout_seconds)
             finally:
                 pool.shutdown(wait=False)
+            # P2-FE-05: 剥掉观测栈返回的统计噪声（Loki stats / Jaeger span 内部日志），
+            # 证据只留业务结果——stats 块动辄数 KB，是 JSON 被截断变残的主因
+            if isinstance(result, dict):
+                data = result.get("data")
+                if isinstance(data, dict):
+                    data.pop("stats", None)
+                    for tr in data.get("data", []) if isinstance(data.get("data"), list) else []:
+                        for sp in tr.get("spans", []) if isinstance(tr, dict) else []:
+                            sp.pop("logs", None)
             call.result_summary = str(result)[:8000]
         except TimeoutError:
             call.status = "TIMEOUT"

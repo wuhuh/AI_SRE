@@ -37,6 +37,8 @@ function salvageTruncated(s) {
   }
   if (lastSafe <= 0) return null;
   let salv = s.slice(0, lastSafe + 1);
+  // lastSafe 可能停在逗号上（如 "...}," 截断）——尾逗号会让补闭合后的 JSON 非法
+  salv = salv.replace(/[,\s]+$/, '');
   // 补齐未闭合括号
   const stack = [];
   inStr = false; esc = false;
