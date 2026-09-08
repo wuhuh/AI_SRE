@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -79,6 +80,9 @@ class ControlPlaneChainTest {
 
     @Autowired
     com.aisre.service.AgentTaskService agentTaskService;
+
+    @Autowired
+    org.springframework.data.redis.core.StringRedisTemplate dedupProbe;
 
     @TestConfiguration
     static class TestBeans {
@@ -149,6 +153,14 @@ class ControlPlaneChainTest {
     @Test
     @Order(1)
     void fullChainIngestDedupDiagnosisAutoApprovalRemediationVerification() throws Exception {
+        // dedup store 预检：Redis 不可用时 AlertService fail-open（放行重复告警），
+        // 下面的 duplicate 断言会假失败——先明确报根因，而不是误导性的 alertCount=2
+        try {
+            dedupProbe.opsForValue().set("aisre:probe:chain", "1", java.time.Duration.ofSeconds(10));
+        } catch (Exception probeEx) {
+            fail("dedup Redis unreachable (AlertService will fail-open and break the duplicate assertion): "
+                    + probeEx.getMessage());
+        }
         // ---- 1. ingest（Alertmanager 契约；AlertController @ResponseStatus(ACCEPTED) → 202）----
         ResponseEntity<String> ingest = post(base() + "/api/v1/alerts/alertmanager",
                 alertmanagerBody("payment-service", "HighErrorRate"), null);
