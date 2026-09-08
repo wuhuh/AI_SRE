@@ -9,6 +9,8 @@ import {
   Layout,
   List,
   Modal,
+  Select,
+  DatePicker,
   Row,
   Space,
   Tabs,
@@ -39,6 +41,11 @@ export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginUser, setLoginUser] = useState('');
   const [loginPass, setLoginPass] = useState('');
+  // P2-FE-05: 列表筛选（状态/服务搜索/日期范围）
+  const [fStatus, setFStatus] = useState('ALL');
+  const [fSearch, setFSearch] = useState('');
+  const [fRange, setFRange] = useState(null);
+  const detailRef = React.useRef(null);
   const [evidence, setEvidence] = useState([]);
   const [toolCalls, setToolCalls] = useState([]);
   const [remediations, setRemediations] = useState([]);
@@ -94,6 +101,8 @@ export default function App() {
       localStorage.setItem('aisre_token', data.token);
       setError(''); // 登录前轮询 401 留下的提示条要清掉，否则误导「仍未登录」
       setLoginOpen(false);
+      load();           // 登录前那轮 401 已把列表打空——立即重拉（SSE 无新事件不会自动刷）
+      loadServices();
       window.alert('登录成功');
     } else {
       window.alert(data.message || '登录失败');
@@ -120,18 +129,20 @@ export default function App() {
     }
   };
 
+  // P2-FE-05: allSettled —— 单个子资源失败（如权限/网络）不再拖死其它 Tab
   const loadDetails = async (id) => {
     if (!id) return;
-    const [ev, tc, rm, st] = await Promise.all([
+    const [ev, tc, rm, st] = await Promise.allSettled([
       apiFetch(`/api/v1/incidents/${id}/evidence`),
       apiFetch(`/api/v1/incidents/${id}/tool-calls`),
       apiFetch(`/api/v1/incidents/${id}/remediations`),
       apiFetch(`/api/v1/incidents/${id}/steps`),
     ]);
-    if (ev.ok) setEvidence(await ev.json());
-    if (tc.ok) setToolCalls(await tc.json());
-    if (rm.ok) setRemediations(await rm.json());
-    if (st.ok) setSteps(await st.json());
+    const pick = async (r, setter) => {
+      if (r.status === 'fulfilled' && r.value.ok) setter(await r.value.json());
+      else setter([]);
+    };
+    await Promise.all([pick(ev, setEvidence), pick(tc, setToolCalls), pick(rm, setRemediations), pick(st, setSteps)]);
   };
 
   useEffect(() => {
@@ -165,8 +176,11 @@ export default function App() {
 
   useEffect(() => {
     if (selected) {
+      setEvidence([]); setToolCalls([]); setRemediations([]); setSteps([]); setApprovals([]);
       loadApprovals(selected.id);
       loadDetails(selected.id);
+      // 点击行后自动滚到详情卡（之前要手动滚到页底找）
+      setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     }
   }, [selected]);
 
@@ -197,6 +211,20 @@ export default function App() {
     }
   };
 
+  // P2-FE-05: 状态/服务/日期范围过滤
+  const filteredIncidents = incidents.filter((i) => {
+    if (fStatus === 'ACTIVE' && !['DETECTED', 'TRIAGING', 'DIAGNOSING', 'ROOT_CAUSE_FOUND', 'WAITING_APPROVAL', 'REMEDIATING', 'VERIFYING'].includes(i.status)) return false;
+    if (!['ALL', 'ACTIVE'].includes(fStatus) && i.status !== fStatus) return false;
+    if (fSearch && !(i.service || '').toLowerCase().includes(fSearch.toLowerCase())
+        && !(i.summary || '').toLowerCase().includes(fSearch.toLowerCase())
+        && String(i.id).includes(fSearch) === false && `INC-${String(i.id).padStart(4, '0')}`.toLowerCase().includes(fSearch.toLowerCase()) === false) return false;
+    if (fRange && fRange[0] && fRange[1]) {
+      const t = i.startedAt ? new Date(i.startedAt).getTime() : 0;
+      if (t < fRange[0].startOf('day').valueOf() || t > fRange[1].endOf('day').valueOf()) return false;
+    }
+    return true;
+  });
+
   const summary = {
     total: incidents.length,
     resolved: incidents.filter((i) => i.status === 'RESOLVED').length,
@@ -216,6 +244,9 @@ export default function App() {
           <Descriptions.Item label="Root Cause">{formatRootCause(selected.rootCause)}</Descriptions.Item>
           <Descriptions.Item label="置信度">{selected.confidence}</Descriptions.Item>
           <Descriptions.Item label="建议方案" span={2}>{selected.recommendedActions || '-'}</Descriptions.Item>
+          <Descriptions.Item label="告警次数">{selected.alertCount ?? '-'}</Descriptions.Item>
+          <Descriptions.Item label="开始时间">{selected.startedAt ? new Date(selected.startedAt).toLocaleString() : '-'}</Descriptions.Item>
+          <Descriptions.Item label="恢复时间">{selected.resolvedAt ? new Date(selected.resolvedAt).toLocaleString() : '-'}</Descriptions.Item>
         </Descriptions>
       ),
     },
@@ -240,9 +271,14 @@ export default function App() {
           dataSource={evidence}
           renderItem={(e) => (
             <List.Item>
-              <Space>
-                <Tag color="blue">{e.source}</Tag>
-                <span>{e.evidenceKey || e.key}: {e.content}</span>
+              <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                <Space>
+                  <Tag color="blue">{e.source}</Tag>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>{e.evidenceKey || e.key}</Typography.Text>
+                </Space>
+                <Typography.Paragraph style={{ marginBottom: 0 }} ellipsis={{ rows: 2, expandable: true, symbol: '展开' }}>
+                  {typeof e.content === 'string' ? e.content : JSON.stringify(e.content)}
+                </Typography.Paragraph>
               </Space>
             </List.Item>
           )}
@@ -383,15 +419,37 @@ export default function App() {
           </Col>
         </Row>
 
-        <Card title="Recent Incidents" style={{ marginBottom: 16 }}>
-          <IncidentTable incidents={incidents} onSelect={setSelected} loading={loading} />
+        <Card title="Incidents" style={{ marginBottom: 16 }} extra={
+          <Space wrap>
+            <Input.Search placeholder="搜索 ID / 服务 / 摘要" allowClear style={{ width: 200 }}
+                          onSearch={setFSearch} onChange={(e) => { if (!e.target.value) setFSearch(''); }} />
+            <Select value={fStatus} style={{ width: 160 }} onChange={setFStatus}
+                    options={[
+                      { value: 'ALL', label: '全部状态' },
+                      { value: 'ACTIVE', label: '活跃（未恢复）' },
+                      { value: 'DETECTED', label: 'DETECTED' },
+                      { value: 'ROOT_CAUSE_FOUND', label: 'ROOT_CAUSE_FOUND' },
+                      { value: 'WAITING_APPROVAL', label: 'WAITING_APPROVAL' },
+                      { value: 'REMEDIATING', label: 'REMEDIATING' },
+                      { value: 'RESOLVED', label: 'RESOLVED' },
+                      { value: 'FAILED', label: 'FAILED' },
+                    ]} />
+            <DatePicker.RangePicker onChange={setFRange} style={{ width: 240 }} placeholder={['开始日期', '结束日期']} />
+            <span style={{ fontSize: 12, color: '#98A2B3' }}>{filteredIncidents.length}/{incidents.length} 条</span>
+          </Space>
+        }>
+          <IncidentTable incidents={filteredIncidents} onSelect={setSelected} loading={loading} selectedId={selected?.id} />
         </Card>
 
+        <div ref={detailRef}>
         {selected && (
-          <Card title={`INC-${String(selected.id).padStart(4, '0')} 详情`} style={{ marginBottom: 16 }}>
+          <Card title={`INC-${String(selected.id).padStart(4, '0')} 详情 — ${selected.service} [${selected.status}]`}
+                extra={<Button size="small" onClick={() => setSelected(null)}>关闭</Button>}
+                style={{ marginBottom: 16 }}>
             <Tabs items={detailItems} />
           </Card>
         )}
+        </div>
       </Content>
     </Layout>
   );

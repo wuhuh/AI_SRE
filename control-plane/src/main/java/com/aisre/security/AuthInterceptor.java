@@ -50,8 +50,11 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
 
         // Agent callbacks authenticate with the shared static token, not a user JWT.
-        boolean agentCallback = path.matches(".*/incidents/\\d+/(diagnosis|verification|remediations)")
-                || path.startsWith("/api/v1/tasks/");
+        // P2-FE-05: 仅写回调（POST）需 agent token——GET /remediations 是前端读接口，
+        // 误拦会把详情页的修复记录 Tab 毒死（401 中断 Promise.all）
+        boolean agentCallback = ("POST".equals(method) || "PUT".equals(method))
+                && (path.matches(".*/incidents/\\d+/(diagnosis|verification|remediations)")
+                    || path.startsWith("/api/v1/tasks/"));
         if (agentCallback) {
             return requireAgentToken(request, response);
         }

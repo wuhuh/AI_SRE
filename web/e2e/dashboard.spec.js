@@ -43,3 +43,26 @@ test('login via admin stores token', async ({ page }) => {
   const token = await page.evaluate(() => localStorage.getItem('aisre_token'));
   expect(token && token.length > 20).toBeTruthy();
 });
+
+test('incident detail tabs show real data', async ({ page }) => {
+  await page.goto('/');
+  let seen = 0;
+  page.on('dialog', async (d) => {
+    try { await d.accept(seen++ === 0 ? 'admin' : 'aisre-dev-admin-pw'); } catch { /* noop */ }
+  });
+  await page.getByRole('button', { name: '登录' }).click();
+  await page.getByPlaceholder(/用户名/).fill('admin');
+  await page.getByPlaceholder('密码').fill(process.env.ADMIN_PW || 'aisre-dev-admin-pw');
+  await page.getByRole('button', { name: /登\s*录/ }).last().click();
+  await expect(page.getByText('Incidents', { exact: true })).toBeVisible({ timeout: 10000 });
+  await page.waitForTimeout(1200); // 列表首屏
+  // 点第一行（选 RESOLVED 的行最有诊断数据：直接点第一行也行，断言 Tab 加载完成）
+  await page.locator('.ant-table-row').first().click();
+  await expect(page.getByText(/详情 —/)).toBeVisible({ timeout: 10000 });
+  await page.waitForTimeout(1500); // 详情子资源加载
+  // 修复记录接口已从 agent-token 误拦修复为 JWT 可读：不再出现全局 401 提示
+  const alertCount = await page.locator('.ant-alert').count();
+  expect(alertCount).toBe(0);
+  // 基本信息 Tab 至少渲染了开始时间字段（详情接口通）
+  await expect(page.getByText('开始时间').first()).toBeVisible();
+});

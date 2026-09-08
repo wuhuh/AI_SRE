@@ -3,7 +3,7 @@ import { Table, Tooltip } from 'antd';
 import { SeverityBadge, IncidentStatusBadge } from './StatusBadge';
 import { formatRootCause, formatTime } from '../theme';
 
-export default function IncidentTable({ incidents, onSelect, loading }) {
+export default function IncidentTable({ incidents, onSelect, loading, selectedId }) {
   const columns = [
     {
       title: 'Incident',
@@ -51,7 +51,8 @@ export default function IncidentTable({ incidents, onSelect, loading }) {
       columns={columns}
       dataSource={incidents}
       loading={loading}
-      pagination={{ pageSize: 8, showSizeChanger: false }}
+      rowClassName={(record) => (record.id === selectedId ? 'incident-row-selected' : '')}
+      pagination={{ pageSize: 10, showSizeChanger: false, showTotal: (t) => `共 ${t} 条` }}
       onRow={(record) => ({
         onClick: () => onSelect(record),
         style: { cursor: 'pointer' },

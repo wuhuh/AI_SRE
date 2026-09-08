@@ -1,0 +1,4 @@
+/* 选中 incident 行高亮（P2-FE-05） */
+.incident-row-selected > td {
+  background: #F0F5FF !important;
+}
