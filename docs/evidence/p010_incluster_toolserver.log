@@ -1,0 +1,13 @@
+# P0-10 收尾实证（2026-09-08，kind 集群 in-cluster）
+
+== MCP /mcp tools/list（8 工具）==
+query_prometheus/query_logs/query_trace/list_pods/restart_pod/scale_deployment/redis_info/db_slow_query
+
+== tools/call list_pods（in-cluster ServiceAccount 真实读取，标准库 urllib+ssl 直连 K8S API）==
+source: in-cluster-k8s | pods: 10（agent-runtime-9df97c84c-dzwvg / control-plane-... / frontend-... / gateway-... 全真实 pod 名+phase+image）
+
+== 错误 token 拒绝 ==
+X-Tool-Token: wrong-token -> 422（MCP 路径 FastAPI 校验拒绝；REST /api/k8s 路径 signature 不符为 403）
+
+== 单测 ==
+tool-server unittest 6/6 OK（含写操作 GET 拒绝 405、dryRun 标注）

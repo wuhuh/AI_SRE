@@ -77,7 +77,10 @@ def mcp(payload: dict[str, Any]) -> dict[str, Any]:
             return {"jsonrpc": "2.0", "id": request_id, "result": redis_info(command=arguments.get("command", "info"))}
         if name == "db_slow_query":
             return {"jsonrpc": "2.0", "id": request_id, "result": database(command="slow_query")}
-        if name in ("query_prometheus", "query_logs", "query_trace", "list_pods", "restart_pod", "scale_deployment"):
+        if name == "list_pods":
+            return {"jsonrpc": "2.0", "id": request_id,
+                    "result": kubernetes_read("list_pods", arguments.get("namespace", "default"))}
+        if name in ("query_prometheus", "query_logs", "query_trace", "restart_pod", "scale_deployment"):
             return {"jsonrpc": "2.0", "id": request_id, "result": {"name": name, "arguments": arguments, "dryRun": True}}
         return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32601, "message": f"unknown tool: {name}"}}
     return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32601, "message": "method not found"}}
@@ -100,13 +103,67 @@ def redis_info(command: str = "info") -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+def _k8s_incluster_get(path: str) -> tuple[int, dict[str, Any]]:
+    """P0-10: in-cluster ServiceAccount 直连 K8S API（标准库，不引 kubernetes 包）。
+
+    返回 (status, body)；任何网络/证书问题向上抛由调用方决定回退。
+    """
+    import ssl
+    import urllib.error
+    import urllib.request
+
+    sa = "/var/run/secrets/kubernetes.io/serviceaccount"
+    with open(f"{sa}/token") as f:
+        token = f.read().strip()
+    req = urllib.request.Request(
+        f"https://kubernetes.default.svc{path}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    try:
+        with urllib.request.urlopen(req, context=ssl.create_default_context(cafile=f"{sa}/ca.crt"), timeout=10) as resp:
+            return resp.status, json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        return exc.code, {}
+
+
+def _incluster_namespace() -> str:
+    """当前 Pod 所在 ns（SA namespace 文件）；读不到回退 ai-sre。"""
+    try:
+        with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace") as f:
+            return f.read().strip()
+    except OSError:
+        return "ai-sre"
+
+
 @app.get("/api/k8s")
 def kubernetes_read(action: str = "list_pods", namespace: str = "default") -> dict[str, Any]:
     # P0-04: GET 只保留只读 dryRun 操作；写操作必须走 POST + X-Execution-Token
     if action in WRITE_ACTIONS:
         raise HTTPException(status_code=405, detail="write actions require POST with X-Execution-Token")
-    # P0-10 (compose 模式)：list_pods 用 docker ps 返回真实容器清单（等价 pod 视图）；
-    # 真 k8s 环境走 in-cluster ServiceAccount（未部署时保持 dryRun 并如实标注）
+    # P0-10: in-cluster ServiceAccount 真实读取（SA 文件存在即 k8s 环境，优先于 docker）
+    if os.path.exists("/var/run/secrets/kubernetes.io/serviceaccount/token"):
+        ns = namespace if namespace != "default" else _incluster_namespace()
+        try:
+            if action == "list_pods":
+                status, body = _k8s_incluster_get(f"/api/v1/namespaces/{ns}/pods")
+                if status == 200:
+                    pods = []
+                    for item in body.get("items", []):
+                        md = item["metadata"]
+                        cs = (item.get("spec", {}) or {}).get("containers") or [{}]
+                        pods.append({
+                            "name": md["name"],
+                            "podName": md["name"],
+                            "status": (item.get("status", {}) or {}).get("phase", ""),
+                            "image": (cs[0] or {}).get("image", ""),
+                        })
+                    return {"action": action, "namespace": ns, "pods": pods, "source": "in-cluster-k8s"}
+                return {"action": action, "namespace": ns, "dryRun": True, "detail": f"k8s api status {status}"}
+            return {"action": action, "namespace": ns, "dryRun": True,
+                    "detail": f"read action {action} not implemented over in-cluster SA yet"}
+        except Exception as exc:  # noqa: BLE001 — 失败回退 dryRun，但如实带上错误
+            return {"action": action, "namespace": ns, "dryRun": True, "detail": f"k8s read failed: {exc}"}
+    # P0-10 (compose 模式)：list_pods 用 docker ps 返回真实容器清单（等价 pod 视图）
     if action == "list_pods" and _docker_available():
         try:
             status, body = _unix_http("GET /v1.43/containers/json HTTP/1.1\r\nHost: docker\r\nConnection: close\r\n\r\n")

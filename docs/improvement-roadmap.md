@@ -99,11 +99,15 @@
   （模拟 kill -9 第二步 → 新 runner 续跑断言 tool_calls 不重复 / tmp 原子替换 /
   损坏 checkpoint 回退重跑）。Python 268 OK。
 
-- [ ] **P0-10 (TS-01) Tool Server 真数据 + MCP 落地**：
-  ✅ 部分完成（commit d09ca46）：db 真实只读查询（pg_stat_activity：health/
-  active_connections/slow_query，原 42 等假数据删除，无 DSN 如实 503）；/mcp tools/call
-  走真实后端；compose 注入 REDIS/DATABASE/KUBE_TOOL_URL；compose 模式 list_pods 经
-  docker ps 返回真实容器清单（source=docker-compose，k8s in-cluster SA 待真 k8s 环境）。
+- [x] **P0-10 (TS-01) Tool Server 真数据 + MCP 落地**：
+  ✅ 完成（commit d09ca46 主体 + 2026-09-08 收尾）：db 真实只读查询
+  （pg_stat_activity：health/active_connections/slow_query，无 DSN 如实 503）；
+  /mcp tools/call 走真实后端；compose 注入 env；compose 模式 list_pods 经
+  docker ps 真实容器清单（source=docker-compose）；**in-cluster SA 真实读取
+  收尾（标准库 urllib+ssl 直连 K8S API，不引 kubernetes 包）——list_pods
+  返回 10 个真实 pod（source=in-cluster-k8s，kind 集群实测）；MCP 路径
+  错误 token 422 拒绝、REST 403；unittest 6/6**（evidence
+  docs/evidence/p010_incluster_toolserver.log）。写操作保留审批+dryRun 如实标注。
   1. k8s：in-cluster ServiceAccount（复用 `tool-server-rbac.yaml` 最小权限）实现 get_deployment/get_events 真实读取；写操作保留审批 + dryRun 开关但如实标注；
   2. db：真实只读查询（pg_stat_activity / pg_stat_statements / EXPLAIN）；
   3. redis：保持（已真实）；
