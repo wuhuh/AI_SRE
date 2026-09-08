@@ -39,7 +39,7 @@ class VerificationAgent:
                 state.evidence.append(Evidence(
                     source=tool_name,
                     key=f"verify:{tool_name}",
-                    content=call.result_summary[:500],
+                    content=call.result_summary[:8000],
                 ))
 
         # P1-AR-06: 确定性 SLI 判定——LLM 不再拥有恢复与否的决定权

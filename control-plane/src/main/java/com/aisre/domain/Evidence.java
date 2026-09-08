@@ -32,7 +32,8 @@ public class Evidence {
     @Column(nullable = false, length = 128)
     private String evidenceKey;
 
-    @Column(nullable = false, length = 4096)
+    // P2-FE-05: text 去限长——4096 varchar 曾把 agent 截断后的 JSON 弄残
+    @Column(nullable = false, columnDefinition = "text")
     private String content;
 
     // P2-AR-09: 溯源字段（查询语句/时间范围）

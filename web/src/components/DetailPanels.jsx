@@ -7,13 +7,48 @@ import { Card, List, Space, Tag, Typography } from 'antd';
 const { Text, Paragraph } = Typography;
 
 // content 可能被双重（或更多层）JSON 编码（agent 序列化 + DB 再存一层）——
-// 循环 parse 到非字符串为止
+// 循环 parse 到非字符串为止；仍失败时尝试抢救「尾部截断」的 JSON
 function tryParse(v) {
   let out = v;
   for (let i = 0; i < 3 && typeof out === 'string'; i++) {
-    try { out = JSON.parse(out); } catch { return null; }
+    let parsed;
+    try { parsed = JSON.parse(out); } catch { return salvageTruncated(out); }
+    out = parsed;
   }
   return typeof out === 'string' ? null : out;
+}
+
+// 历史 evidence 写入端按 500/1000 字符截断过 → JSON 尾部残缺。
+// 平衡扫描：丢弃最后一个不完整元素，保留所有完整元素并补齐闭合。
+function salvageTruncated(s) {
+  let depth = 0, inStr = false, esc = false, lastSafe = -1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '[' || c === '{') depth++;
+    else if (c === ']' || c === '}') depth--;
+    else if ((c === ',' || c === ']' || c === '}') && depth >= 1) lastSafe = i;
+  }
+  if (lastSafe <= 0) return null;
+  let salv = s.slice(0, lastSafe + 1);
+  // 补齐未闭合括号
+  const stack = [];
+  inStr = false; esc = false;
+  for (const c of salv) {
+    if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true;
+    else if (c === '[' || c === '{') stack.push(c);
+    else if (c === ']' && stack[stack.length - 1] === '[') stack.pop();
+    else if (c === '}' && stack[stack.length - 1] === '{') stack.pop();
+  }
+  while (stack.length) salv += stack.pop() === '[' ? ']' : '}';
+  try { return JSON.parse(salv); } catch { return null; }
 }
 
 /** Loki streams 结果 → [{level, container, line}] */

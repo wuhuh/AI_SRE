@@ -41,7 +41,7 @@ class Tool(ABC):
                 result = future.result(timeout=self.spec.timeout_seconds)
             finally:
                 pool.shutdown(wait=False)
-            call.result_summary = str(result)[:2000]
+            call.result_summary = str(result)[:8000]
         except TimeoutError:
             call.status = "TIMEOUT"
             call.error = "tool timeout"

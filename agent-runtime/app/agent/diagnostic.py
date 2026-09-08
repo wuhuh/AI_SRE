@@ -184,7 +184,7 @@ class DiagnosticAgent:
             state.evidence.append(Evidence(
                 source=tool_name,
                 key=f"{tool_name}:{state.step}",
-                content=call.result_summary[:1000],
+                content=call.result_summary[:8000],
                 query=query,
                 time_range=time_range,
             ))
@@ -195,11 +195,11 @@ class DiagnosticAgent:
             return
         docs = self.retriever.retrieve(state.alert.get("summary", ""))
         content = "\n".join(f"[{d.id}] {d.title}: {d.content}" for d in docs)
-        state.tool_results["retrieve_runbook"] = content[:2000]
+        state.tool_results["retrieve_runbook"] = content[:8000]
         state.evidence.append(Evidence(
             source="rag",
             key="retrieved_runbooks",
-            content=content[:1000],
+            content=content[:8000],
         ))
 
     def _ask_llm(self, state: AgentState) -> dict:
@@ -223,7 +223,7 @@ class DiagnosticAgent:
             # P0-07 排障：决策结果必须可见（LLM 回了什么、是否走降级）
             logger.info("llm decision: incident=%s root=%s nextTool=%s raw=%s",
                         state.incident_id, decision.get("rootCause"),
-                        decision.get("nextTool"), result.content[:200])
+                        decision.get("nextTool"), result.content[:800])
             return decision
         except Exception as exc:
             logger.warning("llm decision failed: incident=%s error=%s", state.incident_id, exc)
