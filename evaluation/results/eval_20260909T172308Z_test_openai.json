@@ -1,0 +1,64 @@
+{
+  "report": {
+    "total_cases": 2,
+    "http_errors": 0,
+    "root_cause_top1_accuracy": 1.0,
+    "root_cause_top3_accuracy": 1.0,
+    "unknown_rate": 0.0,
+    "fallback_rate": 0.0,
+    "evidence_precision_avg": 0.0,
+    "evidence_recall_avg": 0.0,
+    "tool_success_rate": 1.0,
+    "average_tool_calls": 3.0,
+    "average_diagnosis_time_s": 22.015,
+    "p95_diagnosis_time_s": 12.195,
+    "average_input_tokens": 3587.0,
+    "average_output_tokens": 2532.5,
+    "provider": "openai",
+    "split": "test",
+    "input_mode": "neutral_symptom_alerts (no fault_type leakage)",
+    "scoring": "exact canonical label match; top3 = expected in candidates[:3]"
+  },
+  "cases": [
+    {
+      "case_id": "cpu_sat_007",
+      "expected": "cpu_saturation",
+      "predicted": "cpu_saturation",
+      "candidates": [
+        "cpu_saturation"
+      ],
+      "confidence": 0.9,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": true,
+      "top3": true,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 3,
+      "llm_input_tokens": 4482,
+      "llm_output_tokens": 3912,
+      "latency_s": 31.836
+    },
+    {
+      "case_id": "cpu_sat_008",
+      "expected": "cpu_saturation",
+      "predicted": "cpu_saturation",
+      "candidates": [
+        "cpu_saturation"
+      ],
+      "confidence": 0.55,
+      "status": "ROOT_CAUSE_FOUND",
+      "fallback_used": false,
+      "top1": true,
+      "top3": true,
+      "evidence_precision": 0.0,
+      "evidence_recall": 0.0,
+      "tool_calls": 3,
+      "tool_success": 3,
+      "llm_input_tokens": 2692,
+      "llm_output_tokens": 1153,
+      "latency_s": 12.195
+    }
+  ]
+}
