@@ -175,7 +175,7 @@ observability/       Prometheus/Loki/OTel/Grafana 配置
 web/                 简易前端 Dashboard
 deploy/              Docker/K8s
 benchmark/           k6 和并发脚本
-docs/                架构/进度/技术评审/基准
+docs/                架构/进度/评审/基准
 ```
 
 ## 文档
@@ -185,8 +185,6 @@ docs/                架构/进度/技术评审/基准
 - [API 契约](docs/api-contract.md)
 - [进度](docs/progress.md)
 - [Benchmark](docs/benchmark.md)
-- [技术评审准备](docs/interview.md)
-- [项目亮点素材](docs/resume.md)
 - [需求覆盖清单](docs/coverage.md)
 - [测试说明](docs/testing.md)
 - [环境限制](docs/limitations.md)

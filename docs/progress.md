@@ -15,7 +15,7 @@
 - Phase 11: Idempotency keys, persistent task state, retry/timeout abstractions
 - Phase 12: Local API load and Agent benchmark runners
 - Phase 13: Docker Compose, Kubernetes manifests, CI workflow
-- Phase 14: Documentation, coverage matrix, resume materials
+- Phase 14: Documentation, coverage matrix, review materials
 
 ## Current
 - Production Readiness Audit completed

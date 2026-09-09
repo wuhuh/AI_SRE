@@ -1,6 +1,6 @@
 # 项目开发总 Prompt：AI SRE 智能故障诊断与自愈平台
 
-你现在是一名 **Staff/Principal 级 AI Infra + 分布式后端工程师**，需要从零设计并实现一个可以真实运行、测试、压测、演示和写入生产级项目的完整项目。
+你现在是一名 **Staff/Principal 级 AI Infra + 分布式后端工程师**，需要从零设计并实现一个可以真实运行、测试、压测、演示的完整生产级项目。
 
 项目名称暂定：
 
@@ -1489,7 +1489,7 @@ Verification
 21:04 Root Cause identified
 ```
 
-这样非常适合技术评审 Demo。
+这样非常适合现场 Demo。
 
 ------
 
@@ -2075,157 +2075,3 @@ After
 ```
 
 所有百分比和指标必须来自真实实验。
-
-------
-
-# 三十七、技术评审材料
-
-生成：
-
-```text
-docs/interview.md
-```
-
-至少包括 50 个可能被问的问题。
-
-包括：
-
-```text
-为什么设计 Multi-Agent？
-
-为什么不用一个 Agent？
-
-Agent 如何避免死循环？
-
-Metrics、Logs、Trace 各有什么作用？
-
-如何定位 Root Cause？
-
-为什么需要 Evidence？
-
-RAG 为什么使用 Hybrid？
-
-为什么使用 MQ？
-
-为什么使用 Redis？
-
-重复消息怎么办？
-
-任务如何保证幂等？
-
-Agent Runtime 挂掉怎么办？
-
-Tool 如何保证安全？
-
-为什么需要 Human-in-the-loop？
-
-如何防止 Prompt Injection？
-
-LLM Timeout 怎么办？
-
-如何做 Evaluation？
-
-如何做故障注入？
-
-如何证明项目真的有效？
-```
-
-并结合实际代码回答。
-
-------
-
-# 三十八、最终验收标准
-
-项目只有满足以下标准才算完成。
-
-必须能够现场演示：
-
-```text
-1. 启动完整环境
-
-2. 正常请求运行
-
-3. 注入一个真实故障
-
-4. Prometheus 产生异常 Metrics
-
-5. Logs/Trace 出现异常
-
-6. Alert 进入 Control Plane
-
-7. Incident 创建
-
-8. Agent 自动查询多个 Tool
-
-9. Agent 给出 Root Cause + Evidence
-
-10. Agent 给出 Recovery Plan
-
-11. 用户审批
-
-12. Tool 执行恢复操作
-
-13. Verification 确认恢复
-
-14. Incident Closed
-
-15. 自动生成 Incident Report
-```
-
-此外：
-
-```text
-Unit Test 可以执行
-
-Integration Test 可以执行
-
-至少一条完整 E2E 可以自动执行
-
-Benchmark 可以重复执行
-
-Evaluation 可以重复执行
-
-Docker Compose 可以一键启动
-
-README 可以让其他人独立运行
-```
-
-------
-
-# 三十九、非常重要的开发约束
-
-整个开发过程中：
-
-**不要追求一次把所有功能写完。**
-
-必须遵循：
-
-```text
-设计
-↓
-实现最小闭环
-↓
-测试
-↓
-审查
-↓
-扩展
-```
-
-如果某阶段发现之前设计存在问题，应直接重构，而不是继续在错误架构上堆功能。
-
-不要为了展示技术而无意义增加组件。
-
-每引入一个中间件，都必须能够回答：
-
-```text
-为什么需要它？
-
-不用它有什么问题？
-
-有没有更简单的方案？
-```
-
-最终目标不是技术栈最多，而是：
-
-**系统完整、设计合理、能够运行、能够测试、能够量化、能够解释。**

@@ -179,7 +179,7 @@ Production Readiness 总分：**3.9 / 10**（评分卡见下）。
 - **Current State**: `_finalize` 中 LLM 结论为空/unknown 时落入 `_rule_based_diagnosis`；置信度 ≤0 一律改写为 0.8；无证据时追加 `source="rule"` 的伪证据。
 - **Evidence**: `agent-runtime/app/agent/diagnostic.py:147-160`（fallback+confidence 改写+伪证据）、`:174-217`（关键词→root cause 映射表："redis" in summary → `redis_connection_pool_exhausted`）。
 - **Problem**: 根因不是推理产物而是关键词匹配；`confidence=0.8` 让超时（`diagnosis_timeout`）、unknown、规则兜底全部显示高置信；伪证据让 Evidence 列表永远非空，掩盖"没有证据"这一事实。
-- **Why It Matters**: 这是用户点名的"alert 名称 → if/else → Root Cause"反模式本体；同时它使 Evaluation（与 rule 关键词同源）必然虚高，也使技术评审深挖时整个 Agent 故事坍塌。
+- **Why It Matters**: 这是用户点名的"alert 名称 → if/else → Root Cause"反模式本体；同时它使 Evaluation（与 rule 关键词同源）必然虚高，也使技术深挖时整个 Agent 故事坍塌。
 - **Failure Scenario**: LLM 挂掉/超时/输出坏 JSON → 系统仍输出 `redis_connection_pool_exhausted, confidence=0.8`，前端与报告展示为高置信结论。
 - **Recommended Change**: 规则结果仅作 `fallback_used=true` 标记的 LOW_CONFIDENCE（≤0.3）降级输出；删除 confidence 改写；删除伪证据（无证据就输出空 evidence + status=UNKNOWN）；规则映射如保留，显式命名为 `heuristic_fallback` 并在报告中注明"非 Agent 推理"。
 - **Tests Required**: LLM 失败路径断言（rootCause=unknown、confidence≤0.3、evidence 无伪条目）；`diagnosis_timeout` 不获得 0.8 置信度的负向测试。
@@ -271,7 +271,7 @@ Production Readiness 总分：**3.9 / 10**（评分卡见下）。
   - `audit_evaluation.py` — 只检查 root_cause==fault_type 的精确泄漏，未覆盖 summary 含 fault_type 的路径。
   - `docs/benchmark.md:55-66` 把 baseline 表作为核心对比引用；docs 声称 "No numbers are fabricated"（PARTIAL：数字真实来自脚本，但脚本自证）。
 - **Problem**: 当前**不存在任何可信的准确率数字**；数据集存在输入泄漏、近重复、split 未用三类问题；baseline 无法证明 RAG/Trace/Agent 的增量价值。
-- **Why It Matters**: Evaluation 是项目"AI 能力可信"的唯一凭证；现状在技术评审深挖（"你的 100% 怎么来的"）时一问即穿。
+- **Why It Matters**: Evaluation 是项目"AI 能力可信"的唯一凭证；现状在技术深挖（"你的 100% 怎么来的"）时一问即穿。
 - **Failure Scenario**: 评审人要求现场重跑 run_evaluation → 输出 0.0 accuracy；或追问 fault_type 与规则兜底关系 → 承认泄漏。
 - **Recommended Change**（按顺序）:
   1. 定义 canonical RCA 标签空间（snake_case 枚举，与 case 的 `expected_root_cause_label` 对齐；现自然语言句子保留为 description）。
@@ -747,7 +747,7 @@ Control Plane 全量 findings 见子审计（CP-01~CP-25），此处汇总关键
 | Rank | Task | Priority | Why | Effort | Impact | Dependencies |
 |---|---|---|---|---|---|---|
 | 1 | P0-12 git init+首次提交+ignore 调试产物 | P0 | 一切工程化前提；CI/回滚/审查的基座 | S | 全局 | — |
-| 2 | P0-03 Evaluation 重构（canonical 标签+去泄漏+真 top3+splits+产物落盘） | P0 | 没有 AI 可信度就没有项目可信度；技术评审第一深挖点 | M | 极高 | 3,4 |
+| 2 | P0-03 Evaluation 重构（canonical 标签+去泄漏+真 top3+splits+产物落盘） | P0 | 没有 AI 可信度就没有项目可信度；评审第一深挖点 | M | 极高 | 3,4 |
 | 3 | P0-01 规则兜底降级（去 0.8/去伪证据） | P0 | 让"Agent 推理"与"规则兜底"诚实可分 | S | 极高 | — |
 | 4 | P0-02 工具参数 alert 驱动 | P0 | 证据链源头修复，~30 行 diff 改变诊断正确性 | S | 极高 | — |
 | 5 | P0-05 Agent 回调 token+幂等 | P0 | 堵住重放/多副本重复执行修复的确定性风险 | M | 高 | 10 |
@@ -756,7 +756,7 @@ Control Plane 全量 findings 见子审计（CP-01~CP-25），此处汇总关键
 | 8 | P0-07 AM 适配端点+全链路 E2E | P0 | 打通"从真实告警开始"的叙事起点 | M | 高 | — |
 | 9 | CP-16+CP-18 全链路日志+输入校验 | P1 | 生产可运维底线；排障前提 | S | 高 | — |
 | 10 | MQ-02 任务 claim+MQ-01 消费端决策落地 | P1 | 分布式系统叙事从"画的"变"跑的" | M-L | 高 | 5 |
-| 11 | CP-07 afterCommit/outbox | P1 | 双写原子性；技术评审必问 | M | 高 | 10 |
+| 11 | CP-07 afterCommit/outbox | P1 | 双写原子性；评审必查 | M | 高 | 10 |
 | 12 | P0-10 tool-server 真数据（k8s SA+真实 db 只读） | P0 | 证据层从假变真；MCP/审批故事复活 | M | 高 | 6 |
 | 13 | T-02 Java 核心链路测试（@SpringBootTest+Testcontainers） | P1 | 最高危链路从 0 覆盖到可回归 | M-L | 高 | 9 |
 | 14 | FI-04 日志进 Loki | P1 | 日志证据从恒空变可用；traceId 关联落地 | S-M | 高 | — |
@@ -768,7 +768,7 @@ Control Plane 全量 findings 见子审计（CP-01~CP-25），此处汇总关键
 | 20 | DOC 全系诚实化（DOC-01~10）+T-01 删生成测试 | P1 | 文档不再领先现实；测试计数可信 | S-M | 中 | 各项落地后 |
 
 **如果只有 2 周**：做 Rank 1-9 + 14 + 19（约 8-10 个工作日）——项目性质从"演示"变"可信"；P0-08 故障真实化做到一期（redis+cpu），P0-10 做到 k8s 真读（compose 环境可先用文档标注）。
-**如果有 1 个月**：完成全部 Top 20 + K8S-01（kind 部署实测）+ P0-08 二期 + 备份恢复演练 + 压测口径修正，然后**停止加功能**（见 Do Not Build Yet），转入技术评审材料与 Demo 脚本打磨。
+**如果有 1 个月**：完成全部 Top 20 + K8S-01（kind 部署实测）+ P0-08 二期 + 备份恢复演练 + 压测口径修正，然后**停止加功能**（见 Do Not Build Yet），转入评审材料与 Demo 脚本打磨。
 
 ---
 
@@ -795,7 +795,7 @@ P0-08 一期（redis pool 真打满 + cpu busy-loop）→ FI-10 对齐评估期�
 验证：注入后 Prom 指标越限；Agent 在**不带答案标签**的输入上靠证据得出根因。
 
 ## Stage 6 — Deploy & Portfolio Polish（第 4 周，~5 天）
-K8S-01（kind 实测部署+修 default-deny/补缺）→ CP-17/20/21/22 → FE-01/02/03 → BM 口径修正+结果入仓 → DOC-07 重写 + README/架构图重绘（含 Mermaid Target Architecture）→ 技术评审深挖材料（每个 Findings 一段"为什么这样修"）。
+K8S-01（kind 实测部署+修 default-deny/补缺）→ CP-17/20/21/22 → FE-01/02/03 → BM 口径修正+结果入仓 → DOC-07 重写 + README/架构图重绘（含 Mermaid Target Architecture）→ 技术深挖材料（每个 Findings 一段"为什么这样修"）。
 验证：全新机器 compose up + kind deploy 双路径可复现；文档与代码零矛盾。
 
 ---
