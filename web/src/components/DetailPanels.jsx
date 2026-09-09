@@ -138,15 +138,25 @@ function EvidenceBody({ source, parsed }) {
   if (source === 'query_logs') {
     const rows = lokiRows(parsed);
     if (rows.length === 0) return null;
+    // 同一条日志重复刷屏（如 WARNING 循环打印）→ 按内容聚合，重复的标 ×N
+    const byLine = new Map();
+    for (const r of rows) {
+      const k = `${r.container}|${r.line}`;
+      const g = byLine.get(k);
+      if (g) { g.count += 1; if (g.level === 'info') g.level = r.level; }
+      else byLine.set(k, { ...r, count: 1 });
+    }
+    const groups = [...byLine.values()];
     return (
       <div style={{ marginTop: 4 }}>
-        {rows.slice(0, 6).map((r, i) => (
+        {groups.slice(0, 6).map((g, i) => (
           <div key={i} style={{ fontSize: 12, fontFamily: 'monospace', display: 'flex', gap: 8 }}>
-            <Tag color={LEVEL_COLOR[r.level] || 'default'} style={{ marginRight: 0 }}>{r.level}</Tag>
-            <Text style={{ fontSize: 12 }} ellipsis={{ tooltip: r.line }}>{r.container}: {r.line}</Text>
+            <Tag color={LEVEL_COLOR[g.level] || 'default'} style={{ marginRight: 0 }}>{g.level}</Tag>
+            <Text style={{ fontSize: 12 }} ellipsis={{ tooltip: g.line }}>{g.container}: {g.line}</Text>
+            {g.count > 1 && <Tag color="default" style={{ marginRight: 0 }}>×{g.count}</Tag>}
           </div>
         ))}
-        {rows.length > 6 && <Text type="secondary" style={{ fontSize: 12 }}>…共 {rows.length} 条</Text>}
+        {groups.length > 6 && <Text type="secondary" style={{ fontSize: 12 }}>…共 {groups.length} 种 {rows.length} 条</Text>}
       </div>
     );
   }
