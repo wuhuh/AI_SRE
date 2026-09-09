@@ -205,6 +205,8 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://opencode.ai/zen/go/v1}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-deepseek-v4-flash}
+      # 代理网关附加头（如 opencode zen 要求的 x-opencode-session）
+      OPENAI_EXTRA_HEADERS: ${OPENAI_EXTRA_HEADERS:-}
       AUTO_CONSUME: ${AUTO_CONSUME:-true}
       CONTROL_PLANE_URL: http://control-plane:8080
       AGENT_TOKEN: ${AISRE_AGENT_TOKEN:-local-dev-agent-token}

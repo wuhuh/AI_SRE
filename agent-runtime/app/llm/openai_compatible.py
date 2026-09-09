@@ -34,6 +34,12 @@ class OpenAICompatibleLLMProvider(LLMProvider):
         if tools:
             payload["tools"] = tools
         headers = {"Authorization": f"Bearer {self.api_key}"}
+        # 代理网关可要求附加头（如 opencode zen 的 x-opencode-session）：
+        # OPENAI_EXTRA_HEADERS 形如 "Header-Name: value, Another: value"
+        extra = os.getenv("OPENAI_EXTRA_HEADERS", "")
+        for part in [p for p in extra.split(",") if p.strip()]:
+            name, _, value = part.partition(":")
+            headers[name.strip()] = value.strip()
         endpoint = self.base_url if self.base_url.endswith("/chat/completions") else f"{self.base_url}/chat/completions"
         with httpx.Client(timeout=self.timeout_seconds) as client:
             resp = client.post(endpoint, json=payload, headers=headers)
