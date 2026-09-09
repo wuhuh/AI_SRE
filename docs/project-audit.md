@@ -613,7 +613,7 @@ Control Plane 全量 findings 见子审计（CP-01~CP-25），此处汇总关键
 - **Current State**: checkpoint 仅在 run 结束后保存；load 生产零调用；verify 从空 state 起跑；文件写非原子；"crash recovery 测试"是 JSON roundtrip。
 - **Evidence**: `runner.py:35-44`、`main.py:137-142`、`checkpoint.py:53-62`、`test_crash_recovery.py:16-41`、grep load 零调用。
 - **Problem**: Agent crash 后无法恢复；声称能力不存在。
-- **Recommended Change**: 方案 A（实现）：save 改 tmp+rename 原子写 + run 中每步 save + diagnose 入口先 load 续跑 + kill-restart 测试。方案 B（诚实降级）：删除"crash recovery"表述，文档改为"run 结束后持久化状态"。项目价值取 A。
+- **Recommended Change**: 方案 A（实现）：save 改 tmp+rename 原子写 + run 中每步 save + diagnose 入口先 load 续跑 + kill-restart 测试。方案 B（诚实降级）：删除"crash recovery"表述，文档改为"run 结束后持久化状态"。价值取 A。
 - **Estimated Effort**: S-M（A）/ S（B）
 - **Dependencies**: MQ-02。
 
