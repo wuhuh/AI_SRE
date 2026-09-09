@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Button,
   Card,
   Col,
   Descriptions,
+  Empty,
   Input,
   Layout,
   List,
@@ -40,6 +41,16 @@ export default function App() {
   const [incidents, setIncidents] = useState([]);
   const [services, setServices] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const selectedRef = useRef(null);
+  selectedRef.current = selected;
+
+  // P2-FE-06: 选中事件写入 URL（?incident=99）——刷新/分享直达；关闭清除
+  const selectIncident = (inc) => {
+    setSelected(inc);
+    const qs = inc ? `?incident=${inc.id}` : '';
+    window.history.replaceState(null, '', `${window.location.pathname}${qs}`);
+  };
   const [approvals, setApprovals] = useState([]);
   const [authToken, setAuthToken] = useState(() => localStorage.getItem('aisre_token') || '');
   const [loginOpen, setLoginOpen] = useState(false);
@@ -77,8 +88,16 @@ export default function App() {
     try {
       const res = await apiFetch('/api/v1/incidents');
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      setIncidents(await res.json());
+      const list = await res.json();
+      setIncidents(list);
       setError('');
+      setLastUpdated(new Date());
+      // 深链：?incident=99 且当前无选中 → 恢复选中（必须在数据回来后取完整对象）
+      const qid = new URLSearchParams(window.location.search).get('incident');
+      if (qid && !selectedRef.current) {
+        const found = list.find((i) => String(i.id) === qid);
+        if (found) selectIncident(found);
+      }
     } catch (e) {
       if (String(e.message) !== '401') setError('加载事故列表失败：' + e.message);
     } finally {
@@ -371,10 +390,10 @@ export default function App() {
         </Row>
 
         <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col xs={12} lg={6}><MetricCard label="Incident" value={summary.total} hint={`${summary.p1} active critical`} /></Col>
-          <Col xs={12} lg={6}><MetricCard label="Active" value={summary.active} hint="Currently processing" color="#D97706" /></Col>
-          <Col xs={12} lg={6}><MetricCard label="Recovered" value={summary.resolved} hint="Recovered incidents" color="#16A34A" /></Col>
-          <Col xs={12} lg={6}><MetricCard label="Pending Approval" value={summary.waitingApproval} hint="Require human action" color="#7C3AED" /></Col>
+          <Col xs={12} lg={6}><MetricCard label="Incident" value={summary.total} hint={`${summary.p1} active critical`} onClick={() => setFStatus('ALL')} /></Col>
+          <Col xs={12} lg={6}><MetricCard label="Active" value={summary.active} hint="Currently processing" color="#D97706" onClick={() => setFStatus('ACTIVE')} /></Col>
+          <Col xs={12} lg={6}><MetricCard label="Recovered" value={summary.resolved} hint="Recovered incidents" color="#16A34A" onClick={() => setFStatus('RESOLVED')} /></Col>
+          <Col xs={12} lg={6}><MetricCard label="Pending Approval" value={summary.waitingApproval} hint="Require human action" color="#7C3AED" onClick={() => setFStatus('WAITING_APPROVAL')} /></Col>
         </Row>
 
         <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
@@ -409,14 +428,38 @@ export default function App() {
             <span style={{ fontSize: 12, color: '#98A2B3' }}>{filteredIncidents.length}/{incidents.length} 条</span>
           </Space>
         }>
-          <IncidentTable incidents={filteredIncidents} onSelect={setSelected} loading={loading} selectedId={selected?.id} />
+          {filteredIncidents.length === 0 && !loading && (fSearch || fStatus !== 'ALL' || (fRange && fRange[0])) ? (
+            <Empty description="没有匹配的事件">
+              <Button size="small" onClick={() => { setFStatus('ALL'); setFSearch(''); setFRange(null); }}>清除筛选</Button>
+            </Empty>
+          ) : (
+            <IncidentTable incidents={filteredIncidents} onSelect={selectIncident} loading={loading} selectedId={selected?.id} />
+          )}
         </Card>
 
         <div ref={detailRef}>
         {selected && (
           <Card title={`INC-${String(selected.id).padStart(4, '0')} 详情 — ${selected.service} [${selected.status}]`}
-                extra={<Button size="small" onClick={() => setSelected(null)}>关闭</Button>}
+                extra={<Button size="small" onClick={() => selectIncident(null)}>关闭</Button>}
                 style={{ marginBottom: 16 }}>
+            {selected.status === 'WAITING_APPROVAL' && (() => {
+              const pending = approvals.find((a) => a.status === 'PENDING');
+              return (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 12 }}
+                  message="等待人工审批"
+                  description={pending ? `待执行动作：${pending.actionType}` : undefined}
+                  action={pending && (
+                    <Space>
+                      <Button size="small" type="primary" onClick={() => decision(pending.id, 'APPROVE')}>批准并执行</Button>
+                      <Button size="small" danger onClick={() => decision(pending.id, 'REJECT')}>拒绝</Button>
+                    </Space>
+                  )}
+                />
+              );
+            })()}
             <Tabs items={detailItems} />
           </Card>
         )}
