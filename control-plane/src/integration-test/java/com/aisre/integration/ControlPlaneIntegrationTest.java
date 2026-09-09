@@ -47,9 +47,9 @@ class ControlPlaneIntegrationTest {
                 .locations("classpath:db/migration")
                 .load()
                 .migrate();
-        // V1..V9 全部落库（V8 = 删未用表，V9 = 证据溯源列）；
+        // V1..V10 全部落库（V8 = 删未用表，V9 = 证据溯源列，V10 = evidence.content 改 text）；
         // 新增迁移时同步此数（ponytail: 保持显式，漏更新即测试红——这正是目的）
-        assertEquals(9, result.migrationsExecuted);
+        assertEquals(10, result.migrationsExecuted);
 
         try (Connection conn = DriverManager.getConnection(
                 postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
