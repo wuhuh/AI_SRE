@@ -2,3 +2,7 @@
 .incident-row-selected > td {
   background: #F0F5FF !important;
 }
+
+/* 诊断流程图：当前选中节点高亮（Steps 不用 current 联动，status 由数据决定） */
+.flow-node-active .ant-steps-item-title { font-weight: 600; }
+.flow-node-active { background: #F0F5FF; border-radius: 6px; }

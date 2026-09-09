@@ -67,41 +67,62 @@ function StepDetail({ item }) {
   );
 }
 
-export default function ToolFlow({ toolCalls }) {
+export default function ToolFlow({ toolCalls, remediations = [] }) {
   const [active, setActive] = useState(null);
 
+  // 诊断工具调用 + 修复执行 = 完整生命周期（必须在首次使用前声明）
+  const allCalls = [...toolCalls, ...remediations];
+
   useEffect(() => {
-    // 默认展开第一个失败环节；全成功则展开第一个
-    const fail = toolCalls.findIndex((t) => t.status !== 'SUCCESS');
-    setActive(toolCalls.length ? (fail >= 0 ? fail : 0) : null);
-  }, [toolCalls]);
+    // 默认展开第一个失败环节（含修复执行失败）；全成功则展开第一个
+    const fail = allCalls.findIndex((t) => t.status !== 'SUCCESS');
+    setActive(allCalls.length ? (fail >= 0 ? fail : 0) : null);
+  }, [toolCalls, remediations]);
 
-  if (!toolCalls.length) return <Text type="secondary">暂无 Tool 调用</Text>;
+  if (!allCalls.length) return <Text type="secondary">暂无诊断记录</Text>;
 
-  const items = toolCalls.map((t, i) => {
-    const failed = t.status !== 'SUCCESS';
-    const sentence = failed ? (t.error ? String(t.error).slice(0, 60) : '执行失败') : resultSentence(t);
-    return {
-      title: <span style={{ fontWeight: i === active ? 600 : 400 }}>{TOOL_LABEL[t.toolName] || t.toolName}</span>,
-      description: (
-        <span style={{ fontSize: 12, color: failed ? '#CF1322' : '#98A2B3' }}>
-          {sentence}{t.durationMs != null ? ` · ${t.durationMs}ms` : ''}
-        </span>
-      ),
-      status: failed ? 'error' : 'finish',
-    };
-  });
+  const items = [
+    ...toolCalls.map((t, i) => {
+      const failed = t.status !== 'SUCCESS';
+      const sentence = failed ? (t.error ? String(t.error).slice(0, 60) : '执行失败') : resultSentence(t);
+      return {
+        title: <span style={{ fontWeight: i === active ? 600 : 400 }}>{TOOL_LABEL[t.toolName] || t.toolName}</span>,
+        description: (
+          <span style={{ fontSize: 12, color: failed ? '#CF1322' : '#98A2B3' }}>
+            {sentence}{t.durationMs != null ? ` · ${t.durationMs}ms` : ''}
+          </span>
+        ),
+        status: failed ? 'error' : 'finish',
+      };
+    }),
+    ...remediations.map((r) => {
+      const failed = r.status !== 'SUCCESS';
+      const parsed = tryParse(r.resultSummary) || {};
+      const how = parsed.dryRun === true ? 'DRY-RUN' : parsed.executed === false ? '未执行' : '已执行';
+      return {
+        title: <span style={{ fontWeight: active === toolCalls.length + remediations.indexOf(r) ? 600 : 400 }}>
+          <Tag color="cyan" style={{ marginRight: 6 }}>修复</Tag>{TOOL_LABEL[r.toolName] || r.toolName}
+        </span>,
+        description: (
+          <span style={{ fontSize: 12, color: failed ? '#CF1322' : '#98A2B3' }}>
+            {failed ? (r.error ? String(r.error).slice(0, 60) : '修复执行失败') : `${how}${r.approvalId ? ` · 审批 #${r.approvalId}` : ''}`}
+          </span>
+        ),
+        status: failed ? 'error' : 'finish',
+      };
+    }),
+  ];
 
   return (
     <div>
       <Steps
         direction="vertical"
         size="small"
-        current={active}
-        items={items}
+        type="inline"
+        items={items.map((it, i) => ({ ...it, className: i === active ? 'flow-node-active' : undefined }))}
         onChange={(i) => setActive(i)}
       />
-      {active != null && toolCalls[active] && <StepDetail item={toolCalls[active]} />}
+      {active != null && allCalls[active] && <StepDetail item={allCalls[active]} />}
     </div>
   );
 }

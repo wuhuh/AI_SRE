@@ -1,5 +1,6 @@
 services:
   postgres:
+    restart: unless-stopped
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: aisre
@@ -16,6 +17,7 @@ services:
       retries: 10
 
   redis:
+    restart: unless-stopped
     image: redis:7-alpine
     ports:
       - "6379:6379"
@@ -26,6 +28,7 @@ services:
       retries: 10
 
   rocketmq-namesrv:
+    restart: unless-stopped
     image: apache/rocketmq:5.3.2
     command: sh mqnamesrv
     ports:
@@ -38,6 +41,7 @@ services:
       start_period: 30s
 
   rocketmq-broker:
+    restart: unless-stopped
     image: apache/rocketmq:5.3.2
     depends_on:
       rocketmq-namesrv:
@@ -48,6 +52,7 @@ services:
       - "10909:10909"
 
   alertmanager:
+    restart: unless-stopped
     image: prom/alertmanager:v0.28.1
     ports:
       - "9093:9093"
@@ -57,6 +62,7 @@ services:
       - --config.file=/etc/alertmanager/alertmanager.yml
 
   prometheus:
+    restart: unless-stopped
     image: prom/prometheus:v2.54.1
     ports:
       - "9090:9090"
@@ -75,6 +81,7 @@ services:
       - payment-service
 
   grafana:
+    restart: unless-stopped
     image: grafana/grafana:11.1.0
     ports:
       - "3000:3000"
@@ -84,6 +91,7 @@ services:
       - ./observability/grafana-provisioning:/etc/grafana/provisioning:ro
 
   loki:
+    restart: unless-stopped
     image: grafana/loki:3.0.0
     ports:
       - "3100:3100"
@@ -93,6 +101,7 @@ services:
 
   # P1-FI-06: 幻影规则落真 —— redis/postgres 真实指标（RocketMQLagHigh 见 prometheus-alerts.yml 注记）
   redis-exporter:
+    restart: unless-stopped
     image: redis_exporter:v1.67.0
     command:
       - --redis.addr=redis://redis:6379
@@ -101,6 +110,7 @@ services:
         condition: service_healthy
 
   postgres-exporter:
+    restart: unless-stopped
     image: postgres-exporter:v0.16.0
     environment:
       DATA_SOURCE_NAME: postgres://aisre:aisre@postgres:5432/aisre?sslmode=disable
@@ -110,6 +120,7 @@ services:
 
   # P1-FI-04: 容器日志 → Loki（docker_sd，产出 service 标签供 query_logs 查询）
   promtail:
+    restart: unless-stopped
     image: grafana/promtail:3.4.1
     command: -config.file=/etc/promtail/config.yml
     volumes:
@@ -120,6 +131,7 @@ services:
       - loki
 
   frontend:
+    restart: unless-stopped
     # P1-FE-01: 前端定版为 React(vite) 轨 —— compose 走构建镜像（原 nginx 挂静态目录轨已删）
     build:
       context: ./web
@@ -130,6 +142,7 @@ services:
       - control-plane
 
   otel-collector:
+    restart: unless-stopped
     image: otel/opentelemetry-collector-contrib:0.102.0
     ports:
       - "4318:4318"
@@ -142,11 +155,13 @@ services:
       - prometheus
 
   jaeger:
+    restart: unless-stopped
     image: jaegertracing/all-in-one:1.57
     ports:
       - "16686:16686"
 
   control-plane:
+    restart: unless-stopped
     build:
       context: ./control-plane
     environment:
@@ -181,6 +196,7 @@ services:
         condition: service_healthy
 
   agent-runtime:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: agent-runtime/Dockerfile
@@ -210,6 +226,7 @@ services:
       - jaeger
 
   tool-server:
+    restart: unless-stopped
     build:
       context: ./tool-server
     environment:
@@ -228,6 +245,7 @@ services:
       - redis
 
   gateway:
+    restart: unless-stopped
     build:
       context: ./demo-services
       dockerfile: gateway/Dockerfile
@@ -237,6 +255,7 @@ services:
       - "8000:8000"
 
   order-service:
+    restart: unless-stopped
     build:
       context: ./demo-services
       dockerfile: order-service/Dockerfile
@@ -247,6 +266,7 @@ services:
       - "8002:8002"
 
   inventory-service:
+    restart: unless-stopped
     build:
       context: ./demo-services
       dockerfile: inventory-service/Dockerfile
@@ -254,6 +274,7 @@ services:
       - "8003:8003"
 
   payment-service:
+    restart: unless-stopped
     build:
       context: ./demo-services
       dockerfile: payment-service/Dockerfile

@@ -281,7 +281,7 @@ export default function App() {
     {
       key: 'tools',
       label: '诊断流程',
-      children: <ToolFlow toolCalls={toolCalls} />,
+      children: <ToolFlow toolCalls={toolCalls} remediations={remediations} />,
     },
     {
       key: 'remediation',
