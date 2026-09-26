@@ -280,11 +280,24 @@ class DiagnosticAgent:
             confidence = 0.0
         fallback_used = False
         heuristic_candidate = None
+        reason_code = ""
         # P2-AR-09: status 语义——ROOT_CAUSE_FOUND / UNKNOWN（降级）/ TIMEOUT（预算耗尽）
         if timed_out:
             status = "TIMEOUT"
+            reason_code = "timeout"
         else:
             status = "ROOT_CAUSE_FOUND"
+        # 文档 8.6：闭集不能只靠提示约束——代码必须校验。
+        # 模型编出的非法标签（不在 RCA_CANDIDATE_LABELS 内、也不是 unknown）
+        # 不能因为「不是 unknown 字符串」就被视为已找到根因，
+        # 走与 unknown 相同的降级路径（文档 8.5：同时清理没有依据的动作建议）。
+        normalized_root = normalize_label(root_cause)
+        valid_labels = {normalize_label(x) for x in RCA_CANDIDATE_LABELS}
+        invalid_label = not timed_out and normalized_root != "unknown" and normalized_root not in valid_labels
+        if invalid_label:
+            logger.warning("model returned non-contract root label %r — treating as unknown", root_cause)
+            root_cause = "unknown"
+            reason_code = "invalid_label"
         if root_cause == "unknown" and not timed_out:
             # P0-01(ponytail): 规则兜底只作降级提示，不冒充根因、不改写置信度、不伪造证据。
             # 未知根因也不给修复建议，避免在不确定结论上触发自动修复。
@@ -295,6 +308,8 @@ class DiagnosticAgent:
             confidence = min(confidence, 0.3)
             recommended = []
             status = "UNKNOWN"
+            if not reason_code:
+                reason_code = "model_unknown"
         # P0-03: Top-3 = root_cause + alternatives（归一化、去重、去 unknown、封顶 3）
         candidates: list[str] = []
         if fallback_used:
@@ -321,6 +336,7 @@ class DiagnosticAgent:
             candidate_root_causes=candidates,
             llm_input_tokens=state.llm_input_tokens,
             llm_output_tokens=state.llm_output_tokens,
+            reason_code=reason_code,
         )
         state.diagnosis = result
         state.status = "DIAGNOSED"

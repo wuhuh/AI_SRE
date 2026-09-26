@@ -47,6 +47,9 @@ class DiagnosisResult:
     # P0-03: 真实 token 计量（openai provider 返回 usage；mock 为固定值）
     llm_input_tokens: int = 0
     llm_output_tokens: int = 0
+    # 文档 8.5：UNKNOWN 的原因分类（timeout / invalid_label / model_unknown），
+    # 不把所有失败压成一条 unknown 文本
+    reason_code: str = ""
 
 
 @dataclass

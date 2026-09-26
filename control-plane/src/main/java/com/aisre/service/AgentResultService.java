@@ -13,6 +13,7 @@ import com.aisre.domain.Evidence;
 import com.aisre.domain.Incident;
 import com.aisre.domain.IncidentStatus;
 import com.aisre.domain.RemediationAction;
+import com.aisre.domain.RcaLabels;
 import com.aisre.domain.ToolCall;
 import com.aisre.repo.AgentStepRepository;
 import com.aisre.repo.AgentTaskRepository;
@@ -88,6 +89,13 @@ public class AgentResultService {
         // 锁到事务提交才释放；事务内只有本地写，不包含外部调用。
         fenceDiagnosisWrite(request);
         Incident incident = getIncident(incidentId);
+        // 文档 8.6：闭集根因校验——非法标签不视为已找到根因，按 unknown 处理，
+        // 且不基于它创建审批/动作（没有证据支持的建议不能触发自动修复）。
+        String rootCause = RcaLabels.normalizeOrUnknown(request.rootCause());
+        boolean invalidRootLabel = "unknown".equals(rootCause)
+                && request.rootCause() != null
+                && !request.rootCause().isBlank()
+                && !"unknown".equalsIgnoreCase(request.rootCause().trim());
         // P0-05: 幂等 —— 诊断结果只允许写入一次（DIAGNOSING → ROOT_CAUSE_FOUND）。
         // 重复回调（网络重试/多副本竞态/重放）直接返回现状，不再追加重复证据与审计。
         if (incident.getStatus().ordinal() >= IncidentStatus.ROOT_CAUSE_FOUND.ordinal()) {
@@ -98,9 +106,9 @@ public class AgentResultService {
             incident.setStatus(IncidentStatus.DIAGNOSING);
         }
         transitionIfAllowed(incident, IncidentStatus.ROOT_CAUSE_FOUND);
-        incident.setRootCause(request.rootCause());
-        incident.setConfidence(request.confidence());
-        if (request.recommendedActions() != null) {
+        incident.setRootCause(rootCause);
+        incident.setConfidence(invalidRootLabel ? Double.valueOf(0.0) : request.confidence());
+        if (request.recommendedActions() != null && !invalidRootLabel) {
             incident.setRecommendedActions(String.join(", ", request.recommendedActions()));
         }
         incidentRepository.save(incident);
@@ -147,9 +155,18 @@ public class AgentResultService {
                 "DIAGNOSIS",
                 "SUCCESS",
                 "Agent diagnosis completed",
-                request.rootCause(),
+                rootCause,
                 Instant.now()
         ));
+
+        if (invalidRootLabel) {
+            log.warn("incident {}: root label '{}' not in closed-set contract — stored as unknown, actions suppressed",
+                    incidentId, request.rootCause());
+            auditService.record(incidentId, "agent", "INVALID_ROOT_CAUSE_REJECTED",
+                    String.valueOf(request.rootCause()));
+            eventService.publish(incidentId, "DIAGNOSIS_SAVED", Map.of("rootCause", "unknown"));
+            return incident;
+        }
 
         boolean hasHighRisk = false;
         if (request.recommendedActions() != null) {
