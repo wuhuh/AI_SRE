@@ -165,4 +165,17 @@ public class Approval {
     public void setExecutionToken(String executionToken) {
         this.executionToken = executionToken;
     }
+
+    // 文档 10.4：被批准动作计划的 SHA-256 摘要（action + 解析后的完整参数 + 目标）。
+    // null = 旧数据（V12 之前创建），执行器回退旧行为。
+    @Column(length = 64)
+    private String planDigest;
+
+    public String getPlanDigest() {
+        return planDigest;
+    }
+
+    public void setPlanDigest(String planDigest) {
+        this.planDigest = planDigest;
+    }
 }

@@ -179,24 +179,12 @@ public class AgentResultService {
                     if (approvalRepository
                             .findFirstByIncidentIdAndActionTypeAndStatusOrderByIdDesc(
                                     incidentId, action, ApprovalStatus.PENDING).isEmpty()) {
-                        approvalRepository.save(new Approval(
-                                incidentId,
-                                action,
-                                payload,
-                                ApprovalStatus.PENDING,
-                                "agent",
-                                Instant.now()
-                        ));
+                        approvalRepository.save(buildBoundApproval(
+                                incidentId, action, payload, incident, ApprovalStatus.PENDING));
                     }
                 } else {
-                    Approval autoApproval = new Approval(
-                            incidentId,
-                            action,
-                            payload,
-                            ApprovalStatus.APPROVED,
-                            "auto-policy",
-                            Instant.now()
-                    );
+                    Approval autoApproval = buildBoundApproval(
+                            incidentId, action, payload, incident, ApprovalStatus.APPROVED);
                     autoApproval.setDecidedBy("auto-policy");
                     autoApproval.setDecidedAt(Instant.now());
                     final Approval savedAuto = approvalRepository.save(autoApproval);
@@ -346,6 +334,20 @@ public class AgentResultService {
      * P0-04: 审批创建时写入真实执行参数（与 RemediationExecutor.buildExecutionBody
      * 的字段约定一致）。未知/无参数动作写 "{}"，执行端 fail-closed 拒绝。
      */
+    /**
+     * 文档 10.4：构建审批时即解析出确定的执行计划，计算 SHA-256 摘要绑定到审批行。
+     * 批准的是「动作 + 完整参数 + 目标」这个不可变计划，而不是一句"同意修复"；
+     * RemediationExecutor 执行前按同一规则重建并比对摘要，漂移即拒绝。
+     */
+    private Approval buildBoundApproval(Long incidentId, String action, String payload,
+                                        Incident incident, ApprovalStatus status) {
+        Approval approval = new Approval(incidentId, action, payload, status, "agent", Instant.now());
+        java.util.Optional<String> plan =
+                RemediationExecutor.buildExecutionBody(action, approval, incident, null);
+        plan.ifPresent(body -> approval.setPlanDigest(RemediationExecutor.planDigest(action, body)));
+        return approval;
+    }
+
     private String buildActionPayload(String action, String service) {
         String target = service == null || service.isBlank() ? "unknown" : service;
         Map<String, Object> payload = new java.util.LinkedHashMap<>();

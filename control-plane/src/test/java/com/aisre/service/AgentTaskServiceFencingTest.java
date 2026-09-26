@@ -41,7 +41,7 @@ class AgentTaskServiceFencingTest {
 
     @BeforeEach
     void setUp() {
-        service = new AgentTaskService(repository, auditService, 600, 16);
+        service = new AgentTaskService(repository, auditService, 600, 16, 3, 60, 1800);
     }
 
     private AgentTask task(long id, String owner, int epoch, AgentTaskStatus status) {
@@ -99,13 +99,13 @@ class AgentTaskServiceFencingTest {
 
     @Test
     void claimReturnsTaskWithNewEpoch() {
-        when(repository.claimTask(eq(7L), eq("worker-a"), any())).thenReturn(1);
+        when(repository.claimTask(eq(7L), eq("worker-a"), any(), any())).thenReturn(1);
         when(repository.findById(7L))
                 .thenReturn(Optional.of(task(7L, "worker-a", 3, AgentTaskStatus.RUNNING)));
 
         Optional<AgentTask> claimed = service.claim(7L, "worker-a");
 
         assertEquals(3, claimed.orElseThrow().getClaimEpoch());
-        verify(repository).claimTask(eq(7L), eq("worker-a"), any());
+        verify(repository).claimTask(eq(7L), eq("worker-a"), any(), any());
     }
 }

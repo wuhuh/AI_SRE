@@ -46,13 +46,15 @@ public interface AgentTaskRepository extends JpaRepository<AgentTask, Long> {
     /**
      * P1-MQ-02: 原子抢占 —— 仅当任务仍为 QUEUED 时置为 RUNNING。
      * 文档 6.7：同时 claim_epoch + 1，产出本次认领的世代号。
+     * 文档 6.5：同时写入显式租约 lease_until = now + lease。
      * 返回受影响行数：0 表示任务已被其他副本抢走。
      */
     @Modifying
     @Query("UPDATE AgentTask t SET t.status = com.aisre.domain.AgentTaskStatus.RUNNING, t.claimedBy = :worker, t.claimedAt = :now, "
-            + "t.startedAt = COALESCE(t.startedAt, :now), t.claimEpoch = t.claimEpoch + 1 "
+            + "t.startedAt = COALESCE(t.startedAt, :now), t.claimEpoch = t.claimEpoch + 1, t.leaseUntil = :leaseUntil "
             + "WHERE t.id = :id AND t.status = com.aisre.domain.AgentTaskStatus.QUEUED")
-    int claimTask(@Param("id") Long id, @Param("worker") String worker, @Param("now") Instant now);
+    int claimTask(@Param("id") Long id, @Param("worker") String worker,
+                  @Param("now") Instant now, @Param("leaseUntil") Instant leaseUntil);
 
     /**
      * 文档 6.7 fencing：终态写入必须保留状态前提 + 现任持有者 + 世代校验，
@@ -69,15 +71,37 @@ public interface AgentTaskRepository extends JpaRepository<AgentTask, Long> {
                           @Param("error") String error, @Param("now") Instant now);
 
     /**
-     * P1-MQ-02: 租约超时回收 —— RUNNING 且 claimedAt 早于 deadline 的任务：
+     * 文档 6.5：租约续期 —— 只能由现任持有者（worker + claim_epoch）发起，
+     * 且必须仍持有租约（lease_until 未过期），并受业务总时长封顶
+     * （startedAt 不得早于 startedAtFloor = newLease - maxTotal）。
+     * 返回受影响行数：0 = 非现任持有者 / 租约已过期 / 超出总时长上限。
+     */
+    @Modifying
+    @Query("UPDATE AgentTask t SET t.leaseUntil = :newLeaseUntil "
+            + "WHERE t.id = :id AND t.status = com.aisre.domain.AgentTaskStatus.RUNNING "
+            + "AND t.claimedBy = :worker AND t.claimEpoch = :claimEpoch "
+            + "AND (t.leaseUntil IS NULL OR t.leaseUntil >= :now) "
+            + "AND (t.startedAt IS NULL OR t.startedAt > :startedAtFloor)")
+    int renewLease(@Param("id") Long id, @Param("worker") String worker,
+                   @Param("claimEpoch") int claimEpoch,
+                   @Param("now") Instant now,
+                   @Param("newLeaseUntil") Instant newLeaseUntil,
+                   @Param("startedAtFloor") Instant startedAtFloor);
+
+    /**
+     * P1-MQ-02/6.5: 租约超时回收 —— RUNNING 且已过租约的任务：
+     * 优先看显式 lease_until；旧数据（null）回退 claimed_at+固定时长。
      * 重试次数 +1，未达上限重回 QUEUED；达上限转 DEAD（P1-MQ-03 毒任务，DLQ 等价物）。
      */
     @Modifying
     @Query("UPDATE AgentTask t SET t.attempts = t.attempts + 1, "
             + "t.status = CASE WHEN t.attempts + 1 >= :maxAttempts THEN com.aisre.domain.AgentTaskStatus.DEAD ELSE com.aisre.domain.AgentTaskStatus.QUEUED END, "
-            + "t.claimedBy = null, t.claimedAt = null "
-            + "WHERE t.status = com.aisre.domain.AgentTaskStatus.RUNNING AND t.claimedAt < :deadline")
-    int reclaimExpiredLeases(@Param("deadline") Instant deadline,
+            + "t.claimedBy = null, t.claimedAt = null, t.leaseUntil = null "
+            + "WHERE t.status = com.aisre.domain.AgentTaskStatus.RUNNING AND ("
+            + "(t.leaseUntil IS NOT NULL AND t.leaseUntil < :now) "
+            + "OR (t.leaseUntil IS NULL AND t.claimedAt < :fallbackDeadline))")
+    int reclaimExpiredLeases(@Param("now") Instant now,
+                             @Param("fallbackDeadline") Instant fallbackDeadline,
                              @Param("maxAttempts") int maxAttempts);
 
     /** P1-MQ-03: 本次回收转为 DEAD 的毒任务（用于审计/告警）。 */

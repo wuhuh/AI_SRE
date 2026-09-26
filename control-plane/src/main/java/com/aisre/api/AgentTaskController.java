@@ -82,6 +82,23 @@ public class AgentTaskController {
         }
     }
 
+    /**
+     * 文档 6.5：租约心跳续租。现任持有者携带 worker + claimEpoch；
+     * 409 = 任务已易主 / 租约已过期 / 超出业务总时长上限——调用方应停止工作，
+     * 结果无论如何都会被 fencing 层拒绝。
+     */
+    @PostMapping("/{id}/renew")
+    public ResponseEntity<Map<String, Object>> renew(@PathVariable Long id,
+                                                     @RequestBody(required = false) Map<String, String> body) {
+        try {
+            Instant leaseUntil = agentTaskService.renewLease(id, workerId(body), claimEpoch(body));
+            return ResponseEntity.ok(Map.of("renewed", true, "leaseUntil", leaseUntil.toString()));
+        } catch (FencingRejectedException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("renewed", false, "reason", String.valueOf(e.getMessage())));
+        }
+    }
+
     private static String workerId(Map<String, String> body) {
         return body == null || body.get("worker") == null || body.get("worker").isBlank()
                 ? "unknown-worker" : body.get("worker");

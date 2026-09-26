@@ -30,24 +30,30 @@ public class AgentTaskService {
     private final int maxAttempts;
     private final int maxRediagnosisRounds;
     private final long rediagnosisBackoffSeconds;
+    private final long maxTaskDurationSeconds;
 
     public AgentTaskService(AgentTaskRepository agentTaskRepository,
                             com.aisre.service.AuditService auditService,
                             @Value("${aisre.task.lease-seconds:600}") long leaseSeconds,
                             @Value("${aisre.task.max-attempts:16}") int maxAttempts,
                             @Value("${aisre.rediagnosis.max-rounds:3}") int maxRediagnosisRounds,
-                            @Value("${aisre.rediagnosis.backoff-seconds:60}") long rediagnosisBackoffSeconds) {
+                            @Value("${aisre.rediagnosis.backoff-seconds:60}") long rediagnosisBackoffSeconds,
+                            @Value("${aisre.task.max-total-seconds:1800}") long maxTaskDurationSeconds) {
         this.agentTaskRepository = agentTaskRepository;
         this.auditService = auditService;
         this.leaseSeconds = leaseSeconds;
         this.maxAttempts = maxAttempts;
         this.maxRediagnosisRounds = maxRediagnosisRounds;
         this.rediagnosisBackoffSeconds = rediagnosisBackoffSeconds;
+        this.maxTaskDurationSeconds = maxTaskDurationSeconds;
     }
 
     @Transactional
     public Optional<AgentTask> claim(Long taskId, String worker) {
-        int claimed = agentTaskRepository.claimTask(taskId, worker, Instant.now());
+        Instant now = Instant.now();
+        // 文档 6.5：claim 即写入显式租约；心跳续租在此基础上延长（受总时长封顶）
+        int claimed = agentTaskRepository.claimTask(taskId, worker, now,
+                now.plusSeconds(leaseSeconds));
         if (claimed == 0) {
             log.debug("task {} claim missed by {} (already claimed)", taskId, worker);
             return Optional.empty();
@@ -55,6 +61,46 @@ public class AgentTaskService {
         log.info("task {} claimed by {} (epoch {})", taskId, worker,
                 agentTaskRepository.findById(taskId).map(AgentTask::getClaimEpoch).orElse(-1));
         return agentTaskRepository.findById(taskId);
+    }
+
+    /**
+     * 文档 6.5：租约心跳续租。只能由现任持有者发起（worker + claim_epoch，
+     * 与 fencing 同一条校验线）；且不能无限延长业务总 deadline——
+     * 新租约不得越过 startedAt + max-total-seconds。
+     * 续租失败抛 FencingRejectedException：任务已易主 / 租约已过期（将被回收）/ 超总上限。
+     */
+    @Transactional
+    public Instant renewLease(Long taskId, String worker, int claimEpoch) {
+        Instant now = Instant.now();
+        Instant newLeaseUntil = now.plusSeconds(leaseSeconds);
+        // startedAtFloor：允许续租的最晚开始时间。startedAt 早于它 = 任务总时长
+        // 已越过上限，续租会突破业务 deadline → 拒绝。
+        Instant startedAtFloor = newLeaseUntil.minusSeconds(maxTaskDurationSeconds);
+        int updated = agentTaskRepository.renewLease(
+                taskId, worker, claimEpoch, now, newLeaseUntil, startedAtFloor);
+        if (updated == 0) {
+            AgentTask task = agentTaskRepository.findById(taskId).orElse(null);
+            String reason;
+            if (task == null) {
+                reason = "not found";
+            } else if (task.getStatus() != AgentTaskStatus.RUNNING) {
+                reason = "status=" + task.getStatus();
+            } else if (!worker.equals(task.getClaimedBy()) || claimEpoch != task.getClaimEpoch()) {
+                reason = "not current owner (owner=" + task.getClaimedBy()
+                        + ", epoch=" + task.getClaimEpoch() + ")";
+            } else if (task.getStartedAt() != null
+                    && !task.getStartedAt().isAfter(startedAtFloor)) {
+                reason = "total duration cap reached (startedAt=" + task.getStartedAt()
+                        + ", max=" + maxTaskDurationSeconds + "s)";
+            } else {
+                reason = "lease already expired";
+            }
+            throw new FencingRejectedException(
+                    "lease renewal refused for task %s (worker=%s epoch=%d): %s"
+                            .formatted(taskId, worker, claimEpoch, reason));
+        }
+        log.debug("task {} lease renewed by {} (epoch {}) until {}", taskId, worker, claimEpoch, newLeaseUntil);
+        return newLeaseUntil;
     }
 
     /**
@@ -160,8 +206,9 @@ public class AgentTaskService {
     @Scheduled(fixedDelayString = "${aisre.task.lease-reclaim-interval-ms:60000}")
     @Transactional
     public void reclaimExpiredLeases() {
+        // 文档 6.5：优先按显式 lease_until 判过期；旧数据（null）回退 claimed_at+固定时长
         int reclaimed = agentTaskRepository.reclaimExpiredLeases(
-                Instant.now().minusSeconds(leaseSeconds), maxAttempts);
+                Instant.now(), Instant.now().minusSeconds(leaseSeconds), maxAttempts);
         if (reclaimed > 0) {
             log.warn("reclaimed {} expired diagnosis task lease(s)", reclaimed);
             // P1-MQ-03: 转入 DEAD 的即毒任务（DLQ 等价物）——审计 + 告警日志。

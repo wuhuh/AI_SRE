@@ -82,6 +82,10 @@ public class AgentTask {
     // 文档 11.6：任务最早可领取时间（重诊退避）；null = 立即可领
     private Instant notBefore;
 
+    // 文档 6.5：显式租约。claim 写入 now+lease；持有者可心跳续租（受总时长封顶）。
+    // null = 旧数据/升级期，回收器回退到 claimed_at+固定时长。
+    private Instant leaseUntil;
+
     public int getClaimEpoch() {
         return claimEpoch;
     }
@@ -96,6 +100,14 @@ public class AgentTask {
 
     public void setNotBefore(Instant notBefore) {
         this.notBefore = notBefore;
+    }
+
+    public Instant getLeaseUntil() {
+        return leaseUntil;
+    }
+
+    public void setLeaseUntil(Instant leaseUntil) {
+        this.leaseUntil = leaseUntil;
     }
 
     public int getAttempts() {

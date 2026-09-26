@@ -39,7 +39,7 @@ class AgentTaskServiceRediagnosisTest {
 
     @BeforeEach
     void setUp() {
-        service = new AgentTaskService(repository, auditService, 600, 16, 3, 60);
+        service = new AgentTaskService(repository, auditService, 600, 16, 3, 60, 1800);
     }
 
     private AgentTask task(String key) {

@@ -83,6 +83,23 @@ public class RemediationExecutor {
                 auditService.record(incidentId, "remediation-executor", "UNKNOWN_ACTION_REFUSED", action);
                 return remediation;
             }
+            // 文档 10.4：执行前核对「批准的计划」——重建计划摘要并与审批上绑定的
+            // 摘要比对。不一致 = 批准的对象/参数与实际执行的对象/参数不同
+            // （教学反例：批准实例 A，执行时名称已复用为实例 B）→ fail-closed 拒绝。
+            // planDigest 为 null 的是 V12 之前的旧审批，回退旧行为（不比对）。
+            if (approval.getPlanDigest() != null
+                    && !approval.getPlanDigest().equals(planDigest(action, body.get()))) {
+                remediation.setStatus("FAILED");
+                remediation.setResultSummary("refused: execution plan does not match approved plan (digest mismatch)");
+                remediation.setExecutedAt(Instant.now());
+                remediation = remediationActionRepository.save(remediation);
+                log.warn("plan digest mismatch for incident {}: approved={} actual={}",
+                        incidentId, approval.getPlanDigest(), planDigest(action, body.get()));
+                auditService.record(incidentId, "remediation-executor", "PLAN_DIGEST_MISMATCH",
+                        "action=" + action);
+                failIncident(incident, "remediation refused: plan does not match approved plan");
+                return remediation;
+            }
             // tool-server 校验的是共享静态密钥（AISRE_TOOL_SERVER_TOKEN）；
             // 审批上的 per-approval UUID 只用于 CP 侧审计，不能当 tool-server 凭证
             HttpRequest request = HttpRequest.newBuilder()
@@ -182,6 +199,27 @@ public class RemediationExecutor {
         auditService.record(incident.getId(), "remediation-executor", "REMEDIATION_NOT_COMPLETED",
                 current + "->" + target + " " + reason);
         log.info("incident {} moved {} -> {} ({})", incident.getId(), current, target, reason);
+    }
+
+    /**
+     * 文档 10.4：动作计划摘要 = SHA-256(action + 换行 + 解析后的完整执行 body JSON)。
+     * 审批创建时计算并绑定到 Approval.planDigest；执行时按同一规则重建并比对。
+     * body 由 LinkedHashMap 按固定顺序构造，序列化稳定。
+     */
+    static String planDigest(String action, String executionBodyJson) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(((action == null ? "" : action.trim().toLowerCase())
+                    + "\n" + executionBodyJson).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(64);
+            for (byte b : hash) {
+                hex.append(Character.forDigit((b >> 4) & 0xF, 16))
+                        .append(Character.forDigit(b & 0xF, 16));
+            }
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
     }
 
     /**
