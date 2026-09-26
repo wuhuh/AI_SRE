@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
 import urllib.request
 from typing import Any
@@ -98,6 +99,53 @@ def _worker_id() -> str:
     return f"{socket.gethostname()}-{os.getpid()}"
 
 
+class LeaseHeartbeat:
+    """文档 6.5：诊断期间按固定周期续租（best-effort）。
+
+    续租只能由现任持有者发起（worker + claimEpoch 与 fencing 同一条校验线）。
+    409 = 任务已易主 / 租约失效 / 超总时长上限——此时停止心跳即可，
+    本进程后续的回写无论如何都会被 CP 的 fencing 层拒绝，不会污染数据。
+    """
+
+    def __init__(self, cp_url: str, task_id: int, worker: str, claim_epoch: int | None,
+                 interval_seconds: float):
+        self._cp_url = cp_url
+        self._task_id = task_id
+        self._worker = worker
+        self._claim_epoch = claim_epoch
+        self._interval = max(interval_seconds, 1.0)
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._loop, daemon=True,
+                                        name=f"lease-hb-{self._task_id}")
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2)
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self._interval):
+            try:
+                _request_json("POST", f"{self._cp_url}/api/v1/tasks/{self._task_id}/renew",
+                              {"worker": self._worker, "claimEpoch": self._claim_epoch},
+                              timeout=10, headers=agent_headers())
+            except Exception as exc:  # noqa: BLE001 - 心跳失败不中断诊断
+                logger.warning("lease renewal failed for task %s: %s "
+                               "(results will be fenced if ownership was lost)",
+                               self._task_id, exc)
+                if "409" in str(exc):
+                    return  # 已易主，继续心跳没有意义
+
+
+def _lease_heartbeat_interval() -> float:
+    # 默认 200s = 租约 600s 的 1/3；租约在 CP 侧配置（aisre.task.lease-seconds）
+    return float(os.getenv("AGENT_LEASE_RENEW_SECONDS", "200"))
+
+
 def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> int:
     # P2-CP-23 补链：轮询也要带 agent token（P1-CP-14 读门控后无头轮询一直 401，
     # 且循环 except: pass 吞掉了错误 —— 现在至少 WARN 一行）
@@ -139,21 +187,31 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
                 "severity": incident.get("severity", "P1"),
                 "summary": incident.get("summary", ""),
             }
-            import time as _time
-            _t0 = _time.monotonic()
-            result = runner.run_diagnosis(incident_id, alert)
-            DIAGNOSIS_DURATION.observe(_time.monotonic() - _t0)
-            DIAGNOSES_TOTAL.labels(status=result.diagnosis.status).inc()
-            submit_diagnosis(cp_url, incident_id, result.diagnosis, task_id=task_id,
-                             worker=worker, claim_epoch=claim_epoch)
+            # 文档 6.5：诊断期间后台续租，防止长任务（重试/慢 LLM）被租约回收误判
+            heartbeat = None
             if task_id is not None:
-                # 文档 6.7：终态写入带 worker + epoch，旧世代写不进终态
-                _request_json("POST", f"{cp_url}/api/v1/tasks/{task_id}/complete",
-                              {"worker": worker, "claimEpoch": claim_epoch},
-                              timeout=10, headers=agent_headers())
-            if idempotency_store is not None and key:
-                idempotency_store.mark_processed(key)
-            processed += 1
+                heartbeat = LeaseHeartbeat(cp_url, task_id, worker, claim_epoch,
+                                           _lease_heartbeat_interval())
+                heartbeat.start()
+            try:
+                import time as _time
+                _t0 = _time.monotonic()
+                result = runner.run_diagnosis(incident_id, alert)
+                DIAGNOSIS_DURATION.observe(_time.monotonic() - _t0)
+                DIAGNOSES_TOTAL.labels(status=result.diagnosis.status).inc()
+                submit_diagnosis(cp_url, incident_id, result.diagnosis, task_id=task_id,
+                                 worker=worker, claim_epoch=claim_epoch)
+                if task_id is not None:
+                    # 文档 6.7：终态写入带 worker + epoch，旧世代写不进终态
+                    _request_json("POST", f"{cp_url}/api/v1/tasks/{task_id}/complete",
+                                  {"worker": worker, "claimEpoch": claim_epoch},
+                                  timeout=10, headers=agent_headers())
+                if idempotency_store is not None and key:
+                    idempotency_store.mark_processed(key)
+                processed += 1
+            finally:
+                if heartbeat is not None:
+                    heartbeat.stop()
         except Exception as exc:
             # P1-MQ-02: 失败上报终态，任务不再卡 RUNNING（租约回收兜底仍在）。
             # 409 = 任务已易主/已终态（fencing 拒绝）——这是正常竞争结果，不重试。
