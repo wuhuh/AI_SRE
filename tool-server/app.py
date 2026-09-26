@@ -24,6 +24,43 @@ def _token_ok(provided: str | None) -> bool:
     return bool(provided) and hmac.compare_digest(provided.encode(), APPROVAL_TOKEN.encode())
 
 
+class OperationStore:
+    """文档 7.6：外部动作的持久化操作记录（execution_id → 结果）。
+
+    文件型 + 原子替换（tmp + os.replace），与 checkpoint 同一套套路。
+    注意它仍不能做到「执行与记录原子提交」——那是外部动作的固有不确定窗口，
+    所以 IN_FLIGHT 状态的重放返回 UNKNOWN 待对账，而不是假装成功或重发。
+    """
+
+    def __init__(self, path: str):
+        self.path = path
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+
+    def _load(self) -> dict[str, Any]:
+        try:
+            with open(self.path, encoding="utf-8") as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            return {}
+
+    def _save(self, data: dict[str, Any]) -> None:
+        tmp = self.path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False, indent=1)
+        os.replace(tmp, self.path)
+
+    def lookup(self, execution_id: str) -> dict[str, Any] | None:
+        return self._load().get(execution_id)
+
+    def record(self, execution_id: str, result: dict[str, Any]) -> None:
+        data = self._load()
+        data[execution_id] = result
+        self._save(data)
+
+
+OPERATIONS = OperationStore(os.getenv("OPERATION_LOG_PATH", "./data/operations.json"))
+
+
 # P2-FI-08: 平台自监控（同端口 /metrics + 请求计数）
 from prometheus_client import Counter as _Counter
 from prometheus_client import make_asgi_app
@@ -194,17 +231,45 @@ def kubernetes_write(payload: dict[str, Any],
         raise HTTPException(status_code=400, detail=f"unknown or read-only action: {action}")
     if not _token_ok(x_execution_token):
         raise HTTPException(status_code=403, detail="invalid execution token")
-    params = {k: v for k, v in payload.items() if k not in ("action", "namespace")}
-    # P0-07: compose 演示挂载 docker.sock 时，restart_pod 真实重启容器；
-    # 无 socket（k8s 环境）保持 dryRun，等 in-cluster ServiceAccount 接管（P0-10）
-    if action == "restart_pod" and _docker_available():
-        container = str(params.get("pod", ""))
-        restarted = _docker_restart(container)
-        if restarted:
-            return {"action": action, "namespace": payload.get("namespace", "default"),
-                    "params": params, "executed": True, "detail": restarted}
-    return {"action": action, "namespace": payload.get("namespace", "default"),
-            "params": params, "dryRun": True}
+    params = {k: v for k, v in payload.items() if k not in ("action", "namespace", "execution_id")}
+    execution_id = str(payload.get("execution_id") or "")
+
+    # 文档 7.6：外部动作最难的窗口——真实执行完成、响应在网络中丢失、
+    # 控制面超时后盲目重试 = 再重启一次。带 execution_id 的请求走
+    # 持久化操作记录：重复 ID 返回已知结果，不再真实执行第二次。
+    if execution_id:
+        prior = OPERATIONS.lookup(execution_id)
+        if prior is not None:
+            if prior.get("status") == "IN_FLIGHT":
+                # 意图已记录但结果未知（执行中崩溃/响应丢失）→ 待对账，不重发
+                return {"action": action, "namespace": payload.get("namespace", "default"),
+                        "executionId": execution_id, "duplicate": True, "status": "UNKNOWN",
+                        "detail": "operation in flight or interrupted; reconciliation required"}
+            return {**prior, "duplicate": True}
+
+    def _execute() -> dict[str, Any]:
+        # P0-07: compose 演示挂载 docker.sock 时，restart_pod 真实重启容器；
+        # 无 socket（k8s 环境）保持 dryRun，等 in-cluster ServiceAccount 接管（P0-10）
+        if action == "restart_pod" and _docker_available():
+            container = str(params.get("pod", ""))
+            restarted = _docker_restart(container)
+            if restarted:
+                return {"action": action, "namespace": payload.get("namespace", "default"),
+                        "params": params, "executed": True, "status": "SUCCEEDED",
+                        "detail": restarted}
+        return {"action": action, "namespace": payload.get("namespace", "default"),
+                "params": params, "dryRun": True, "status": "NOT_EXECUTED"}
+
+    if not execution_id:
+        # 旧协议客户端（无 execution_id）：保留原行为，但无法提供幂等保护
+        return _execute()
+
+    # 先持久化「执行意图」，再执行：进程在执行后、记录前崩溃时，
+    # 重放会命中 IN_FLIGHT → 返回 UNKNOWN 待对账，而不是再次真实执行
+    OPERATIONS.record(execution_id, {"action": action, "status": "IN_FLIGHT"})
+    result = _execute()
+    OPERATIONS.record(execution_id, result)
+    return result
 
 
 DOCKER_SOCKET = os.getenv("DOCKER_SOCKET", "")

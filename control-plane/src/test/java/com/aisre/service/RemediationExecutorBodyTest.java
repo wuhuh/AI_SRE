@@ -27,8 +27,10 @@ class RemediationExecutorBodyTest {
         Optional<String> body = RemediationExecutor.buildExecutionBody(
                 "scale_deployment",
                 approval("scale_deployment", "{\"namespace\":\"prod\",\"deployment\":\"payment-service\",\"replicas\":5}"),
-                incident("payment-service"));
+                incident("payment-service"), "rem-1");
         assertTrue(body.isPresent());
+        // 文档 7.6：execution_id 随请求下发，tool-server 据此做操作幂等
+        assertTrue(body.get().contains("\"execution_id\":\"rem-1\""));
         assertTrue(body.get().contains("\"deployment\":\"payment-service\""));
         assertTrue(body.get().contains("\"replicas\":5"));
         assertTrue(body.get().contains("\"namespace\":\"prod\""));
@@ -37,7 +39,7 @@ class RemediationExecutorBodyTest {
     @Test
     void missingPayloadFieldsFallBackToIncidentService() throws Exception {
         Optional<String> body = RemediationExecutor.buildExecutionBody(
-                "restart_pod", approval("restart_pod", "{}"), incident("order-service"));
+                "restart_pod", approval("restart_pod", "{}"), incident("order-service"), "rem-2");
         assertTrue(body.isPresent());
         assertTrue(body.get().contains("\"pod\":\"order-service\""));
     }
@@ -46,18 +48,18 @@ class RemediationExecutorBodyTest {
     void unknownActionIsRefused() {
         // P0-04: default 兜底已删 —— 未知动作必须 fail-closed
         assertTrue(RemediationExecutor.buildExecutionBody(
-                "purge_database", approval("purge_database", "{}"), incident("x")).isEmpty());
+                "purge_database", approval("purge_database", "{}"), incident("x"), null).isEmpty());
         assertTrue(RemediationExecutor.buildExecutionBody(
-                null, approval(null, "{}"), incident("x")).isEmpty());
+                null, approval(null, "{}"), incident("x"), null).isEmpty());
     }
 
     @Test
     void corruptedPayloadDoesNotCrash() throws Exception {
         Optional<String> body = RemediationExecutor.buildExecutionBody(
-                "restart_pod", approval("restart_pod", "not-json{"), incident("db-service"));
+                "restart_pod", approval("restart_pod", "not-json{"), incident("db-service"), "rem-3");
         assertTrue(body.isPresent());
         assertTrue(body.get().contains("\"pod\":\"db-service\""));
         assertEquals(Optional.empty(), RemediationExecutor.buildExecutionBody(
-                "increase_db_pool_size", approval("increase_db_pool_size", "{}"), incident("x")));
+                "increase_db_pool_size", approval("increase_db_pool_size", "{}"), incident("x"), null));
     }
 }

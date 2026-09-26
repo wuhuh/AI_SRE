@@ -47,6 +47,18 @@ class RemediationDryRunTest {
     }
 
     @Test
+    void unknownOutcomeIsDetected() {
+        // 文档 7.6/10.10：重放命中 IN_FLIGHT 记录 → UNKNOWN 待对账，不能猜成败
+        assertTrue(RemediationExecutor.isUnknownOutcome(
+                "{\"action\":\"restart_pod\",\"duplicate\":true,\"status\":\"UNKNOWN\"}"));
+        assertFalse(RemediationExecutor.isUnknownOutcome(
+                "{\"action\":\"restart_pod\",\"executed\":true,\"status\":\"SUCCEEDED\"}"));
+        assertFalse(RemediationExecutor.isUnknownOutcome(
+                "{\"dryRun\":true,\"status\":\"NOT_EXECUTED\"}"));
+        assertFalse(RemediationExecutor.isUnknownOutcome(null));
+    }
+
+    @Test
     void nullAndEmptyAreNotDryRun() {
         assertFalse(RemediationExecutor.isDryRun(null));
         assertFalse(RemediationExecutor.isDryRun(""));

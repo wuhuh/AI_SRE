@@ -70,7 +70,10 @@ public class RemediationExecutor {
         remediation = remediationActionRepository.save(remediation);
         try {
             // P0-04: 参数化 body（从审批 payload 构造）；未知动作 fail-closed，不发任何请求
-            Optional<String> body = buildExecutionBody(action, approval, incident);
+            // 文档 7.6：execution_id 绑定 remediation 行（持久化后才发请求），
+            // 同一行重试复用同一 ID；tool-server 据此对重复请求返回已知结果
+            String executionId = "rem-" + remediation.getId();
+            Optional<String> body = buildExecutionBody(action, approval, incident, executionId);
             if (body.isEmpty()) {
                 remediation.setStatus("FAILED");
                 remediation.setResultSummary("refused: unknown action not in fail-closed policy");
@@ -99,8 +102,12 @@ public class RemediationExecutor {
             // （{"dryRun":true}），所以判定走 JSON 解析而不是字符串匹配。
             boolean dryRun = isDryRun(response.body());
             boolean executed = !dryRun && isExecuted(response.body());
+            boolean unknownOutcome = isUnknownOutcome(response.body());
             String outcome;
-            if (dryRun) {
+            if (unknownOutcome) {
+                // 文档 7.6/10.10：响应丢失/执行中断的对账态——不能猜成功也不能猜失败
+                outcome = "UNKNOWN";
+            } else if (dryRun) {
                 outcome = "NOT_EXECUTED";
             } else if (executed || (response.statusCode() >= 200 && response.statusCode() < 300)) {
                 outcome = "SUCCESS";
@@ -119,6 +126,14 @@ public class RemediationExecutor {
                 incident.setStatus(IncidentStatus.VERIFYING);
                 incidentRepository.save(incident);
                 triggerVerification(incident);
+            } else if ("UNKNOWN".equals(outcome)) {
+                // 文档 7.6：UNKNOWN = 无法确认是否执行 → 待对账，不盲目重复。
+                // Incident 移出 REMEDIATING 落 FAILED（人工决定是否重发/升级），
+                // 审计里带 execution_id 便于对 tool-server 操作记录对账。
+                auditService.record(incidentId, "remediation-executor", "REMEDIATION_OUTCOME_UNKNOWN",
+                        "executionId=" + remediation.getId() + " action=" + action);
+                failIncident(incident, "remediation outcome unknown (needs reconciliation), executionId=rem-"
+                        + remediation.getId());
             } else if ("NOT_EXECUTED".equals(outcome)) {
                 // 红线 31/41：dryRun 不推进状态、不触发验证。事故回到 ROOT_CAUSE_FOUND
                 // 等待人工处置（状态机 REMEDIATING → FAILED 亦可，但「未执行」不是失败，
@@ -185,6 +200,16 @@ public class RemediationExecutor {
         return node != null && node.path("executed").asBoolean(false);
     }
 
+    /**
+     * 文档 7.6/10.10：执行结果无法确认（响应丢失后重放命中 IN_FLIGHT 记录等）。
+     * 返回 UNKNOWN 的响应带 duplicate=true + status=UNKNOWN。
+     */
+    static boolean isUnknownOutcome(String body) {
+        JsonNode node = tryParse(body);
+        return node != null && node.path("duplicate").asBoolean(false)
+                && "UNKNOWN".equals(node.path("status").asText(""));
+    }
+
     private static JsonNode tryParse(String body) {
         if (body == null || body.isBlank()) {
             return null;
@@ -201,12 +226,17 @@ public class RemediationExecutor {
      * P0-04: 从审批 payload 构造 tool-server 请求 body。
      * payload 缺字段时回退到 incident.service（payload 由 AgentResultService 在
      * 创建审批时写入真实参数）。未知动作返回 empty —— 调用方必须 fail-closed。
+     * 文档 7.6：execution_id 随请求下发，tool-server 端按它做操作幂等。
      */
-    static Optional<String> buildExecutionBody(String action, Approval approval, Incident incident) {
+    static Optional<String> buildExecutionBody(String action, Approval approval, Incident incident,
+                                               String executionId) {
         String normalized = action == null ? "" : action.trim().toLowerCase();
         JsonNode p = parsePayload(approval == null ? null : approval.getActionPayload());
         String service = incident == null || incident.getService() == null ? "unknown" : incident.getService();
         Map<String, Object> body = new LinkedHashMap<>();
+        if (executionId != null && !executionId.isBlank()) {
+            body.put("execution_id", executionId);
+        }
         switch (normalized) {
             case "scale_deployment" -> {
                 body.put("action", "scale_deployment");
