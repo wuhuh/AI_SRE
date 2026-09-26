@@ -13,9 +13,12 @@ import com.aisre.domain.IncidentStatus;
 import com.aisre.domain.RemediationAction;
 import com.aisre.domain.ToolCall;
 import com.aisre.service.AgentResultService;
+import com.aisre.service.AgentTaskService;
 import com.aisre.service.IncidentDetailService;
 import com.aisre.service.IncidentReportService;
 import com.aisre.service.IncidentService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -63,9 +66,15 @@ public class IncidentController {
     }
 
     @PostMapping("/{id}/diagnosis")
-    public IncidentResponse saveDiagnosis(@PathVariable Long id,
-                                          @Valid @RequestBody DiagnosisRequest request) {
-        return IncidentResponse.from(agentResultService.saveDiagnosis(id, request));
+    public ResponseEntity<IncidentResponse> saveDiagnosis(@PathVariable Long id,
+                                                          @Valid @RequestBody DiagnosisRequest request) {
+        try {
+            return ResponseEntity.ok(IncidentResponse.from(agentResultService.saveDiagnosis(id, request)));
+        } catch (AgentTaskService.FencingRejectedException e) {
+            // 文档 6.7：旧 worker 的诊断回写同样被栅栏拒绝——
+            // 只拦 complete 而接受旧 diagnosis，旧结论仍可能触发审批/执行
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
     }
 
     @PostMapping("/{id}/verification")

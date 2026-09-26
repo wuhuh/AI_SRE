@@ -6,6 +6,7 @@ import com.aisre.api.dto.RemediationRequest;
 import com.aisre.api.dto.ToolCallDTO;
 import com.aisre.api.dto.VerificationRequest;
 import com.aisre.domain.AgentStep;
+import com.aisre.domain.AgentTask;
 import com.aisre.domain.Approval;
 import com.aisre.domain.ApprovalStatus;
 import com.aisre.domain.Evidence;
@@ -14,6 +15,7 @@ import com.aisre.domain.IncidentStatus;
 import com.aisre.domain.RemediationAction;
 import com.aisre.domain.ToolCall;
 import com.aisre.repo.AgentStepRepository;
+import com.aisre.repo.AgentTaskRepository;
 import com.aisre.repo.ApprovalRepository;
 import com.aisre.repo.EvidenceRepository;
 import com.aisre.repo.IncidentRepository;
@@ -42,6 +44,7 @@ public class AgentResultService {
     private final EvidenceRepository evidenceRepository;
     private final ToolCallRepository toolCallRepository;
     private final AgentStepRepository agentStepRepository;
+    private final AgentTaskRepository agentTaskRepository;
     private final RemediationActionRepository remediationActionRepository;
     private final AuditService auditService;
     private final IncidentEventService eventService;
@@ -53,6 +56,7 @@ public class AgentResultService {
                               EvidenceRepository evidenceRepository,
                               ToolCallRepository toolCallRepository,
                               AgentStepRepository agentStepRepository,
+                              AgentTaskRepository agentTaskRepository,
                               RemediationActionRepository remediationActionRepository,
                               AuditService auditService,
                               IncidentEventService eventService,
@@ -65,6 +69,7 @@ public class AgentResultService {
         this.evidenceRepository = evidenceRepository;
         this.toolCallRepository = toolCallRepository;
         this.agentStepRepository = agentStepRepository;
+        this.agentTaskRepository = agentTaskRepository;
         this.remediationActionRepository = remediationActionRepository;
         this.auditService = auditService;
         this.eventService = eventService;
@@ -74,6 +79,11 @@ public class AgentResultService {
 
     @Transactional
     public Incident saveDiagnosis(Long incidentId, DiagnosisRequest request) {
+        // 文档 6.7 fencing（第二点）：诊断回写同样要校验现任持有者——
+        // 只拦 complete 而接受旧 diagnosis，旧结论仍可能触发审批/执行。
+        // 做法与文档一致：同一短事务内锁任务行 → 校验身份与世代 → 落结果，
+        // 锁到事务提交才释放；事务内只有本地写，不包含外部调用。
+        fenceDiagnosisWrite(request);
         Incident incident = getIncident(incidentId);
         // P0-05: 幂等 —— 诊断结果只允许写入一次（DIAGNOSING → ROOT_CAUSE_FOUND）。
         // 重复回调（网络重试/多副本竞态/重放）直接返回现状，不再追加重复证据与审计。
@@ -257,6 +267,36 @@ public class AgentResultService {
     private Incident getIncident(Long incidentId) {
         return incidentRepository.findById(incidentId)
                 .orElseThrow(() -> new IllegalArgumentException("Incident not found: " + incidentId));
+    }
+
+    /**
+     * 文档 6.7：诊断回写的栅栏校验。
+     * 带 taskId 的异步主路径必须携带 workerId + claimEpoch，与任务当前
+     * status=RUNNING、claimedBy、claimEpoch 三者同时匹配才放行；
+     * 缺身份 = 无法验证 → fail-closed 拒绝（执行凭据缺失不能 fail-open）。
+     * 同步 API 路径（无 taskId）不经任务认领，跳过校验。
+     */
+    private void fenceDiagnosisWrite(DiagnosisRequest request) {
+        if (request.taskId() == null) {
+            return;
+        }
+        AgentTask task = agentTaskRepository.findByIdForUpdate(request.taskId())
+                .orElseThrow(() -> new AgentTaskService.FencingRejectedException(
+                        "task not found: " + request.taskId()));
+        if (request.workerId() == null || request.workerId().isBlank() || request.claimEpoch() == null) {
+            throw new AgentTaskService.FencingRejectedException(
+                    "diagnosis writeback for task " + request.taskId()
+                            + " must carry workerId and claimEpoch (fencing contract)");
+        }
+        boolean ownerMatches = request.workerId().equals(task.getClaimedBy());
+        boolean epochMatches = request.claimEpoch() == task.getClaimEpoch();
+        boolean stillRunning = task.getStatus() == com.aisre.domain.AgentTaskStatus.RUNNING;
+        if (!(ownerMatches && epochMatches && stillRunning)) {
+            throw new AgentTaskService.FencingRejectedException(
+                    "stale diagnosis writeback for task %s: worker=%s epoch=%s vs current owner=%s epoch=%s status=%s"
+                            .formatted(request.taskId(), request.workerId(), request.claimEpoch(),
+                                    task.getClaimedBy(), task.getClaimEpoch(), task.getStatus()));
+        }
     }
 
     /**

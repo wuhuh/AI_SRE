@@ -74,6 +74,30 @@ public class AgentTask {
     @Column(nullable = false)
     private int attempts = 0;
 
+    // 文档 6.7 fencing：每次成功 claim 原子 +1；complete/fail/诊断回写必须携带
+    // 本次认领的 epoch，旧世代写入在接收端被拒绝（单调序号让下游可比新旧）。
+    @Column(nullable = false)
+    private int claimEpoch = 0;
+
+    // 文档 11.6：任务最早可领取时间（重诊退避）；null = 立即可领
+    private Instant notBefore;
+
+    public int getClaimEpoch() {
+        return claimEpoch;
+    }
+
+    public void setClaimEpoch(int claimEpoch) {
+        this.claimEpoch = claimEpoch;
+    }
+
+    public Instant getNotBefore() {
+        return notBefore;
+    }
+
+    public void setNotBefore(Instant notBefore) {
+        this.notBefore = notBefore;
+    }
+
     public int getAttempts() {
         return attempts;
     }

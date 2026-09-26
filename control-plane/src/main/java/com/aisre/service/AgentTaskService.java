@@ -46,26 +46,50 @@ public class AgentTaskService {
             log.debug("task {} claim missed by {} (already claimed)", taskId, worker);
             return Optional.empty();
         }
-        log.info("task {} claimed by {}", taskId, worker);
+        log.info("task {} claimed by {} (epoch {})", taskId, worker,
+                agentTaskRepository.findById(taskId).map(AgentTask::getClaimEpoch).orElse(-1));
         return agentTaskRepository.findById(taskId);
     }
 
+    /**
+     * 文档 6.7 fencing：终态写入校验现任持有者 + 世代。
+     * 校验失败（任务已易主 / 已终态 / 旧世代）抛 FencingRejectedException，
+     * 调用方（Agent）收到 409——旧结果不允许落库。
+     */
     @Transactional
-    public AgentTask complete(Long taskId) {
-        AgentTask task = getTask(taskId);
-        task.setStatus(AgentTaskStatus.COMPLETED);
-        task.setFinishedAt(Instant.now());
-        return agentTaskRepository.save(task);
+    public AgentTask complete(Long taskId, String worker, int claimEpoch) {
+        int updated = agentTaskRepository.finishTaskIfOwner(
+                taskId, worker, claimEpoch, AgentTaskStatus.COMPLETED, null, Instant.now());
+        if (updated == 0) {
+            throw new FencingRejectedException(
+                    "task %s not owned by worker '%s' at epoch %d (already reassigned or finished)"
+                            .formatted(taskId, worker, claimEpoch));
+        }
+        log.info("task {} completed by {} (epoch {})", taskId, worker, claimEpoch);
+        return getTask(taskId);
     }
 
+    /** 文档 6.7 fencing：fail 与 complete 走同一条现任持有者校验。 */
     @Transactional
-    public AgentTask fail(Long taskId, String error) {
-        AgentTask task = getTask(taskId);
-        task.setStatus(AgentTaskStatus.FAILED);
-        task.setError(error == null ? "unknown error" : error.substring(0, Math.min(error.length(), 4000)));
-        task.setFinishedAt(Instant.now());
-        log.warn("task {} failed: {}", taskId, task.getError());
-        return agentTaskRepository.save(task);
+    public AgentTask fail(Long taskId, String worker, int claimEpoch, String error) {
+        String truncated = error == null ? "unknown error"
+                : error.substring(0, Math.min(error.length(), 4000));
+        int updated = agentTaskRepository.finishTaskIfOwner(
+                taskId, worker, claimEpoch, AgentTaskStatus.FAILED, truncated, Instant.now());
+        if (updated == 0) {
+            throw new FencingRejectedException(
+                    "task %s not owned by worker '%s' at epoch %d (already reassigned or finished)"
+                            .formatted(taskId, worker, claimEpoch));
+        }
+        log.warn("task {} failed by {} (epoch {}): {}", taskId, worker, claimEpoch, truncated);
+        return getTask(taskId);
+    }
+
+    /** 旧世代 / 非现任持有者的业务写入被栅栏拒绝。 */
+    public static class FencingRejectedException extends IllegalStateException {
+        public FencingRejectedException(String message) {
+            super(message);
+        }
     }
 
     @Scheduled(fixedDelayString = "${aisre.task.lease-reclaim-interval-ms:60000}")

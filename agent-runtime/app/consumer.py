@@ -40,7 +40,8 @@ def agent_headers() -> dict:
     return {"X-Agent-Token": token} if token else {}
 
 
-def submit_diagnosis(cp_url: str, incident_id: int, diagnosis, task_id: int | None = None) -> None:
+def submit_diagnosis(cp_url: str, incident_id: int, diagnosis, task_id: int | None = None,
+                     worker: str | None = None, claim_epoch: int | None = None) -> None:
     # P2-AR-09: 证据带溯源字段（timestamp 由 CP 落库时补）
     # 红线 39：工具结果/证据在入库前统一脱敏——此前 mask_sensitive 零调用，
     # 观测栈返回的 bearer token / api_key 会原样落进 incident_evidence 表。
@@ -70,6 +71,11 @@ def submit_diagnosis(cp_url: str, incident_id: int, diagnosis, task_id: int | No
     }
     if task_id is not None:
         payload["taskId"] = task_id
+        # 文档 6.7 fencing：诊断回写必须携带现任持有者身份与认领世代，
+        # 否则 CP 侧 fail-closed 拒绝（409）
+        if worker is not None and claim_epoch is not None:
+            payload["workerId"] = worker
+            payload["claimEpoch"] = claim_epoch
     # P1-AR-05: submit 失败必须让调用方知道（重试 N 次后上抛）——
     # 否则诊断没落库任务却被 complete，事故永远停在诊断完成之前
     max_retries = int(os.getenv("SUBMIT_MAX_RETRIES", "3"))
@@ -112,6 +118,7 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
         if idempotency_store is not None and key and idempotency_store.is_processed(key):
             continue
         # P1-MQ-02: 先原子领取再诊断；抢不到说明任务已被其他副本处理，直接跳过
+        claim_epoch = None
         if task_id is not None:
             try:
                 claim = _request_json("POST", f"{cp_url}/api/v1/tasks/{task_id}/claim",
@@ -120,6 +127,8 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
                 continue
             if not claim.get("claimed"):
                 continue
+            # 文档 6.7 fencing：本次认领的世代号，后续所有业务写入都要携带
+            claim_epoch = (claim.get("task") or {}).get("claimEpoch")
         try:
             # P1-CP-14: 控制面读接口需要凭据（agent token 或 JWT）
             incident = _request_json("GET", f"{cp_url}/api/v1/incidents/{incident_id}",
@@ -135,19 +144,25 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
             result = runner.run_diagnosis(incident_id, alert)
             DIAGNOSIS_DURATION.observe(_time.monotonic() - _t0)
             DIAGNOSES_TOTAL.labels(status=result.diagnosis.status).inc()
-            submit_diagnosis(cp_url, incident_id, result.diagnosis, task_id=task_id)
+            submit_diagnosis(cp_url, incident_id, result.diagnosis, task_id=task_id,
+                             worker=worker, claim_epoch=claim_epoch)
             if task_id is not None:
-                _request_json("POST", f"{cp_url}/api/v1/tasks/{task_id}/complete", {},
+                # 文档 6.7：终态写入带 worker + epoch，旧世代写不进终态
+                _request_json("POST", f"{cp_url}/api/v1/tasks/{task_id}/complete",
+                              {"worker": worker, "claimEpoch": claim_epoch},
                               timeout=10, headers=agent_headers())
             if idempotency_store is not None and key:
                 idempotency_store.mark_processed(key)
             processed += 1
         except Exception as exc:
-            # P1-MQ-02: 失败上报终态，任务不再卡 RUNNING（租约回收兜底仍在）
+            # P1-MQ-02: 失败上报终态，任务不再卡 RUNNING（租约回收兜底仍在）。
+            # 409 = 任务已易主/已终态（fencing 拒绝）——这是正常竞争结果，不重试。
             if task_id is not None:
                 try:
                     _request_json("POST", f"{cp_url}/api/v1/tasks/{task_id}/fail",
-                                  {"error": str(exc)[:500]}, timeout=10, headers=agent_headers())
+                                  {"error": str(exc)[:500], "worker": worker,
+                                   "claimEpoch": claim_epoch},
+                                  timeout=10, headers=agent_headers())
                 except Exception:
                     pass
             continue

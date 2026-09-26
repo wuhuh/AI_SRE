@@ -11,6 +11,11 @@ public record DiagnosisRequest(
         List<EvidenceDTO> evidence,
         List<String> recommendedActions,
         List<ToolCallDTO> toolCalls,
-        Long taskId
+        Long taskId,
+        // 文档 6.7 fencing：worker 身份与本次认领的世代。
+        // 可选——同步 API 路径（不走任务认领）不带这两个字段，跳过校验；
+        // 带了 taskId 的异步主路径必须携带，接收端原子校验现任持有者。
+        String workerId,
+        Integer claimEpoch
 ) {
 }
