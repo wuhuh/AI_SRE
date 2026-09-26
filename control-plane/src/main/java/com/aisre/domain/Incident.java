@@ -57,6 +57,11 @@ public class Incident {
     @Column(nullable = false)
     private int alertCount = 0;
 
+    // 文档 11.6：当前诊断轮次。NOT_RECOVERED 创建下一轮任务时推进；
+    // verification 回调携带它验证的轮次，重放回调据此被识别并跳过。
+    @Column(nullable = false)
+    private int diagnosisRound = 0;
+
     public Incident() {
     }
 
@@ -158,5 +163,13 @@ public class Incident {
 
     public void setAlertCount(int alertCount) {
         this.alertCount = alertCount;
+    }
+
+    public int getDiagnosisRound() {
+        return diagnosisRound;
+    }
+
+    public void setDiagnosisRound(int diagnosisRound) {
+        this.diagnosisRound = diagnosisRound;
     }
 }

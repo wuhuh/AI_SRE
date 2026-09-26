@@ -50,6 +50,7 @@ public class AgentResultService {
     private final IncidentEventService eventService;
     private final ApprovalRepository approvalRepository;
     private final RemediationExecutor remediationExecutor;
+    private final AgentTaskService agentTaskService;
     private final TransactionTemplate requiresNewTx;
 
     public AgentResultService(IncidentRepository incidentRepository,
@@ -62,6 +63,7 @@ public class AgentResultService {
                               IncidentEventService eventService,
                               ApprovalRepository approvalRepository,
                               RemediationExecutor remediationExecutor,
+                              AgentTaskService agentTaskService,
                               PlatformTransactionManager transactionManager) {
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionTemplate.PROPAGATION_REQUIRES_NEW);
@@ -75,6 +77,7 @@ public class AgentResultService {
         this.eventService = eventService;
         this.approvalRepository = approvalRepository;
         this.remediationExecutor = remediationExecutor;
+        this.agentTaskService = agentTaskService;
     }
 
     @Transactional
@@ -231,6 +234,29 @@ public class AgentResultService {
         }
         transitionIfAllowed(incident, resultStatus);
         incidentRepository.save(incident);
+
+        // 文档 11.6：重诊环闭合 —— NOT_RECOVERED 不再只是状态回退。
+        // 同一事务内创建下一轮诊断任务（轮次幂等键 + not_before 退避 + 轮次上限）。
+        // 重放回调识别：回调携带它验证的轮次 diagnosisRound；若事故轮次已经
+        // 推进过（incident.diagnosisRound > request.diagnosisRound），说明这是
+        // 同一次 NOT_RECOVERED 的网络重试，不再重复建轮。旧客户端不带该字段时
+        // 退回轮次键推算（diag-<id>-r<N> 已存在即跳过）。
+        if ("NOT_RECOVERED".equals(status)) {
+            if (request.diagnosisRound() != null
+                    && incident.getDiagnosisRound() > request.diagnosisRound()) {
+                log.info("verification callback is a replay (incident {} already at round {}, callback verified round {})",
+                        incidentId, incident.getDiagnosisRound(), request.diagnosisRound());
+            } else {
+                agentTaskService.createRediagnosisTask(incidentId).ifPresent(task -> {
+                    // 轮次取自任务键 diag-<id>-r<N>（首轮 diag-<id> 记 1）
+                    String key = task.getIdempotencyKey();
+                    int round = key.contains("-r")
+                            ? Integer.parseInt(key.substring(key.lastIndexOf("-r") + 2)) : 1;
+                    incident.setDiagnosisRound(Math.max(incident.getDiagnosisRound(), round));
+                    incidentRepository.save(incident);
+                });
+            }
+        }
 
         agentStepRepository.save(new AgentStep(
                 0L,

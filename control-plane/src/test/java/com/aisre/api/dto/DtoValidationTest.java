@@ -54,7 +54,7 @@ class DtoValidationTest {
 
     @Test
     void verificationRequestRequiresStatus() {
-        assertFalse(validator.validate(new VerificationRequest("  ", null, null, null)).isEmpty());
-        assertTrue(validator.validate(new VerificationRequest("RECOVERED", null, null, 9L)).isEmpty());
+        assertFalse(validator.validate(new VerificationRequest("  ", null, null, null, null)).isEmpty());
+        assertTrue(validator.validate(new VerificationRequest("RECOVERED", null, null, 9L, 1)).isEmpty());
     }
 }
