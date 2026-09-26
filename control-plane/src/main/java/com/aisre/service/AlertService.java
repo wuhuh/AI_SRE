@@ -48,8 +48,23 @@ public class AlertService {
     @Transactional
     public AlertResult ingest(AlertRequest request) {
         String fingerprint = fingerprint(request.service(), request.alertName(), request.resource());
-        boolean firstSeen = deduplicationStore.putIfAbsent(fingerprint, DEDUP_TTL);
+        // 文档 5.5：putIfAbsent 返回本次占用的 owner token，落库失败时按 token 释放
+        String dedupToken = deduplicationStore.putIfAbsent(fingerprint, DEDUP_TTL);
+        boolean firstSeen = dedupToken != null;
 
+        try {
+            AlertResult result = doIngest(request, fingerprint, firstSeen);
+            return result;
+        } catch (RuntimeException e) {
+            // 文档 5.5 的跨系统窗口：Redis 标记成功但 DB 落库失败时，上游重试的
+            // 同一条告警会被残留标记压住 → 告警丢失。按自己的 token 释放
+            // （releaseIfOwner 保证不误删其他实例新写入的标记）。
+            deduplicationStore.releaseIfOwner(fingerprint, dedupToken);
+            throw e;
+        }
+    }
+
+    private AlertResult doIngest(AlertRequest request, String fingerprint, boolean firstSeen) {
         Instant receivedAt = request.receivedAt() != null ? request.receivedAt() : Instant.now();
         Alert alert = new Alert(
                 fingerprint,
