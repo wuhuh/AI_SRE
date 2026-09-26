@@ -49,6 +49,11 @@ def prom_latency_query(service: str) -> str:
     )
 
 
+def prom_traffic_query(service: str) -> str:
+    """总请求速率（验证阶段用它判断窗口内流量样本是否充足——文档 11.3）。"""
+    return f'sum(rate(http_requests_total{{service="{service}"}}[5m]))'
+
+
 def prom_query_for(alert: dict) -> str:
     service = str(alert.get("service") or "unknown-service")
     text = f"{alert.get('alertName', '')} {alert.get('summary', '')}".lower()

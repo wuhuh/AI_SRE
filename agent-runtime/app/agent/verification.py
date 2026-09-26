@@ -44,7 +44,10 @@ class VerificationAgent:
 
         # P1-AR-06: 确定性 SLI 判定——LLM 不再拥有恢复与否的决定权
         sli = self._measure_sli(state)
-        determinate = sli_verify.judge(sli.get("error_rate"), sli.get("p95_seconds"))
+        determinate = sli_verify.judge(
+            sli.get("error_rate"), sli.get("p95_seconds"),
+            requests=sli.get("requests"),
+        )
 
         context = build_context(state, state.alert)
         prompt = (
@@ -72,23 +75,39 @@ class VerificationAgent:
         return verification
 
     def _measure_sli(self, state: AgentState) -> dict[str, float]:
-        """P1-AR-06: 采 error_rate 与 p95（无数据/不可达时字段缺省）。"""
-        from app.agent.diagnostic import prom_error_query, prom_latency_query
-        from app.agent.sli_verify import parse_instant_value
+        """P1-AR-06: 采 error_rate 与 p95（无数据/不可达时字段缺省）。
+
+        文档 11.3：**零流量不能当成健康证据**。先采总流量，只有确认流量
+        有效（rate>0）时，空错误序列才能默认成 0（无 5xx 样本=无错误）；
+        流量为 0 或未知时，error_rate 缺省 → judge 判 UNKNOWN。
+        """
+        from app.agent.diagnostic import prom_error_query, prom_latency_query, prom_traffic_query
+        from app.agent.sli_verify import min_requests, parse_instant_value
 
         service = str(state.alert.get("service") or "unknown-service")
         sli: dict[str, float] = {}
+
+        # 先采总流量（[5m] 窗口平均速率 × 300s ≈ 窗口请求数）
+        traffic_call = self.registry.call(
+            "query_prometheus", {"query": prom_traffic_query(service)})
+        state.tool_calls.append(traffic_call)
+        state.step += 1
+        traffic_rate = (parse_instant_value(traffic_call.result_summary)
+                        if traffic_call.status == "SUCCESS" else None)
+        if traffic_rate is not None and traffic_rate > 0 and state.step <= self.max_steps + 1:
+            sli["requests"] = round(traffic_rate * 300)
+
         for name, query in (("error_rate", prom_error_query(service)),
                             ("p95_seconds", prom_latency_query(service))):
             call = self.registry.call("query_prometheus", {"query": query})
             state.tool_calls.append(call)
             state.step += 1
             value = parse_instant_value(call.result_summary) if call.status == "SUCCESS" else None
-            # P1-AR-06 修正（round 17）：rate(5xx)[5m] 空结果 = 窗口内没有 5xx 样本
-            # ——这是「无错误」的好状态，应记 0 而不是 UNKNOWN（否则完全恢复的服务
-            # 因无错误样本反而永远 UNKNOWN）。p95 空仍按无数据处理（没请求≠延迟好）。
+            # 空错误序列 = 窗口内没有 5xx 样本，仅当总流量有效时才是「无错误」
+            # （round 27 按文档 11.3 收紧：零流量/流量未知时不再默认 0，交由 UNKNOWN）
             if name == "error_rate" and value is None and call.status == "SUCCESS":
-                value = 0.0
+                if sli.get("requests", 0) >= min_requests():
+                    value = 0.0
             if value is not None:
                 sli[name] = value
         return sli
