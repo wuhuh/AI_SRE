@@ -113,8 +113,10 @@ public class AgentResultService {
                         incidentId,
                         request.taskId(), // P2-CP-23: 链路关联（此前断链 null）
                         dto.toolName(),
-                        // P2-CP-23: 风险来源=agent 端 ToolSpec（策略工件），缺省 READ_ONLY
-                        dto.riskLevel() != null ? dto.riskLevel() : "READ_ONLY",
+                        // 红线 42：riskLevel 值域无契约——上游漏发时此前缺省成 READ_ONLY（最宽松），
+                        // 一个字段写错就让高风险调用看起来像只读。改为严格枚举校验 + fail-closed：
+                        // 只接受三个合法值，任何未知/缺失都按 HIGH_RISK 落库并告警。
+                        normalizeRiskLevel(dto.riskLevel(), dto.toolName()),
                         dto.status() != null ? dto.status() : "SUCCESS",
                         dto.argumentsJson() != null ? dto.argumentsJson() : "{}",
                         dto.resultSummary(),
@@ -319,6 +321,32 @@ public class AgentResultService {
                     });
         } else {
             action.run();
+        }
+    }
+
+    /**
+     * 红线 42：riskLevel 值域收敛。跨服务契约此前对 riskLevel 无任何校验，
+     * agent 端漏发时缺省成 READ_ONLY（最宽松），上游一个字段写错下游就静默走偏。
+     * 这里只接受三个合法枚举值，其余（含 null / 空串 / 未知字符串）一律
+     * fail-closed 记为 HIGH_RISK 并打 WARN——宁可多走一次人工审批，不可静默放行。
+     *
+     * @return 合法值原样返回；非法值返回 "HIGH_RISK"
+     */
+    static String normalizeRiskLevel(String raw, String toolName) {
+        if (raw == null || raw.isBlank()) {
+            log.warn("toolCall riskLevel missing for tool={} — fail-closed as HIGH_RISK", toolName);
+            return "HIGH_RISK";
+        }
+        String v = raw.trim().toUpperCase();
+        switch (v) {
+            case "READ_ONLY":
+            case "LOW_RISK":
+            case "HIGH_RISK":
+                return v;
+            default:
+                log.warn("toolCall riskLevel '{}' for tool={} not in contract — fail-closed as HIGH_RISK",
+                        raw, toolName);
+                return "HIGH_RISK";
         }
     }
 }

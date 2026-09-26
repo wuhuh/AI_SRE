@@ -206,7 +206,15 @@ class DatabaseTool(Tool):
     )
 
     def __init__(self, base_url: str | None = None):
-        self.base_url = (base_url or os.getenv("DB_TOOL_URL", "http://localhost:8003")).rstrip("/")
+        # 红线 17：compose/k8s 注入的是 DATABASE_TOOL_URL，此前只读 DB_TOOL_URL
+        # → database 工具拿不到后端地址，db_pool / slow_sql 类证据实际采不到。
+        # 兼容读取两个名字（DATABASE_TOOL_URL 优先），避免再靠约定对齐。
+        self.base_url = (
+            base_url
+            or os.getenv("DATABASE_TOOL_URL")
+            or os.getenv("DB_TOOL_URL")
+            or "http://localhost:8003"
+        ).rstrip("/")
 
     def execute(self, arguments: dict[str, Any], principal: str = "agent") -> str:
         params = urllib.parse.urlencode(arguments)

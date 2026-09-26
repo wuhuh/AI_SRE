@@ -100,6 +100,12 @@ class DiagnosticAgent:
                 if tool_name is not None:
                     self._execute_tool(state, tool_name)
                     self._checkpoint(state)
+                else:
+                    # 红线 13 加固：计划里的步骤解析不出工具名时不能静默跳过——
+                    # 那正是 retrieve_runbook 之前被丢掉、以及「固定 4 步实跑 3 步」
+                    # 长期没被发现的原因。留一条 WARN 让缺口可观测。
+                    logger.warning("plan step skipped: unresolvable tool %r (incident=%s)",
+                                   raw_tool, state.incident_id)
             else:
                 # Ask the LLM whether it needs another tool or can produce a final diagnosis.
                 decision = self._ask_llm(state)
@@ -136,8 +142,11 @@ class DiagnosticAgent:
         if not name:
             return None
         normalized = name.strip().lower()
-        if normalized in self.registry.names():
-            return normalized
+        # 红线 13/18：别名表必须先查，再回落到 registry 精确匹配。
+        # 旧顺序是「先匹配 registry」，而 retrieve_runbook 不在 registry 里
+        # （它由 retriever 在进程内实现，见 _execute_tool），于是
+        # DEFAULT_PLAN 的第 4 步 `retrieve_runbook` 在别名表命中之前就返回 None
+        # 被静默跳过 → 固定开局实际只跑 3 个只读工具。
         aliases = {
             "prometheus": "query_prometheus",
             "prom": "query_prometheus",
@@ -155,10 +164,15 @@ class DiagnosticAgent:
             "redis_tool": "redis",
             "database": "database",
             "db": "database",
+            "retrieve_runbook": "retrieve_runbook",
             "runbook": "retrieve_runbook",
             "rag": "retrieve_runbook",
         }
-        return aliases.get(normalized)
+        if normalized in aliases:
+            return aliases[normalized]
+        if normalized in self.registry.names():
+            return normalized
+        return None
 
     def _execute_tool(self, state: AgentState, tool_name: str) -> ToolCall:
         if tool_name == "retrieve_runbook":

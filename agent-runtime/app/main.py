@@ -21,6 +21,7 @@ from app.consumer import agent_headers, consumer_loop
 from app.llm.mock import MockLLMProvider
 from app.llm.openai_compatible import OpenAICompatibleLLMProvider
 from app.llm.retry import RetryLLMProvider
+from app.masking import mask_sensitive
 from app.models import AgentState
 from app.rag.retriever import Document, HybridRetriever
 from app.tools.factory import create_default_registry
@@ -95,12 +96,17 @@ def _control_plane_url() -> str:
 
 
 def _submit_diagnosis(incident_id: int, diagnosis) -> None:
-    evidence = [{"source": e.source, "key": e.key, "content": e.content} for e in diagnosis.evidence]
+    # 红线 39：同步路径同样先脱敏再出网（与 consumer.submit_diagnosis 对齐）
+    evidence = [{"source": e.source, "key": e.key,
+                 "content": mask_sensitive(e.content or "")} for e in diagnosis.evidence]
     tool_calls = [{
         "toolName": t.name,
         "argumentsJson": json.dumps(t.arguments, ensure_ascii=False),
         "status": t.status,
-        "resultSummary": t.result_summary,
+        # 红线 42：riskLevel 此前在同步路径漏发 → CP 侧缺省读作 READ_ONLY，
+        # 高风险动作可能被当成只读而绕过审批。这里与 consumer 路径补齐同一字段。
+        "riskLevel": getattr(t, "risk_level", None) or "READ_ONLY",
+        "resultSummary": mask_sensitive(t.result_summary or ""),
         "durationMs": t.duration_ms,
         "error": t.error,
         "createdAt": None,

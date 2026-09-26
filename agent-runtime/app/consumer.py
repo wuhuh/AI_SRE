@@ -16,6 +16,7 @@ from typing import Any
 
 from app.agent.runner import AgentRunner
 from app.idempotency import FileIdempotencyStore
+from app.masking import mask_sensitive
 
 
 def _request_json(method: str, url: str, payload: dict | None = None, timeout: float = 10,
@@ -41,10 +42,12 @@ def agent_headers() -> dict:
 
 def submit_diagnosis(cp_url: str, incident_id: int, diagnosis, task_id: int | None = None) -> None:
     # P2-AR-09: 证据带溯源字段（timestamp 由 CP 落库时补）
+    # 红线 39：工具结果/证据在入库前统一脱敏——此前 mask_sensitive 零调用，
+    # 观测栈返回的 bearer token / api_key 会原样落进 incident_evidence 表。
     evidence = [{
         "source": e.source,
         "key": e.key,
-        "content": e.content,
+        "content": mask_sensitive(e.content or ""),
         "query": getattr(e, "query", None),
         "timeRange": getattr(e, "time_range", None),
     } for e in diagnosis.evidence]
@@ -53,7 +56,7 @@ def submit_diagnosis(cp_url: str, incident_id: int, diagnosis, task_id: int | No
         "argumentsJson": json.dumps(t.arguments, ensure_ascii=False),
         "status": t.status,
         "riskLevel": getattr(t, "risk_level", None) or "READ_ONLY",
-        "resultSummary": t.result_summary,
+        "resultSummary": mask_sensitive(t.result_summary or ""),
         "durationMs": t.duration_ms,
         "error": t.error,
         "createdAt": None,
@@ -96,7 +99,10 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
                           headers=agent_headers()) or []
     processed = 0
     worker = _worker_id()
-    from app.metrics import DIAGNOSES_TOTAL, DIAGNOSIS_DURATION
+    from app.metrics import DIAGNOSES_TOTAL, DIAGNOSIS_DURATION, TASKS_PENDING
+    # 红线 18：aisre_tasks_pending 此前全仓库从未 .set()，恒为 0——
+    # Grafana「任务积压」面板是死的。轮询已经拿到了待认领清单，直接落这个数。
+    TASKS_PENDING.set(len(tasks))
     for task in tasks:
         incident_id = task.get("incidentId")
         task_id = task.get("id")

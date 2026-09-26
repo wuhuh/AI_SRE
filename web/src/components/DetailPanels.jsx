@@ -283,7 +283,7 @@ export function RemediationItem({ item }) {
     <List.Item>
       <Space direction="vertical" size={2} style={{ width: '100%' }}>
         <Space>
-          <Tag color={item.status === 'SUCCESS' ? 'green' : item.status === 'FAILED' ? 'red' : 'orange'}>{item.status}</Tag>
+          <Tag color={item.status === 'SUCCESS' ? 'green' : item.status === 'FAILED' ? 'red' : item.status === 'NOT_EXECUTED' ? 'gold' : 'orange'}>{item.status}</Tag>
           <Text strong>{TOOL_LABEL[item.toolName] || item.toolName}</Text>
           <Tag color={result.dryRun ? 'gold' : 'cyan'}>{executed}</Tag>
           {item.approvalId && <Text type="secondary" style={{ fontSize: 12 }}>审批 #{item.approvalId}</Text>}

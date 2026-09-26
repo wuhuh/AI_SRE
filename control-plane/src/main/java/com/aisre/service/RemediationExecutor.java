@@ -91,18 +91,43 @@ public class RemediationExecutor {
                     .POST(HttpRequest.BodyPublishers.ofString(body.get()))
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            boolean success = response.statusCode() >= 200 && response.statusCode() < 300;
-            log.info("remediation {} for incident {}: HTTP {}", action, incidentId, response.statusCode());
-            remediation.setStatus(success ? "SUCCESS" : "FAILED");
+            // 红线 41：2xx 不等于「真的执行了」。tool-server 在没有 docker.sock / 非
+            // in-cluster 时返回 200 + {"dryRun": true}——什么都没做。此前只看状态码，
+            // 把 dryRun 判成 SUCCESS，进而把 Incident 推到 VERIFYING 并触发验证，
+            // k8s 形态下所有修复都是「假成功」：状态机推进、可能判 RECOVERED，而实际未动。
+            // 现在解析响应体，显式区分三种结局。注意 FastAPI 序列化不带空格
+            // （{"dryRun":true}），所以判定走 JSON 解析而不是字符串匹配。
+            boolean dryRun = isDryRun(response.body());
+            boolean executed = !dryRun && isExecuted(response.body());
+            String outcome;
+            if (dryRun) {
+                outcome = "NOT_EXECUTED";
+            } else if (executed || (response.statusCode() >= 200 && response.statusCode() < 300)) {
+                outcome = "SUCCESS";
+            } else {
+                outcome = "FAILED";
+            }
+            log.info("remediation {} for incident {}: HTTP {} outcome={} dryRun={}",
+                    action, incidentId, response.statusCode(), outcome, dryRun);
+            remediation.setStatus(outcome);
             remediation.setResultSummary(response.body().length() > 2000 ? response.body().substring(0, 2000) : response.body());
             remediation.setExecutedAt(Instant.now());
             remediation = remediationActionRepository.save(remediation);
 
-            if (success && incident != null
+            if ("SUCCESS".equals(outcome) && incident != null
                     && IncidentStateMachineSafe.canTransition(incident.getStatus(), IncidentStatus.VERIFYING)) {
                 incident.setStatus(IncidentStatus.VERIFYING);
                 incidentRepository.save(incident);
                 triggerVerification(incident);
+            } else if ("NOT_EXECUTED".equals(outcome)) {
+                // 红线 31/41：dryRun 不推进状态、不触发验证。事故回到 ROOT_CAUSE_FOUND
+                // 等待人工处置（状态机 REMEDIATING → FAILED 亦可，但「未执行」不是失败，
+                // 回 ROOT_CAUSE_FOUND 才允许重新决策/改方案）。
+                failIncident(incident, "remediation not executed (dryRun): " + action);
+            } else {
+                // 红线 31：非 2xx → 此前只标 remediation 行，Incident 永远卡在
+                // REMEDIATING（ApprovalService 已先置该状态，且状态机没有「执行失败」自动边）。
+                failIncident(incident, "remediation failed: HTTP " + response.statusCode());
             }
         } catch (Exception e) {
             log.warn("remediation {} for incident {} failed: {}", action, incidentId, e.getMessage());
@@ -110,8 +135,66 @@ public class RemediationExecutor {
             remediation.setResultSummary("remediation execution failed: " + e.getMessage());
             remediation.setExecutedAt(Instant.now());
             remediation = remediationActionRepository.save(remediation);
+            // 红线 31：异常路径同样必须把 Incident 从 REMEDIATING 里放出来
+            failIncident(incident, "remediation exception: " + e.getMessage());
         }
         return remediation;
+    }
+
+    /**
+     * 红线 31：把卡在 REMEDIATING 的 Incident 推进到终态或可重决策态。
+     * 状态机允许 REMEDIATING → FAILED，但「未执行 / 执行失败」更合理的落点是
+     * ROOT_CAUSE_FOUND（可重新诊断、换方案、再走审批），只有状态机不允许时才退到 FAILED。
+     */
+    private void failIncident(Incident incident, String reason) {
+        if (incident == null) {
+            return;
+        }
+        IncidentStatus current = incident.getStatus();
+        IncidentStatus target = null;
+        if (IncidentStateMachineSafe.canTransition(current, IncidentStatus.ROOT_CAUSE_FOUND)) {
+            target = IncidentStatus.ROOT_CAUSE_FOUND;
+        } else if (IncidentStateMachineSafe.canTransition(current, IncidentStatus.FAILED)) {
+            target = IncidentStatus.FAILED;
+        }
+        if (target == null) {
+            log.warn("incident {} stayed in {} — no recovery transition available ({})",
+                    incident.getId(), current, reason);
+            return;
+        }
+        incident.setStatus(target);
+        incidentRepository.save(incident);
+        auditService.record(incident.getId(), "remediation-executor", "REMEDIATION_NOT_COMPLETED",
+                current + "->" + target + " " + reason);
+        log.info("incident {} moved {} -> {} ({})", incident.getId(), current, target, reason);
+    }
+
+    /**
+     * 判定 tool-server 响应是否为「未真正执行」的 dryRun 结果。
+     * 走 JSON 解析：FastAPI 默认 separators 无空格（{"dryRun":true}），
+     * 用字符串匹配 {"dryRun": true} 会漏判 → 又变成假成功。
+     */
+    static boolean isDryRun(String body) {
+        JsonNode node = tryParse(body);
+        return node != null && node.path("dryRun").asBoolean(false);
+    }
+
+    /** tool-server 明确回报 executed=true（真实执行闭环）。 */
+    static boolean isExecuted(String body) {
+        JsonNode node = tryParse(body);
+        return node != null && node.path("executed").asBoolean(false);
+    }
+
+    private static JsonNode tryParse(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            return MAPPER.readTree(body);
+        } catch (Exception e) {
+            // 非 JSON 响应：交由状态码路径判定，不在这里抛
+            return null;
+        }
     }
 
     /**
