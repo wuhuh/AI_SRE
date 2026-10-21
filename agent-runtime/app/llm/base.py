@@ -12,6 +12,9 @@ class Message:
     role: str  # system, user, assistant, tool
     content: str
     tool_call_id: str | None = None
+    # native function calling：assistant 消息回传模型发起的 tool_calls，
+    # tool 消息通过 tool_call_id 与之一一对应。
+    tool_calls: list[dict[str, Any]] | None = None
 
 
 class LLMProvider(ABC):

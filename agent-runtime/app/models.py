@@ -79,6 +79,9 @@ class AgentState:
     # P0-03: 跨步累计 LLM token 用量
     llm_input_tokens: int = 0
     llm_output_tokens: int = 0
+    # native function calling：多轮 LLM 消息（assistant tool_calls / tool results）
+    # 随 checkpoint 持久化，崩溃续跑时不会丢失已执行工具的结果。
+    llm_messages: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

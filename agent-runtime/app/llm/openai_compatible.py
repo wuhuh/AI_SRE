@@ -27,9 +27,17 @@ class OpenAICompatibleLLMProvider(LLMProvider):
             os.getenv("LLM_TIMEOUT_SECONDS", os.getenv("DIAG_BUDGET_SECONDS", "120")))
 
     def complete(self, messages: list[Message], tools: list[dict[str, Any]] | None = None) -> LLMResult:
+        serialized_messages: list[dict[str, Any]] = []
+        for m in messages:
+            item: dict[str, Any] = {"role": m.role, "content": m.content}
+            if m.tool_call_id:
+                item["tool_call_id"] = m.tool_call_id
+            if m.tool_calls:
+                item["tool_calls"] = m.tool_calls
+            serialized_messages.append(item)
         payload: dict[str, Any] = {
             "model": self.model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": serialized_messages,
         }
         if tools:
             payload["tools"] = tools

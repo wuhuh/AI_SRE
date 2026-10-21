@@ -4,9 +4,9 @@ import json
 import logging
 import time
 
-from app.context import DATA_NOT_INSTRUCTIONS, build_context
+from app.context import DATA_NOT_INSTRUCTIONS, build_context, wrap_evidence
 from app.llm.base import LLMProvider, Message
-from app.models import AgentState, DiagnosisResult, Evidence, ToolCall
+from app.models import AgentState, DiagnosisResult, Evidence, LLMResult, ToolCall
 from app.tools.registry import ToolRegistry
 
 logger = logging.getLogger("agent.diagnostic")
@@ -103,7 +103,8 @@ class DiagnosticAgent:
                 raw_tool = pending.pop(0)
                 tool_name = self._normalize_tool_name(raw_tool)
                 if tool_name is not None:
-                    self._execute_tool(state, tool_name)
+                    call = self._execute_tool(state, tool_name)
+                    self._remember_legacy_tool_result(state, tool_name, call)
                     self._checkpoint(state)
                 else:
                     # 红线 13 加固：计划里的步骤解析不出工具名时不能静默跳过——
@@ -111,30 +112,48 @@ class DiagnosticAgent:
                     # 长期没被发现的原因。留一条 WARN 让缺口可观测。
                     logger.warning("plan step skipped: unresolvable tool %r (incident=%s)",
                                    raw_tool, state.incident_id)
-            else:
-                # Ask the LLM whether it needs another tool or can produce a final diagnosis.
-                decision = self._ask_llm(state)
-                self._checkpoint(state)
-                if decision.get("nextTool"):
-                    next_tool = self._normalize_tool_name(decision["nextTool"])
-                    if next_tool is not None:
-                        pending.append(next_tool)
-                        unresolved = 0
-                    else:
-                        # P0-08: LLM 编造不存在的工具名（如 redis_info/get_container_metrics）
-                        # 会让 pending 永远为空 → 空转烧满预算。已执行过工具仍收敛不了才强制出结论；
-                        # 一个工具没跑过就收敛会让可观测的真实证据白白错过。
-                        unresolved += 1
-                        if unresolved >= 2 and state.tool_calls:
-                            state.error = f"unresolvable_tool:{decision['nextTool']}"
-                            return self._finalize(state, decision)
-                    continue
-                return self._finalize(state, decision)
+                continue
+
+            # 一次 LLM 调用：优先消费 native tool_calls；否则回退旧的 JSON 协议
+            # （{"nextTool": ...} 或最终 diagnosis），保证 mock / 旧模型仍可工作。
+            result = self._ask_llm(state)
+            self._checkpoint(state)
+            if result.tool_calls:
+                self._handle_native_tool_calls(state, result)
+                continue
+
+            decision = self._parse_decision(state, result)
+            if decision.get("nextTool"):
+                next_tool = self._normalize_tool_name(decision["nextTool"])
+                self._remember_assistant_message(state, result)
+                if next_tool is not None:
+                    pending.append(next_tool)
+                    unresolved = 0
+                else:
+                    # P0-08: LLM 编造不存在的工具名（如 redis_info/get_container_metrics）
+                    # 会让 pending 永远为空 → 空转烧满预算。已执行过工具仍收敛不了才强制出结论；
+                    # 一个工具没跑过就收敛会让可观测的真实证据白白错过。
+                    self._remember_tool_error(
+                        state, f"unknown tool {decision['nextTool']!r}")
+                    unresolved += 1
+                    if unresolved >= 2 and state.tool_calls:
+                        state.error = f"unresolvable_tool:{decision['nextTool']}"
+                        return self._finalize(state, decision)
+                continue
+            return self._finalize(state, decision)
 
         # If we exhausted steps without a final answer, ask one more time for a graceful failure.
         if time.monotonic() - start_time <= self.max_duration_seconds:
-            decision = self._ask_llm(state)
-            return self._finalize(state, decision)
+            result = self._ask_llm(state)
+            if result.tool_calls:
+                state.error = "max_steps_reached_with_pending_tool_calls"
+                return self._finalize(state, {
+                    "rootCause": "unknown",
+                    "confidence": 0.0,
+                    "evidence": [],
+                    "recommendedActions": [],
+                })
+            return self._finalize(state, self._parse_decision(state, result))
         state.error = "diagnosis_timeout"
         return self._finalize(state, {
             "rootCause": "unknown",
@@ -179,15 +198,197 @@ class DiagnosticAgent:
             return normalized
         return None
 
-    def _execute_tool(self, state: AgentState, tool_name: str) -> ToolCall:
+    def _tool_specs(self) -> list[dict]:
+        """把 Tool Registry 转成 OpenAI function-calling schema。
+
+        retrieve_runbook 由进程内 retriever 实现（不在 registry 里），
+        这里补一条合成 schema，让模型也能主动请求 Runbook。
+        """
+        specs: list[dict] = []
+        for s in self.registry.specs():
+            specs.append({
+                "type": "function",
+                "function": {
+                    "name": s["name"],
+                    "description": s.get("description", ""),
+                    "parameters": s.get("parameters") or {"type": "object", "properties": {}},
+                },
+            })
+        if "retrieve_runbook" not in {s["function"]["name"] for s in specs}:
+            specs.append({
+                "type": "function",
+                "function": {
+                    "name": "retrieve_runbook",
+                    "description": "Retrieve runbooks/postmortems relevant to the incident",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string"}},
+                        "required": [],
+                    },
+                },
+            })
+        return specs
+
+    def _tool_names(self) -> str:
+        return ", ".join(s["function"]["name"] for s in self._tool_specs())
+
+    def _diagnosis_instruction(self) -> str:
+        labels = ", ".join(RCA_CANDIDATE_LABELS)
+        return (
+            "Based on the collected evidence, either return a final diagnosis JSON "
+            '({"rootCause": "<label>", "alternatives": ["<label>", "<label>"], '
+            '"confidence": 0.0, "evidence": [], "recommendedActions": []}) '
+            'or request one more tool ({"nextTool": "tool_name"}). Do not explain.\n'
+            f"rootCause must be exactly one of these labels: [{labels}].\n"
+            '"alternatives" lists up to 2 other plausible labels (may be empty).'
+        )
+
+    def _initial_user_content(self, state: AgentState) -> str:
+        context = build_context(state, state.alert)
+        return (
+            f"{DATA_NOT_INSTRUCTIONS}\n"
+            f"{self._diagnosis_instruction()}\n"
+            f"Available tools: {self._tool_names()}\n\n"
+            + context.summary
+        )
+
+    def _messages(self, state: AgentState) -> list[Message]:
+        """初始化/恢复多轮消息；旧 checkpoint 没有 llm_messages 时用现有证据重建。"""
+        if not state.llm_messages:
+            state.llm_messages = [
+                {"role": "system",
+                 "content": "You are a precise SRE diagnostic agent. " + DATA_NOT_INSTRUCTIONS},
+                {"role": "user", "content": self._initial_user_content(state)},
+            ]
+        return [
+            Message(role=m.get("role", "user"), content=m.get("content") or "",
+                    tool_call_id=m.get("tool_call_id"), tool_calls=m.get("tool_calls"))
+            for m in state.llm_messages
+        ]
+
+    def _ask_llm(self, state: AgentState) -> LLMResult:
+        """一次 LLM 调用：下发工具 schema，返回原始结果（tool_calls 由调用方消费）。"""
+        try:
+            result = self.llm.complete(self._messages(state), tools=self._tool_specs())
+            state.llm_input_tokens += result.input_tokens
+            state.llm_output_tokens += result.output_tokens
+            return result
+        except Exception as exc:
+            logger.warning("llm decision failed: incident=%s error=%s", state.incident_id, exc)
+            return LLMResult(content=json.dumps({
+                "rootCause": "unknown",
+                "confidence": 0.0,
+                "evidence": [],
+                "recommendedActions": [],
+            }))
+
+    def _parse_decision(self, state: AgentState, result: LLMResult) -> dict:
+        try:
+            decision = json.loads(result.content)
+            if not isinstance(decision, dict):
+                raise ValueError("decision must be a JSON object")
+            # P0-07 排障：决策结果必须可见（LLM 回了什么、是否走降级）
+            logger.info("llm decision: incident=%s root=%s nextTool=%s raw=%s",
+                        state.incident_id, decision.get("rootCause"),
+                        decision.get("nextTool"), result.content[:800])
+            return decision
+        except Exception as exc:
+            logger.warning("llm decision parse failed: incident=%s error=%s", state.incident_id, exc)
+            return {
+                "rootCause": "unknown",
+                "confidence": 0.0,
+                "evidence": [],
+                "recommendedActions": [],
+            }
+
+    def _remember_assistant_message(self, state: AgentState, result: LLMResult) -> None:
+        if state.llm_messages:
+            state.llm_messages.append({
+                "role": "assistant",
+                "content": result.content or "",
+                "tool_calls": result.tool_calls or None,
+            })
+
+    def _remember_legacy_tool_result(self, state: AgentState, tool_name: str,
+                                     call: ToolCall) -> None:
+        """旧 JSON 协议（nextTool）下把工具结果作为下一条 user 消息回灌。"""
+        if not state.llm_messages:
+            return  # 固定初始计划阶段还没有会话，结果由首次 _initial_user_content 汇总
+        body = (call.result_summary or call.error or "")[:4000]
+        state.llm_messages.append({
+            "role": "user",
+            "content": f"{self._diagnosis_instruction()}\n\n"
+                       f"Tool result for {tool_name}:\n{wrap_evidence(body)}",
+        })
+
+    def _remember_tool_error(self, state: AgentState, message: str) -> None:
+        if state.llm_messages:
+            state.llm_messages.append({
+                "role": "user",
+                "content": f"{self._diagnosis_instruction()}\n\nTool error: {message}\n"
+                           f"Available tools: {self._tool_names()}",
+            })
+
+    @staticmethod
+    def _parse_tool_arguments(raw) -> dict:
+        """接受 OpenAI 的 JSON 字符串，也兼容部分代理直接回 dict。"""
+        if isinstance(raw, dict):
+            return raw
+        if isinstance(raw, str) and raw.strip():
+            try:
+                value = json.loads(raw)
+                return value if isinstance(value, dict) else {}
+            except json.JSONDecodeError:
+                return {}
+        return {}
+
+    def _handle_native_tool_calls(self, state: AgentState, result: LLMResult) -> None:
+        """执行模型发起的 native tool_calls，并把结果写回消息历史。"""
+        state.llm_messages.append({
+            "role": "assistant",
+            "content": result.content or "",
+            "tool_calls": result.tool_calls,
+        })
+        for tc in result.tool_calls:
+            if state.step >= self.max_steps:
+                break
+            if not isinstance(tc, dict):
+                continue
+            fn = tc.get("function") or {}
+            name = fn.get("name") if isinstance(fn, dict) else None
+            raw_args = fn.get("arguments") if isinstance(fn, dict) else None
+            call_id = tc.get("id") or f"call_{state.step}"
+            tool_name = self._normalize_tool_name(name)
+            if tool_name is None:
+                state.llm_messages.append({
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "content": f"ERROR: unknown tool {name!r}. "
+                               f"Available tools: {self._tool_names()}",
+                })
+                continue
+            args = self._parse_tool_arguments(raw_args)
+            call = self._execute_tool(state, tool_name, arguments=args)
+            state.llm_messages.append({
+                "role": "tool",
+                "tool_call_id": call_id,
+                "content": (call.result_summary or call.error or "")[:4000],
+            })
+
+    def _execute_tool(self, state: AgentState, tool_name: str,
+                      arguments: dict | None = None) -> ToolCall:
         if tool_name == "retrieve_runbook":
-            self._retrieve_runbook(state)
+            query = arguments.get("query") if isinstance(arguments, dict) else None
+            self._retrieve_runbook(state, query=query)
             content = state.tool_results.get("retrieve_runbook", "")
-            call = ToolCall(name="retrieve_runbook", arguments={}, status="SUCCESS", result_summary=content)
+            call = ToolCall(name="retrieve_runbook",
+                            arguments={"query": query} if query else {},
+                            status="SUCCESS", result_summary=content)
             state.tool_calls.append(call)
             state.step += 1
             return call
-        args = self._tool_arguments(state, tool_name)
+        # native tool_calls 的参数来自模型；只有旧 nextTool/固定计划才回退到告警驱动参数。
+        args = arguments if isinstance(arguments, dict) else self._tool_arguments(state, tool_name)
         call = self.registry.call(tool_name, args)
         state.tool_calls.append(call)
         state.tool_results[tool_name] = call.result_summary or call.error or ""
@@ -209,49 +410,19 @@ class DiagnosticAgent:
             ))
         return call
 
-    def _retrieve_runbook(self, state: AgentState) -> None:
+    def _retrieve_runbook(self, state: AgentState, query: str | None = None) -> None:
         if self.retriever is None:
             return
-        docs = self.retriever.retrieve(state.alert.get("summary", ""))
+        effective_query = query or state.alert.get("summary", "")
+        docs = self.retriever.retrieve(effective_query)
         content = "\n".join(f"[{d.id}] {d.title}: {d.content}" for d in docs)
         state.tool_results["retrieve_runbook"] = content[:8000]
         state.evidence.append(Evidence(
             source="rag",
             key="retrieved_runbooks",
             content=content[:8000],
+            query=effective_query or None,
         ))
-
-    def _ask_llm(self, state: AgentState) -> dict:
-        context = build_context(state, state.alert)
-        labels = ", ".join(RCA_CANDIDATE_LABELS)
-        prompt = (
-            f"{DATA_NOT_INSTRUCTIONS}\n"
-            "Based on the collected evidence, either return a final diagnosis JSON "
-            '({"rootCause": "<label>", "alternatives": ["<label>", "<label>"], '
-            '"confidence": 0.0, "evidence": [], "recommendedActions": []}) '
-            'or request one more tool ({"nextTool": "tool_name"}). Do not explain.\n'
-            f"rootCause must be exactly one of these labels: [{labels}].\n"
-            '"alternatives" lists up to 2 other plausible labels (may be empty).\n\n'
-            + context.summary
-        )
-        try:
-            result = self.llm.complete([Message(role="user", content=prompt)])
-            state.llm_input_tokens += result.input_tokens
-            state.llm_output_tokens += result.output_tokens
-            decision = json.loads(result.content)
-            # P0-07 排障：决策结果必须可见（LLM 回了什么、是否走降级）
-            logger.info("llm decision: incident=%s root=%s nextTool=%s raw=%s",
-                        state.incident_id, decision.get("rootCause"),
-                        decision.get("nextTool"), result.content[:800])
-            return decision
-        except Exception as exc:
-            logger.warning("llm decision failed: incident=%s error=%s", state.incident_id, exc)
-            return {
-                "rootCause": "unknown",
-                "confidence": 0.0,
-                "evidence": [],
-                "recommendedActions": [],
-            }
 
     def _finalize(self, state: AgentState, decision: dict, timed_out: bool = False) -> DiagnosisResult:
         evidence = state.evidence
