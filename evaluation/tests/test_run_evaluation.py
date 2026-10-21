@@ -83,6 +83,15 @@ class OpenSetScoringTest(unittest.TestCase):
         abstain = {"root_cause": "unknown", "candidate_root_causes": []}
         self.assertEqual(score_open(abstain, "slow_sql"), (False, False))
 
+    def test_open_top1_uses_primary_not_first_candidate(self):
+        # 主结论 unknown、候选里有正确答案：仍必须算拒答，不能虚高 Top-1。
+        abstain_with_alternative = {
+            "root_cause": "unknown",
+            "candidate_root_causes": ["slow_sql"],
+        }
+        self.assertEqual(score_open(abstain_with_alternative, "slow_sql"), (False, False))
+        self.assertEqual(score(abstain_with_alternative, "slow_sql"), (False, False))
+
 
 class ScoreTest(unittest.TestCase):
     def test_top1_exact_match(self):
@@ -188,6 +197,7 @@ class SummarizeTest(unittest.TestCase):
         self.assertEqual(report["root_cause_top3_accuracy"], 0.5)
         self.assertEqual(report["unknown_rate"], 0.5)
         self.assertEqual(report["fallback_rate"], 0.5)
+        self.assertEqual(report["llm_error_cases"], 1)
         self.assertEqual(report["evidence_recall_avg"], 1.0)
         self.assertEqual(report["tool_success_rate"], 1.0)
 

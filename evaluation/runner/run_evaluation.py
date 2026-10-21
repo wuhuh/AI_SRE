@@ -237,12 +237,21 @@ def build_alert(case: dict) -> dict:
 
 
 def score(diagnosis: dict, expected_label: str) -> tuple[bool, bool]:
-    """返回 (top1, top3)。全部为 canonical 标签的精确匹配。"""
+    """返回 (top1, top3)。全部为 canonical 标签的精确匹配。
+
+    Top-1 必须看主结论 root_cause；candidates 仅用于 Top-3。
+    旧实现用 candidates[0] 当 Top-1，会让「主结论 unknown、候选里有正确答案」
+    被误算成命中——这是拒答语义下最危险的虚高。
+    """
+    predicted = normalize_label(diagnosis.get("root_cause", ""))
     candidates = [normalize_label(c) for c in (diagnosis.get("candidate_root_causes") or [])]
     if not candidates:
-        candidates = [normalize_label(diagnosis.get("root_cause", ""))]
+        candidates = [predicted]
     expected = normalize_label(expected_label)
-    top1 = bool(candidates) and candidates[0] == expected
+    if predicted == "unknown":
+        # 闭集路径的 unknown 是降级兜底，不是有效标签；不能靠 candidates 命中。
+        return False, False
+    top1 = bool(predicted) and predicted == expected
     top3 = expected in candidates[:3]
     return top1, top3
 
@@ -250,18 +259,20 @@ def score(diagnosis: dict, expected_label: str) -> tuple[bool, bool]:
 def score_open(diagnosis: dict, expected_label: str) -> tuple[bool, bool]:
     """开放诊断打分：先把自由输出 canonical 化，再与 ground truth 比对。
 
+    - Top-1 只看主 root_cause；unknown 主结论 = 拒答，不能靠 alternatives 命中；
     - expected=unknown 的拒答用例：预测 unknown 才算命中；
     - 其余用例：unknown 一律视为未命中（不能靠拒答刷准确率）。
     """
+    predicted = canonicalize_label(diagnosis.get("root_cause", ""))
     candidates = [canonicalize_label(c) for c in (diagnosis.get("candidate_root_causes") or [])]
     if not candidates:
-        candidates = [canonicalize_label(diagnosis.get("root_cause", ""))]
+        candidates = [predicted]
     expected = canonicalize_label(expected_label)
+    if predicted == "unknown":
+        return expected == "unknown", expected == "unknown"
     if expected == "unknown":
-        predicted = candidates[0] if candidates else "unknown"
-        aborted = predicted == "unknown"
-        return aborted, aborted
-    top1 = bool(candidates) and candidates[0] == expected
+        return False, False
+    top1 = predicted == expected
     top3 = expected in candidates[:3]
     return top1, top3
 
@@ -423,6 +434,8 @@ def summarize(rows: list[dict], open_set: bool = False) -> dict:
     unknown = sum(1 for r in rows if predicted(r) == "unknown" or r["status"] == "UNKNOWN")
     fallback = sum(1 for r in rows if r["fallback_used"])
     http_errors = sum(1 for r in rows if r["status"] == "HTTP_ERROR")
+    # LLM 传输/解析失败会表现为 0 token + unknown；必须与模型主动拒答分开报。
+    llm_error_cases = sum(1 for r in scored if r.get("llm_input_tokens", 0) == 0)
     recalls = [r["evidence_recall"] for r in rows if r["evidence_recall"] is not None]
     precisions = [r["evidence_precision"] for r in rows if r["evidence_precision"] is not None]
 
@@ -449,6 +462,8 @@ def summarize(rows: list[dict], open_set: bool = False) -> dict:
         "wrong_confident_rate": round((len(answered) - answered_correct) / n, 4),
         "unknown_rate": round(unknown / n, 4),
         "fallback_rate": round(fallback / n, 4),
+        "llm_error_cases": llm_error_cases,
+        "llm_error_rate": round(llm_error_cases / n, 4),
         "evidence_precision_avg": round(sum(precisions) / len(precisions), 4) if precisions else None,
         "evidence_recall_avg": round(sum(recalls) / len(recalls), 4) if recalls else None,
         "tool_success_rate": round(successful_tools / total_tools, 4) if total_tools else None,
