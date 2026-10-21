@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -7,6 +8,8 @@ import httpx
 
 from app.llm.base import LLMProvider, Message
 from app.models import LLMResult
+
+logger = logging.getLogger("llm.openai")
 
 
 class OpenAICompatibleLLMProvider(LLMProvider):
@@ -51,6 +54,11 @@ class OpenAICompatibleLLMProvider(LLMProvider):
         endpoint = self.base_url if self.base_url.endswith("/chat/completions") else f"{self.base_url}/chat/completions"
         with httpx.Client(timeout=self.timeout_seconds) as client:
             resp = client.post(endpoint, json=payload, headers=headers)
+            if resp.status_code >= 400:
+                # 4xx 不重试（RetryLLMProvider 语义），但必须留下可诊断的响应体，
+                # 否则只能看到 "400 Bad Request" 而不知道是 schema/消息序列还是限流。
+                logger.warning("llm http error status=%s body=%s",
+                               resp.status_code, resp.text[:800])
             resp.raise_for_status()
             data = resp.json()
         choice = data["choices"][0]["message"]

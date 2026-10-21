@@ -161,6 +161,35 @@ class NativeToolCallingTest(unittest.TestCase):
         rag = next(e for e in result.evidence if e.source == "rag")
         self.assertEqual(rag.query, "redis pool")
 
+    def test_tool_calls_at_step_limit_still_get_tool_responses(self):
+        # OpenAI 协议要求每个 tool_call 都有 tool 响应；max_steps 截断时
+        # 未执行的调用也必须回一条 SKIPPED，否则下一次请求会 400。
+        recorder = RecordingTool(
+            "query_prometheus",
+            {"type": "object", "properties": {"query": {"type": "string"}},
+             "required": ["query"]},
+        )
+        llm = ScriptedLLM([
+            LLMResult("", tool_calls=[
+                _tool_call("query_prometheus", {"query": "q1"}, "call_1"),
+                _tool_call("query_prometheus", {"query": "q2"}, "call_2"),
+            ], input_tokens=1, output_tokens=1),
+            _final(),
+        ])
+        state = AgentState(incident_id=5, alert=ALERT)
+        state.plan = []
+
+        result = DiagnosticAgent(
+            llm, _registry_with(recorder), max_steps=1).run(state)
+
+        tool_messages = [m for m in state.llm_messages if m["role"] == "tool"]
+        by_id = {m["tool_call_id"]: m["content"] for m in tool_messages}
+        self.assertIn("call_1", by_id)
+        self.assertIn("call_2", by_id)
+        self.assertIn("SKIPPED", by_id["call_2"])
+        self.assertEqual(recorder.seen, [{"query": "q1"}])
+        self.assertEqual(result.root_cause, "slow_sql")
+
     def test_unknown_native_tool_is_reported_then_loop_continues(self):
         llm = ScriptedLLM([
             LLMResult("", tool_calls=[_tool_call("hack_tool", {})],

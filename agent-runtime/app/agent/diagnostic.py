@@ -369,14 +369,21 @@ class DiagnosticAgent:
             "tool_calls": result.tool_calls,
         })
         for tc in result.tool_calls:
-            if state.step >= self.max_steps:
-                break
             if not isinstance(tc, dict):
                 continue
             fn = tc.get("function") or {}
             name = fn.get("name") if isinstance(fn, dict) else None
             raw_args = fn.get("arguments") if isinstance(fn, dict) else None
             call_id = tc.get("id") or f"call_{state.step}"
+            if state.step >= self.max_steps:
+                # OpenAI 协议要求每个 tool_call 都有 tool 响应；否则下一次请求
+                # 会因消息序列非法被 400 拒绝（真实 LLM 评测已复现）。
+                state.llm_messages.append({
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "content": "SKIPPED: max_steps reached before executing this tool",
+                })
+                continue
             tool_name = self._normalize_tool_name(name)
             if tool_name is None:
                 state.llm_messages.append({
