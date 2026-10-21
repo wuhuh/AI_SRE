@@ -118,6 +118,13 @@ def _submit_diagnosis(incident_id: int, diagnosis) -> None:
     payload = {
         "rootCause": diagnosis.root_cause,
         "confidence": diagnosis.confidence,
+        # 与 consumer 路径保持同一契约：状态/原因/候选/降级/token 全部透出。
+        "status": diagnosis.status,
+        "reasonCode": diagnosis.reason_code,
+        "candidateRootCauses": diagnosis.candidate_root_causes,
+        "fallbackUsed": diagnosis.fallback_used,
+        "llmInputTokens": diagnosis.llm_input_tokens,
+        "llmOutputTokens": diagnosis.llm_output_tokens,
         "evidence": evidence,
         "recommendedActions": diagnosis.recommended_actions,
         "toolCalls": tool_calls,

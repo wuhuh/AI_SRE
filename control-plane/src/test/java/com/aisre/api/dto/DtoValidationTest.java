@@ -48,8 +48,12 @@ class DtoValidationTest {
 
     @Test
     void diagnosisRequestRequiresRootCause() {
-        assertFalse(validator.validate(new DiagnosisRequest(null, 0.5, null, null, null, null, null, null)).isEmpty());
-        assertTrue(validator.validate(new DiagnosisRequest("slow_sql", 0.5, null, null, null, 7L, "worker-a", 1)).isEmpty());
+        assertFalse(validator.validate(new DiagnosisRequest(
+                null, 0.5, null, null, null, null, null, null,
+                null, null, null, null, null, null)).isEmpty());
+        assertTrue(validator.validate(new DiagnosisRequest(
+                "slow_sql", 0.5, null, null, null, 7L, "worker-a", 1,
+                "ROOT_CAUSE_FOUND", null, null, false, 10, 5)).isEmpty());
     }
 
     @Test

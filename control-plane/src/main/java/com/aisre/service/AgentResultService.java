@@ -96,6 +96,15 @@ public class AgentResultService {
                 && request.rootCause() != null
                 && !request.rootCause().isBlank()
                 && !"unknown".equalsIgnoreCase(request.rootCause().trim());
+        // 文档 8.5/8.6：Agent 的 UNKNOWN/TIMEOUT 不能因为状态机没有对应节点
+        // 就被当成 ROOT_CAUSE_FOUND。状态单独落库，动作建议一律抑制。
+        String diagnosisStatus = normalizeDiagnosisStatus(
+                request.status(), rootCause, invalidRootLabel);
+        boolean suppressActions = invalidRootLabel
+                || !"ROOT_CAUSE_FOUND".equals(diagnosisStatus);
+        if (suppressActions) {
+            rootCause = "unknown";
+        }
         // P0-05: 幂等 —— 诊断结果只允许写入一次（DIAGNOSING → ROOT_CAUSE_FOUND）。
         // 重复回调（网络重试/多副本竞态/重放）直接返回现状，不再追加重复证据与审计。
         if (incident.getStatus().ordinal() >= IncidentStatus.ROOT_CAUSE_FOUND.ordinal()) {
@@ -107,10 +116,23 @@ public class AgentResultService {
         }
         transitionIfAllowed(incident, IncidentStatus.ROOT_CAUSE_FOUND);
         incident.setRootCause(rootCause);
-        incident.setConfidence(invalidRootLabel ? Double.valueOf(0.0) : request.confidence());
-        if (request.recommendedActions() != null && !invalidRootLabel) {
+        incident.setConfidence(suppressActions
+                ? Double.valueOf(Math.min(
+                        request.confidence() == null ? 0.0 : request.confidence(), 0.3))
+                : request.confidence());
+        // 重诊轮次必须覆盖上一轮建议：本轮 UNKNOWN 或没有建议时不能残留旧动作，
+        // 否则前端/审批会看到与当前结论不一致的修复方案。
+        incident.setRecommendedActions(null);
+        if (request.recommendedActions() != null && !suppressActions
+                && !request.recommendedActions().isEmpty()) {
             incident.setRecommendedActions(String.join(", ", request.recommendedActions()));
         }
+        incident.setDiagnosisStatus(diagnosisStatus);
+        incident.setReasonCode(blankToNull(request.reasonCode()));
+        incident.setCandidateRootCauses(joinCandidates(request.candidateRootCauses()));
+        incident.setFallbackUsed(request.fallbackUsed());
+        incident.setLlmInputTokens(request.llmInputTokens());
+        incident.setLlmOutputTokens(request.llmOutputTokens());
         incidentRepository.save(incident);
 
         if (request.evidence() != null) {
@@ -159,12 +181,24 @@ public class AgentResultService {
                 Instant.now()
         ));
 
-        if (invalidRootLabel) {
-            log.warn("incident {}: root label '{}' not in closed-set contract — stored as unknown, actions suppressed",
-                    incidentId, request.rootCause());
-            auditService.record(incidentId, "agent", "INVALID_ROOT_CAUSE_REJECTED",
-                    String.valueOf(request.rootCause()));
-            eventService.publish(incidentId, "DIAGNOSIS_SAVED", Map.of("rootCause", "unknown"));
+        if (suppressActions) {
+            String reason = blankToNull(request.reasonCode()) == null
+                    ? "" : request.reasonCode().trim();
+            if (invalidRootLabel) {
+                log.warn("incident {}: root label '{}' not in closed-set contract — stored as unknown, actions suppressed",
+                        incidentId, request.rootCause());
+                auditService.record(incidentId, "agent", "INVALID_ROOT_CAUSE_REJECTED",
+                        String.valueOf(request.rootCause()));
+            } else {
+                log.warn("incident {}: diagnosis status {} (reason={}) — stored as unknown, actions suppressed",
+                        incidentId, diagnosisStatus, reason);
+                auditService.record(incidentId, "agent", "DIAGNOSIS_UNKNOWN",
+                        diagnosisStatus + (reason.isEmpty() ? "" : ":" + reason));
+            }
+            eventService.publish(incidentId, "DIAGNOSIS_SAVED", Map.of(
+                    "rootCause", "unknown",
+                    "status", diagnosisStatus,
+                    "reasonCode", reason));
             return incident;
         }
 
@@ -198,9 +232,12 @@ public class AgentResultService {
             transitionIfAllowed(incident, IncidentStatus.WAITING_APPROVAL);
         }
 
-        log.info("diagnosis saved: incidentId={}, rootCause={}, taskId={}", incidentId, request.rootCause(), request.taskId());
-        auditService.record(incidentId, "agent", "DIAGNOSIS_SAVED", request.rootCause());
-        eventService.publish(incidentId, "DIAGNOSIS_SAVED", Map.of("rootCause", request.rootCause()));
+        log.info("diagnosis saved: incidentId={}, rootCause={}, status={}, taskId={}",
+                incidentId, rootCause, diagnosisStatus, request.taskId());
+        auditService.record(incidentId, "agent", "DIAGNOSIS_SAVED",
+                rootCause + " status=" + diagnosisStatus);
+        eventService.publish(incidentId, "DIAGNOSIS_SAVED", Map.of(
+                "rootCause", rootCause, "status", diagnosisStatus));
         return incident;
     }
 
@@ -407,6 +444,51 @@ public class AgentResultService {
         } else {
             action.run();
         }
+    }
+
+    /**
+     * 文档 8.5/8.6：诊断状态白名单。
+     * 未知状态 fail-closed 为 UNKNOWN——上游拼错状态不能让 UNKNOWN 冒充 ROOT_CAUSE_FOUND。
+     */
+    static String normalizeDiagnosisStatus(String raw, String normalizedRootCause,
+                                           boolean invalidRootLabel) {
+        String upper = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
+        if ("TIMEOUT".equals(upper)) {
+            return "TIMEOUT";
+        }
+        if ("UNKNOWN".equals(upper) || invalidRootLabel
+                || "unknown".equals(normalizedRootCause)) {
+            return "UNKNOWN";
+        }
+        if (upper.isEmpty() || "ROOT_CAUSE_FOUND".equals(upper)) {
+            return "ROOT_CAUSE_FOUND";
+        }
+        return "UNKNOWN";
+    }
+
+    /** 候选根因落库（最多 3 个，逗号分隔，截断到列宽）。 */
+    static String joinCandidates(List<String> candidates) {
+        if (candidates == null || candidates.isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String candidate : candidates) {
+            if (candidate == null || candidate.isBlank()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(',');
+            }
+            sb.append(candidate.trim());
+            if (sb.length() >= 1024) {
+                break;
+            }
+        }
+        return sb.length() == 0 ? null : sb.substring(0, Math.min(sb.length(), 1024));
+    }
+
+    static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     /**

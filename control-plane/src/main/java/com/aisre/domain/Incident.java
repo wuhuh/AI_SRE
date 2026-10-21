@@ -49,6 +49,23 @@ public class Incident {
 
     private Double confidence;
 
+    // Agent 诊断语义（V13）：状态与降级原因必须落库，不能只活在 Agent 进程内。
+    // UNKNOWN / TIMEOUT 不冒充 root cause，但 Incident 状态机仍保持兼容。
+    @Column(length = 32)
+    private String diagnosisStatus;
+
+    @Column(length = 64)
+    private String reasonCode;
+
+    @Column(length = 1024)
+    private String candidateRootCauses;
+
+    private Boolean fallbackUsed;
+
+    private Integer llmInputTokens;
+
+    private Integer llmOutputTokens;
+
     @Column(nullable = false)
     private Instant startedAt;
 
@@ -171,5 +188,53 @@ public class Incident {
 
     public void setDiagnosisRound(int diagnosisRound) {
         this.diagnosisRound = diagnosisRound;
+    }
+
+    public String getDiagnosisStatus() {
+        return diagnosisStatus;
+    }
+
+    public void setDiagnosisStatus(String diagnosisStatus) {
+        this.diagnosisStatus = diagnosisStatus;
+    }
+
+    public String getReasonCode() {
+        return reasonCode;
+    }
+
+    public void setReasonCode(String reasonCode) {
+        this.reasonCode = reasonCode;
+    }
+
+    public String getCandidateRootCauses() {
+        return candidateRootCauses;
+    }
+
+    public void setCandidateRootCauses(String candidateRootCauses) {
+        this.candidateRootCauses = candidateRootCauses;
+    }
+
+    public Boolean getFallbackUsed() {
+        return fallbackUsed;
+    }
+
+    public void setFallbackUsed(Boolean fallbackUsed) {
+        this.fallbackUsed = fallbackUsed;
+    }
+
+    public Integer getLlmInputTokens() {
+        return llmInputTokens;
+    }
+
+    public void setLlmInputTokens(Integer llmInputTokens) {
+        this.llmInputTokens = llmInputTokens;
+    }
+
+    public Integer getLlmOutputTokens() {
+        return llmOutputTokens;
+    }
+
+    public void setLlmOutputTokens(Integer llmOutputTokens) {
+        this.llmOutputTokens = llmOutputTokens;
     }
 }

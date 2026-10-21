@@ -16,7 +16,14 @@ public record IncidentResponse(
         Double confidence,
         Instant startedAt,
         Instant resolvedAt,
-        int alertCount
+        int alertCount,
+        String diagnosisStatus,
+        String reasonCode,
+        String candidateRootCauses,
+        Boolean fallbackUsed,
+        Integer llmInputTokens,
+        Integer llmOutputTokens,
+        int diagnosisRound
 ) {
     public static IncidentResponse from(Incident incident) {
         return new IncidentResponse(
@@ -30,7 +37,14 @@ public record IncidentResponse(
                 incident.getConfidence(),
                 incident.getStartedAt(),
                 incident.getResolvedAt(),
-                incident.getAlertCount()
+                incident.getAlertCount(),
+                incident.getDiagnosisStatus(),
+                incident.getReasonCode(),
+                incident.getCandidateRootCauses(),
+                incident.getFallbackUsed(),
+                incident.getLlmInputTokens(),
+                incident.getLlmOutputTokens(),
+                incident.getDiagnosisRound()
         );
     }
 }

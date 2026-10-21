@@ -66,6 +66,14 @@ def submit_diagnosis(cp_url: str, incident_id: int, diagnosis, task_id: int | No
     payload = {
         "rootCause": diagnosis.root_cause,
         "confidence": diagnosis.confidence,
+        # 文档 8.5/8.6：UNKNOWN/TIMEOUT 与降级原因必须随回调透出，
+        # 不能只在 Agent 进程内打日志；CP 侧据此抑制动作建议。
+        "status": diagnosis.status,
+        "reasonCode": diagnosis.reason_code,
+        "candidateRootCauses": diagnosis.candidate_root_causes,
+        "fallbackUsed": diagnosis.fallback_used,
+        "llmInputTokens": diagnosis.llm_input_tokens,
+        "llmOutputTokens": diagnosis.llm_output_tokens,
         "evidence": evidence,
         "recommendedActions": diagnosis.recommended_actions,
         "toolCalls": tool_calls,
