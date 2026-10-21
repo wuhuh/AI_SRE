@@ -24,6 +24,7 @@ from app.llm.openai_compatible import OpenAICompatibleLLMProvider
 from app.llm.retry import RetryLLMProvider
 from app.masking import mask_sensitive
 from app.models import AgentState
+from app.rag.embeddings import OpenAICompatibleEmbeddingProvider
 from app.rag.retriever import Document, HybridRetriever
 from app.tools.factory import create_default_registry
 
@@ -58,6 +59,26 @@ def _load_runbook_docs() -> list[Document]:
     return docs
 
 
+def _build_embedding_provider():
+    """EMBEDDING_PROVIDER=openai 时启用真实 embedding；默认保持确定性本地向量。"""
+    provider = os.getenv("EMBEDDING_PROVIDER", "").strip().lower()
+    if provider in ("openai", "openai-compatible"):
+        return OpenAICompatibleEmbeddingProvider()
+    return None
+
+
+_RETRIEVER: HybridRetriever | None = None
+
+
+def _get_retriever() -> HybridRetriever:
+    """进程内复用 retriever：真实 embedding 下避免每个请求重新嵌入全部 runbook。"""
+    global _RETRIEVER
+    if _RETRIEVER is None:
+        _RETRIEVER = HybridRetriever(
+            _load_runbook_docs(), embedding_provider=_build_embedding_provider())
+    return _RETRIEVER
+
+
 def _build_runner() -> AgentRunner:
     if os.getenv("LLM_PROVIDER", "mock") == "openai":
         # P1-AR-04: 重试边界——429 尊重 Retry-After（封顶），5xx 短退避，4xx 直接上抛
@@ -69,7 +90,7 @@ def _build_runner() -> AgentRunner:
     else:
         llm = MockLLMProvider()
     registry = create_default_registry()
-    retriever = HybridRetriever(_load_runbook_docs())
+    retriever = _get_retriever()
     checkpoint_store = FileCheckpointStore() if os.getenv("CHECKPOINT_DIR") else None
     # P0-03: 诊断预算/步数可用环境变量调（默认与原行为一致）
     try:

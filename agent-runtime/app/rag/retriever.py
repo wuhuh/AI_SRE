@@ -7,6 +7,7 @@ pgvector or an embedding API.
 """
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 from collections import Counter
@@ -32,10 +33,16 @@ def default_tokenize(text: str) -> list[str]:
 
 
 def default_embedding(text: str, dimensions: int = 256) -> list[float]:
+    """轻量确定性 bag-of-ngrams 向量（无外部依赖）。
+
+    使用 hashlib 而不是内置 hash()：后者受 PYTHONHASHSEED 影响，
+    跨进程/重启不一致——一旦向量落 pgvector 就会查不到。
+    """
     vec = [0.0] * dimensions
     tokens = default_tokenize(text)
     for i, token in enumerate(tokens):
-        idx = abs(hash(f"{token}:{i % 7}")) % dimensions
+        digest = hashlib.sha256(f"{token}:{i % 7}".encode("utf-8")).digest()
+        idx = int.from_bytes(digest[:8], "big") % dimensions
         vec[idx] += 1.0
     norm = math.sqrt(sum(v * v for v in vec)) or 1.0
     return [v / norm for v in vec]

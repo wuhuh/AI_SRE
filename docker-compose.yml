@@ -207,6 +207,11 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-deepseek-v4-flash}
       # 代理网关附加头（如 opencode zen 要求的 x-opencode-session）
       OPENAI_EXTRA_HEADERS: ${OPENAI_EXTRA_HEADERS:-}
+      # 真实 embedding（可选）：EMBEDDING_PROVIDER=openai 时启用 OpenAI-compatible /embeddings
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       AUTO_CONSUME: ${AUTO_CONSUME:-true}
       CONTROL_PLANE_URL: http://control-plane:8080
       AGENT_TOKEN: ${AISRE_AGENT_TOKEN:-local-dev-agent-token}
