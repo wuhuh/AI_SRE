@@ -108,12 +108,25 @@ from prometheus_client import make_asgi_app
 app.mount("/metrics", make_asgi_app())
 
 
+def _consumer_worker_count() -> int:
+    """有界并发：每个 worker 独立 runner，共享 CP 的原子 claim 防重复。"""
+    try:
+        configured = int(os.getenv("CONSUMER_WORKERS", "1"))
+    except ValueError:
+        configured = 1
+    return max(1, min(configured, 16))
+
+
 @app.on_event("startup")
 def start_consumer() -> None:
     if os.getenv("AUTO_CONSUME", "false") == "true":
         cp_url = _control_plane_url()
-        runner = _build_runner()
-        threading.Thread(target=consumer_loop, args=(runner, cp_url), daemon=True).start()
+        for index in range(_consumer_worker_count()):
+            # 每个线程独立 runner：checkpoint key / tool cache 不跨任务竞争；
+            # 任务是否重复执行由 CP 的 claim + fencing 决定。
+            runner = _build_runner()
+            threading.Thread(target=consumer_loop, args=(runner, cp_url),
+                             daemon=True, name=f"agent-consumer-{index}").start()
 
 
 def _control_plane_url() -> str:

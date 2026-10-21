@@ -201,9 +201,14 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
         DIAGNOSES_TOTAL, DIAGNOSIS_DURATION, TASKS_PENDING,
         VERIFICATIONS_TOTAL, VERIFICATION_DURATION,
     )
-    # 红线 18：aisre_tasks_pending 此前全仓库从未 .set()，恒为 0——
-    # Grafana「任务积压」面板是死的。轮询已经拿到了待认领清单，直接落这个数。
-    TASKS_PENDING.set(len(tasks))
+    # 红线 18：队列深度以 CP 的 DB 事实源为准。分页拉取后 len(tasks)
+    # 只是本批上限，不能代表真实积压量；count 查询失败时退回本批长度。
+    try:
+        count = _request_json("GET", f"{cp_url}/api/v1/tasks/pending/count",
+                              timeout=5, headers=agent_headers()) or {}
+        TASKS_PENDING.set(int(count.get("count", len(tasks))))
+    except Exception:
+        TASKS_PENDING.set(len(tasks))
     for task in tasks:
         incident_id = task.get("incidentId")
         task_id = task.get("id")

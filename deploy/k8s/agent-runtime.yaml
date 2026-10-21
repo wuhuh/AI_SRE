@@ -32,6 +32,9 @@ spec:
             # P1-MQ-02 生产消费路径：轮询 /tasks/pending + claim
             - name: AUTO_CONSUME
               value: "true"
+            # 有界并发消费者；claim/fencing 保证多 worker 不重复执行
+            - name: CONSUMER_WORKERS
+              value: "2"
             - name: PROMETHEUS_URL
               value: http://prometheus:9090
             - name: LOKI_URL

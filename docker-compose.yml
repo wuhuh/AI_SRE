@@ -213,6 +213,8 @@ services:
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       AUTO_CONSUME: ${AUTO_CONSUME:-true}
+      # 有界并发消费（1..16）；claim/fencing 保证多 worker 不重复执行
+      CONSUMER_WORKERS: ${CONSUMER_WORKERS:-1}
       CONTROL_PLANE_URL: http://control-plane:8080
       AGENT_TOKEN: ${AISRE_AGENT_TOKEN:-local-dev-agent-token}
       # P0-03/P0-07: 慢工具链路下放宽诊断预算；k8s 工具指向 tool-server
