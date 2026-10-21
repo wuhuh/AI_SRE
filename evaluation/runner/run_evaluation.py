@@ -35,6 +35,18 @@ AGENT_URL = os.getenv("AGENT_URL", "http://localhost:8081")
 # P0-03: fault_type 只作为 ground truth，绝不进入告警输入。
 # P3-EV-01: 每故障 ≥5 条中性表述 + 严重度扰动（按 case id 确定性选取）——
 # 单模板会让模型背稿而非判因。
+# 开放诊断的拒答用例：没有任何单一主导信号，正确行为是 unknown。
+UNKNOWN_PROFILE: dict[str, object] = {
+    "alertName": "InsufficientSignal",
+    "summaries": [
+        "{service} reports intermittent errors, but metrics, logs and traces show no single dominant signal",
+        "{service} latency is slightly elevated without a clear resource or dependency bottleneck",
+        "{service} has mixed symptoms across requests; no consistent failure mode is visible",
+        "{service} occasionally times out while CPU, memory, DB and cache all look healthy",
+        "{service} shows low-rate 5xx without a reproducible dependency or resource pattern",
+    ],
+}
+
 ALERT_PROFILES: dict[str, dict[str, object]] = {
     "redis_connection_pool_exhausted": {
         "alertName": "DependencyErrorsHigh",
@@ -149,9 +161,66 @@ def normalize_label(value: str | None) -> str:
     return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
 
 
+# 开放诊断不把候选标签给模型，但打分时允许把同义表达归一到 canonical label。
+# 这是「自由输出 -> 可比标签」的规范化，不是把答案注入 prompt。
+CANONICAL_LABELS = (
+    "cpu_saturation",
+    "database_connection_pool_exhausted",
+    "downstream_http_timeout",
+    "memory_leak",
+    "pod_crashloopbackoff",
+    "redis_connection_pool_exhausted",
+    "redis_slow_command",
+    "rocketmq_message_backlog",
+    "slow_sql",
+    "thread_pool_exhausted",
+)
+
+LABEL_SYNONYMS = {
+    "redis_pool_exhausted": "redis_connection_pool_exhausted",
+    "redis_connection_pool": "redis_connection_pool_exhausted",
+    "redis_exhausted": "redis_connection_pool_exhausted",
+    "db_pool_exhausted": "database_connection_pool_exhausted",
+    "database_pool_exhausted": "database_connection_pool_exhausted",
+    "database_connection_pool": "database_connection_pool_exhausted",
+    "slow_database_query": "slow_sql",
+    "database_slow_query": "slow_sql",
+    "sql_slow": "slow_sql",
+    "cpu": "cpu_saturation",
+    "high_cpu": "cpu_saturation",
+    "cpu_high": "cpu_saturation",
+    "memory_pressure": "memory_leak",
+    "oom": "memory_leak",
+    "crashloop": "pod_crashloopbackoff",
+    "crash_loop_backoff": "pod_crashloopbackoff",
+    "downstream_timeout": "downstream_http_timeout",
+    "http_timeout": "downstream_http_timeout",
+    "mq_backlog": "rocketmq_message_backlog",
+    "message_backlog": "rocketmq_message_backlog",
+    "thread_pool": "thread_pool_exhausted",
+    "thread_pool_saturation": "thread_pool_exhausted",
+}
+
+
+def canonicalize_label(value: str | None) -> str:
+    """把自由输出归一成 canonical label；未知/拒答保持 unknown。"""
+    label = normalize_label(value)
+    if not label:
+        return "unknown"
+    if label in CANONICAL_LABELS or label == "unknown":
+        return label
+    if label in LABEL_SYNONYMS:
+        return LABEL_SYNONYMS[label]
+    # 不做子串模糊匹配：宁可漏配，也不能把 "not_slow_sql" 之类映射成命中。
+    return label
+
+
 def build_alert(case: dict) -> dict:
     fault = case.get("fault_type", "")
-    profile = ALERT_PROFILES.get(fault)
+    if fault == "unknown":
+        profile = UNKNOWN_PROFILE
+    else:
+        profile = ALERT_PROFILES.get(fault)
     if profile is None:
         raise KeyError(f"no alert profile for fault_type={fault!r}")
     service = case.get("service", "payment-service")
@@ -173,6 +242,25 @@ def score(diagnosis: dict, expected_label: str) -> tuple[bool, bool]:
     if not candidates:
         candidates = [normalize_label(diagnosis.get("root_cause", ""))]
     expected = normalize_label(expected_label)
+    top1 = bool(candidates) and candidates[0] == expected
+    top3 = expected in candidates[:3]
+    return top1, top3
+
+
+def score_open(diagnosis: dict, expected_label: str) -> tuple[bool, bool]:
+    """开放诊断打分：先把自由输出 canonical 化，再与 ground truth 比对。
+
+    - expected=unknown 的拒答用例：预测 unknown 才算命中；
+    - 其余用例：unknown 一律视为未命中（不能靠拒答刷准确率）。
+    """
+    candidates = [canonicalize_label(c) for c in (diagnosis.get("candidate_root_causes") or [])]
+    if not candidates:
+        candidates = [canonicalize_label(diagnosis.get("root_cause", ""))]
+    expected = canonicalize_label(expected_label)
+    if expected == "unknown":
+        predicted = candidates[0] if candidates else "unknown"
+        aborted = predicted == "unknown"
+        return aborted, aborted
     top1 = bool(candidates) and candidates[0] == expected
     top3 = expected in candidates[:3]
     return top1, top3
@@ -236,11 +324,16 @@ def load_split_ids(splits_dir: Path, split: str) -> set[str] | None:
     return set(json.loads(path.read_text(encoding="utf-8")))
 
 
-def call_diagnose(case: dict, agent_url: str = AGENT_URL) -> tuple[dict, float]:
+def call_diagnose(case: dict, agent_url: str = AGENT_URL,
+                  open_set: bool = False) -> tuple[dict, float]:
     payload = {
         # P3-EV-02: hash() 受 PYTHONHASHSEED 影响（同 case 重跑 id 漂移）→ sha256 确定性
         "incident_id": _case_variant(case["id"], 100000),
         "alert": build_alert(case),
+        # 开放模式：Agent prompt 不提供候选标签
+        "open_set": open_set,
+        # 评测不回写 CP：开放 label 可能不在 CP 闭集契约内
+        "submit_result": False,
     }
     body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
@@ -254,17 +347,19 @@ def call_diagnose(case: dict, agent_url: str = AGENT_URL) -> tuple[dict, float]:
     return data, time.perf_counter() - start
 
 
-def evaluate(cases: list[dict], agent_url: str = AGENT_URL) -> list[dict]:
+def evaluate(cases: list[dict], agent_url: str = AGENT_URL,
+             open_set: bool = False) -> list[dict]:
     rows = []
     for case in cases:
         try:
-            data, latency = call_diagnose(case, agent_url)
+            data, latency = call_diagnose(case, agent_url, open_set=open_set)
         except Exception as e:  # noqa: BLE001 - 单个 case 失败不炸全局，记为 error row
             rows.append(
                 {
                     "case_id": case.get("id"),
                     "expected": case.get("fault_type"),
                     "predicted": "http_error",
+                    "predicted_canonical": "http_error",
                     "error": f"{type(e).__name__}: {e}",
                     "candidates": [],
                     "confidence": None,
@@ -283,14 +378,17 @@ def evaluate(cases: list[dict], agent_url: str = AGENT_URL) -> list[dict]:
             )
             continue
         diagnosis = data.get("diagnosis", {})
-        top1, top3 = score(diagnosis, case.get("fault_type", ""))
+        expected = case.get("fault_type", "")
+        top1, top3 = (score_open(diagnosis, expected) if open_set
+                      else score(diagnosis, expected))
         precision, recall = evidence_scores(diagnosis, case)
         tool_calls = diagnosis.get("tool_calls", []) or []
         rows.append(
             {
                 "case_id": case.get("id"),
-                "expected": case.get("fault_type"),
+                "expected": expected,
                 "predicted": diagnosis.get("root_cause", ""),
+                "predicted_canonical": canonicalize_label(diagnosis.get("root_cause", "")),
                 "candidates": diagnosis.get("candidate_root_causes", []),
                 "confidence": diagnosis.get("confidence"),
                 "status": diagnosis.get("status", ""),
@@ -309,7 +407,7 @@ def evaluate(cases: list[dict], agent_url: str = AGENT_URL) -> list[dict]:
     return rows
 
 
-def summarize(rows: list[dict]) -> dict:
+def summarize(rows: list[dict], open_set: bool = False) -> dict:
     n = len(rows)
     if n == 0:
         return {"total_cases": 0}
@@ -318,16 +416,37 @@ def summarize(rows: list[dict]) -> dict:
     p95 = latencies[max(0, int(len(scored) * 0.95) - 1)] if scored else 0.0
     total_tools = sum(r["tool_calls"] for r in scored)
     successful_tools = sum(r["tool_success"] for r in scored)
-    unknown = sum(1 for r in rows if normalize_label(r["predicted"]) == "unknown" or r["status"] == "UNKNOWN")
+
+    def predicted(r: dict) -> str:
+        return r.get("predicted_canonical") or canonicalize_label(r.get("predicted"))
+
+    unknown = sum(1 for r in rows if predicted(r) == "unknown" or r["status"] == "UNKNOWN")
     fallback = sum(1 for r in rows if r["fallback_used"])
     http_errors = sum(1 for r in rows if r["status"] == "HTTP_ERROR")
     recalls = [r["evidence_recall"] for r in rows if r["evidence_recall"] is not None]
     precisions = [r["evidence_precision"] for r in rows if r["evidence_precision"] is not None]
+
+    # 开放诊断指标：拒答/覆盖率/选择性准确率分开报，避免「靠 unknown 刷整体准确率」。
+    answered = [r for r in scored if predicted(r) != "unknown"
+                and r["status"] not in ("UNKNOWN", "TIMEOUT")]
+    known = [r for r in scored if canonicalize_label(r.get("expected")) != "unknown"]
+    unknown_cases = [r for r in scored if canonicalize_label(r.get("expected")) == "unknown"]
+    answered_correct = sum(1 for r in answered if r["top1"])
+    abstained = sum(1 for r in unknown_cases if predicted(r) == "unknown")
     return {
         "total_cases": n,
         "http_errors": http_errors,
         "root_cause_top1_accuracy": round(sum(1 for r in scored if r["top1"]) / n, 4) if scored else 0.0,
         "root_cause_top3_accuracy": round(sum(1 for r in scored if r["top3"]) / n, 4) if scored else 0.0,
+        "known_case_count": len(known),
+        "known_case_top1_accuracy": round(sum(1 for r in known if r["top1"]) / len(known), 4) if known else None,
+        "known_case_top3_accuracy": round(sum(1 for r in known if r["top3"]) / len(known), 4) if known else None,
+        "unknown_case_count": len(unknown_cases),
+        "unknown_case_abstention_accuracy": round(abstained / len(unknown_cases), 4) if unknown_cases else None,
+        "answered_cases": len(answered),
+        "coverage": round(len(answered) / n, 4),
+        "selective_top1_accuracy": round(answered_correct / len(answered), 4) if answered else 0.0,
+        "wrong_confident_rate": round((len(answered) - answered_correct) / n, 4),
         "unknown_rate": round(unknown / n, 4),
         "fallback_rate": round(fallback / n, 4),
         "evidence_precision_avg": round(sum(precisions) / len(precisions), 4) if precisions else None,
@@ -338,12 +457,16 @@ def summarize(rows: list[dict]) -> dict:
         "p95_diagnosis_time_s": round(p95, 3),
         "average_input_tokens": round(sum(r["llm_input_tokens"] for r in scored) / len(scored), 1) if scored else 0,
         "average_output_tokens": round(sum(r["llm_output_tokens"] for r in scored) / len(scored), 1) if scored else 0,
+        "mode": "open" if open_set else "closed",
     }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--splits", default="test", choices=["dev", "validation", "test", "all"])
+    parser.add_argument("--splits", default="test",
+                        choices=["dev", "validation", "test", "open_test", "all"])
+    parser.add_argument("--mode", default="closed", choices=["closed", "open"],
+                        help="closed=prompt 给候选标签；open=不提供标签，允许 unknown")
     parser.add_argument(
         "--provider", default=os.getenv("LLM_PROVIDER", "mock"), help="报告元数据：本次评测使用的 LLM provider"
     )
@@ -374,12 +497,17 @@ def main() -> int:
     if args.limit > 0:
         cases = cases[: args.limit]
 
-    rows = evaluate(cases, args.agent_url)
-    report = summarize(rows)
+    open_set = args.mode == "open"
+    rows = evaluate(cases, args.agent_url, open_set=open_set)
+    report = summarize(rows, open_set=open_set)
     report["provider"] = args.provider
     report["split"] = args.splits
     report["input_mode"] = "neutral_symptom_alerts (no fault_type leakage)"
-    report["scoring"] = "exact canonical label match; top3 = expected in candidates[:3]"
+    report["scoring"] = (
+        "open-set: free-form label canonicalized, unknown expected=abstention"
+        if open_set else
+        "closed-set: exact canonical label match; top3 = expected in candidates[:3]"
+    )
     if args.tag:
         report["tag"] = args.tag
 
@@ -387,7 +515,7 @@ def main() -> int:
     results_dir.mkdir(exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     suffix = f"_{args.tag}" if args.tag else ""
-    out = results_dir / f"eval_{stamp}_{args.splits}_{args.provider}{suffix}.json"
+    out = results_dir / f"eval_{stamp}_{args.splits}_{args.provider}_{args.mode}{suffix}.json"
     out.write_text(json.dumps({"report": report, "cases": rows}, indent=2, ensure_ascii=False), encoding="utf-8")
 
     print(json.dumps(report, indent=2, ensure_ascii=False))

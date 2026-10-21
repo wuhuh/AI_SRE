@@ -11,8 +11,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "runner"))
 from run_evaluation import (  # noqa: E402
     ALERT_PROFILES,
     build_alert,
+    canonicalize_label,
     evidence_scores,
     score,
+    score_open,
     summarize,
 )
 
@@ -44,6 +46,42 @@ class BuildAlertTest(unittest.TestCase):
     def test_unknown_fault_rejected_loudly(self):
         with self.assertRaises(KeyError):
             build_alert({"fault_type": "martian_invasion", "service": "x"})
+
+    def test_unknown_profile_is_neutral_and_dedicated(self):
+        alert = build_alert({"id": "unknown_001", "fault_type": "unknown",
+                             "service": "payment-service"})
+        text = f"{alert['alertName']} {alert['summary']}".lower()
+        self.assertNotIn("fault", text)
+        self.assertNotIn("unknown", text)
+
+
+class OpenSetScoringTest(unittest.TestCase):
+    def test_free_form_label_is_canonicalized(self):
+        self.assertEqual(canonicalize_label("Redis Pool Exhausted"),
+                         "redis_connection_pool_exhausted")
+        self.assertEqual(canonicalize_label("db_pool_exhausted"),
+                         "database_connection_pool_exhausted")
+        self.assertEqual(canonicalize_label("unknown"), "unknown")
+        self.assertEqual(canonicalize_label("network_policy_misconfiguration"),
+                         "network_policy_misconfiguration")
+
+    def test_open_score_matches_synonyms(self):
+        diagnosis = {
+            "root_cause": "Redis Pool Exhausted",
+            "candidate_root_causes": ["Redis Pool Exhausted"],
+        }
+        self.assertEqual(
+            score_open(diagnosis, "redis_connection_pool_exhausted"), (True, True))
+
+    def test_open_score_unknown_expected_requires_abstention(self):
+        abstain = {"root_cause": "unknown", "candidate_root_causes": ["unknown"]}
+        guess = {"root_cause": "slow_sql", "candidate_root_causes": ["slow_sql"]}
+        self.assertEqual(score_open(abstain, "unknown"), (True, True))
+        self.assertEqual(score_open(guess, "unknown"), (False, False))
+
+    def test_open_score_unknown_is_not_a_match_for_known_expected(self):
+        abstain = {"root_cause": "unknown", "candidate_root_causes": []}
+        self.assertEqual(score_open(abstain, "slow_sql"), (False, False))
 
 
 class ScoreTest(unittest.TestCase):
@@ -152,6 +190,43 @@ class SummarizeTest(unittest.TestCase):
         self.assertEqual(report["fallback_rate"], 0.5)
         self.assertEqual(report["evidence_recall_avg"], 1.0)
         self.assertEqual(report["tool_success_rate"], 1.0)
+
+    def test_open_set_metrics_separate_abstention_from_accuracy(self):
+        def row(expected, predicted, status, top1, top3):
+            return {
+                "expected": expected,
+                "predicted": predicted,
+                "predicted_canonical": predicted,
+                "top1": top1,
+                "top3": top3,
+                "status": status,
+                "fallback_used": status == "UNKNOWN",
+                "evidence_precision": None,
+                "evidence_recall": None,
+                "tool_calls": 0,
+                "tool_success": 0,
+                "llm_input_tokens": 0,
+                "llm_output_tokens": 0,
+                "latency_s": 1.0,
+            }
+
+        rows = [
+            row("slow_sql", "slow_sql", "ROOT_CAUSE_FOUND", True, True),
+            row("cpu_saturation", "memory_leak", "ROOT_CAUSE_FOUND", False, False),
+            row("unknown", "unknown", "UNKNOWN", True, True),
+            row("unknown", "slow_sql", "ROOT_CAUSE_FOUND", False, False),
+        ]
+        report = summarize(rows, open_set=True)
+
+        self.assertEqual(report["known_case_count"], 2)
+        self.assertEqual(report["known_case_top1_accuracy"], 0.5)
+        self.assertEqual(report["unknown_case_count"], 2)
+        self.assertEqual(report["unknown_case_abstention_accuracy"], 0.5)
+        self.assertEqual(report["answered_cases"], 3)
+        self.assertEqual(report["coverage"], 0.75)
+        self.assertEqual(report["selective_top1_accuracy"], 0.3333)
+        self.assertEqual(report["wrong_confident_rate"], 0.5)
+        self.assertEqual(report["mode"], "open")
 
 
 if __name__ == "__main__":

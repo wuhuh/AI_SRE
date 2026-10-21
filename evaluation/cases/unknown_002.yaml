@@ -1,0 +1,5 @@
+id: unknown_002
+fault_type: unknown
+service: order-service
+expected_root_cause: Insufficient evidence to identify a single root cause
+expected_evidence: []
