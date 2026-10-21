@@ -22,4 +22,14 @@ class RiskPolicyTest {
         assertEquals(RiskPolicy.RiskLevel.HIGH_RISK, RiskPolicy.classify("scale_deployment"));
         assertFalse(RiskPolicy.requiresApproval("clear_redis_cache"));
     }
+
+    @Test
+    void onlyCanonicalActionNamesEnterApprovalPipeline() {
+        assertTrue(RiskPolicy.isKnownAction("restart_pod"));
+        assertTrue(RiskPolicy.isKnownAction(" SCALE_DEPLOYMENT "));
+        // LLM 的整句建议不是动作名，不能生成 approval（E2E 中曾触发 varchar(128) 溢出）
+        assertFalse(RiskPolicy.isKnownAction(
+                "Please restart the payment service and inspect the Redis connection pool"));
+        assertFalse(RiskPolicy.isKnownAction(null));
+    }
 }

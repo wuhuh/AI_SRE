@@ -44,4 +44,14 @@ public final class RiskPolicy {
     public static boolean requiresApproval(String action) {
         return classify(action) == RiskLevel.HIGH_RISK;
     }
+
+    /**
+     * 只有策略表里的规范动作名才允许进入审批/执行链路。
+     * LLM 的 recommendedActions 是自由文本（可能是整句建议），不能直接当 action_type
+     * 落库——真实 E2E 已出现 varchar(128) 溢出把诊断回写打成 500。
+     * 未知文本仍可在 incident.recommendedActions 中展示，但不会生成审批单。
+     */
+    public static boolean isKnownAction(String action) {
+        return action != null && ACTION_RISK.containsKey(action.trim().toLowerCase());
+    }
 }

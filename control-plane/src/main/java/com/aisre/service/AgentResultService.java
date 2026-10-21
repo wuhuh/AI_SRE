@@ -205,6 +205,17 @@ public class AgentResultService {
         boolean hasHighRisk = false;
         if (request.recommendedActions() != null) {
             for (String action : request.recommendedActions()) {
+                // 仅规范动作名可以进入审批/执行链路；自由文本建议只保留在
+                // incident.recommendedActions，不创建 approval 行（避免超长 action_type）。
+                if (!RiskPolicy.isKnownAction(action)) {
+                    String shortAction = action == null ? "" : action.substring(
+                            0, Math.min(action.length(), 120));
+                    log.warn("incident {}: non-action recommendation ignored for approval: {}",
+                            incidentId, shortAction);
+                    auditService.record(incidentId, "agent",
+                            "UNKNOWN_RECOMMENDED_ACTION_IGNORED", shortAction);
+                    continue;
+                }
                 // P0-04: 审批携带真实参数（服务名驱动），不再写死 "{}"/"default"
                 String payload = buildActionPayload(action, incident.getService());
                 if (RiskPolicy.requiresApproval(action)) {
