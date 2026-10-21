@@ -112,7 +112,7 @@ def _submit_diagnosis(incident_id: int, diagnosis) -> None:
         "riskLevel": getattr(t, "risk_level", None) or "READ_ONLY",
         "resultSummary": mask_sensitive(t.result_summary or ""),
         "durationMs": t.duration_ms,
-        "error": t.error,
+        "error": mask_sensitive(t.error) if t.error else t.error,
         "createdAt": None,
     } for t in diagnosis.tool_calls]
     payload = {
@@ -146,13 +146,14 @@ def _submit_verification(incident_id: int, verification) -> None:
     evidence = [{
         "source": e.source,
         "key": e.key,
-        "content": e.content,
+        # 验证路径与诊断路径同一脱敏边界：证据出网前必须 mask。
+        "content": mask_sensitive(e.content or ""),
         "query": getattr(e, "query", None),
         "timeRange": getattr(e, "time_range", None),
     } for e in verification.evidence]
     payload = {
         "status": verification.status,
-        "detail": verification.detail,
+        "detail": mask_sensitive(verification.detail or ""),
         "evidence": evidence,
         "taskId": getattr(verification, "task_id", None),
     }

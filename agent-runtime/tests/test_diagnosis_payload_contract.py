@@ -9,8 +9,8 @@ import unittest
 from unittest.mock import patch
 
 from app.consumer import submit_diagnosis
-from app.main import _submit_diagnosis
-from app.models import DiagnosisResult, Evidence
+from app.main import _submit_diagnosis, _submit_verification
+from app.models import DiagnosisResult, Evidence, VerificationResult
 
 
 def _diagnosis() -> DiagnosisResult:
@@ -73,6 +73,26 @@ class DiagnosisPayloadContractTest(unittest.TestCase):
         self.assertTrue(captured["fallbackUsed"])
         self.assertEqual(captured["llmInputTokens"], 120)
         self.assertEqual(captured["llmOutputTokens"], 30)
+
+    def test_verification_payload_is_masked_before_leaving_process(self):
+        captured = {}
+
+        def fake_post(url, json=None, timeout=10, headers=None):
+            captured.update(json or {})
+            return type("R", (), {"status_code": 200})()
+
+        verification = VerificationResult(
+            status="UNKNOWN",
+            detail="api_key=sk-1234567890",
+            evidence=[Evidence(source="prom", key="sli",
+                               content="password=secret123 traceId=abc")],
+        )
+        with patch("app.main.httpx.post", fake_post):
+            _submit_verification(4, verification)
+
+        self.assertNotIn("sk-1234567890", captured["detail"])
+        self.assertNotIn("secret123", captured["evidence"][0]["content"])
+        self.assertIn("password=", captured["evidence"][0]["content"])
 
 
 if __name__ == "__main__":

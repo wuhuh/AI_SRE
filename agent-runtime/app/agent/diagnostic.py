@@ -7,6 +7,7 @@ import time
 from app.context import DATA_NOT_INSTRUCTIONS, build_context, wrap_evidence
 from app.llm.base import LLMProvider, Message
 from app.models import AgentState, DiagnosisResult, Evidence, LLMResult, ToolCall
+from app.tools.policy import escape_label_value
 from app.tools.registry import ToolRegistry
 
 logger = logging.getLogger("agent.diagnostic")
@@ -39,19 +40,22 @@ def normalize_label(value: str | None) -> str:
 # 注意：PromQL 自带花括号，不能用 str.format —— 用 f-string 构造函数。
 # 更多故障类别模板：评测重做(P0-03)后按 runbook 归类补充。
 def prom_error_query(service: str) -> str:
-    return f'rate(http_requests_total{{service="{service}",status=~"5.."}}[5m])'
+    safe = escape_label_value(service)
+    return f'rate(http_requests_total{{service="{safe}",status=~"5.."}}[5m])'
 
 
 def prom_latency_query(service: str) -> str:
+    safe = escape_label_value(service)
     return (
         'histogram_quantile(0.95, sum by (le) (rate('
-        f'http_request_duration_seconds_bucket{{service="{service}"}}[5m])))'
+        f'http_request_duration_seconds_bucket{{service="{safe}"}}[5m])))'
     )
 
 
 def prom_traffic_query(service: str) -> str:
     """总请求速率（验证阶段用它判断窗口内流量样本是否充足——文档 11.3）。"""
-    return f'sum(rate(http_requests_total{{service="{service}"}}[5m]))'
+    safe = escape_label_value(service)
+    return f'sum(rate(http_requests_total{{service="{safe}"}}[5m]))'
 
 
 def prom_query_for(alert: dict) -> str:

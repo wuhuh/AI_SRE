@@ -60,7 +60,7 @@ def submit_diagnosis(cp_url: str, incident_id: int, diagnosis, task_id: int | No
         "riskLevel": getattr(t, "risk_level", None) or "READ_ONLY",
         "resultSummary": mask_sensitive(t.result_summary or ""),
         "durationMs": t.duration_ms,
-        "error": t.error,
+        "error": mask_sensitive(t.error) if t.error else t.error,
         "createdAt": None,
     } for t in diagnosis.tool_calls]
     payload = {

@@ -30,7 +30,9 @@ ACTION_RISK = {
 def classify(action: str | None) -> RiskLevel:
     if not action:
         return RiskLevel.HIGH_RISK
-    return ACTION_RISK.get(action.strip().lower(), RiskLevel.LOW_RISK)
+    # fail-closed：策略表之外的未知动作一律走人工审批，不能默认 LOW_RISK。
+    # 与 Control Plane 的 RiskPolicy 保持同一语义。
+    return ACTION_RISK.get(action.strip().lower(), RiskLevel.HIGH_RISK)
 
 
 def requires_approval(action: str | None) -> bool:

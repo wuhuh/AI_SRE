@@ -7,7 +7,7 @@ import urllib.request
 from typing import Any
 
 from app.tools.base import Tool, ToolSpec
-from app.tools.policy import assert_namespace_allowed
+from app.tools.policy import assert_namespace_allowed, escape_label_value
 
 
 def _http_get_json(url: str, timeout: float = 3.0) -> dict[str, Any]:
@@ -70,11 +70,13 @@ class LogTool(Tool):
         self.base_url = (base_url or os.getenv("LOKI_URL", "http://localhost:3100")).rstrip("/")
 
     def execute(self, arguments: dict[str, Any], principal: str = "agent") -> str:
-        query = f'{{service="{arguments["service"]}"}}'
+        # 告警 label / LLM 参数都是外部输入，拼 LogQL 前必须转义。
+        safe_service = escape_label_value(arguments["service"])
+        query = f'{{service="{safe_service}"}}'
         if arguments.get("traceId"):
-            query += f' |= "{arguments["traceId"]}"'
+            query += f' |= "{escape_label_value(arguments["traceId"])}"'
         if arguments.get("keyword"):
-            query += f' |= "{arguments["keyword"]}"'
+            query += f' |= "{escape_label_value(arguments["keyword"])}"'
         params = {"query": query, "limit": arguments.get("limit", 100)}
         # P0-07: Loki API 不接受 "now-1h" 这类相对时间（400）——缺省即最近 1h，仅透传显式值
         if arguments.get("start") is not None:

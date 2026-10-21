@@ -14,8 +14,10 @@ class RiskPolicyTest(unittest.TestCase):
         self.assertFalse(requires_approval("disable_fault"))
         self.assertFalse(requires_approval("clear_redis_cache"))
 
-    def test_unknown_action_defaults_to_low_risk(self):
-        self.assertEqual(classify("some_new_action"), RiskLevel.LOW_RISK)
+    def test_unknown_action_fails_closed_to_high_risk(self):
+        # 与 CP 的 RiskPolicy 同语义：未知动作不能默认放行。
+        self.assertEqual(classify("some_new_action"), RiskLevel.HIGH_RISK)
+        self.assertTrue(requires_approval("some_new_action"))
 
     def test_none_is_treated_as_high_risk(self):
         self.assertTrue(requires_approval(None))
