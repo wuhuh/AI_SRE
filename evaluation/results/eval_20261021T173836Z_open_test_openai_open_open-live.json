@@ -32,7 +32,8 @@
     "scoring": "open-set: free-form label canonicalized, unknown expected=abstention",
     "tag": "open-live",
     "environment": "live WSL Docker compose stack: Prometheus/Loki/Jaeger/tool-server + 4 demo services; no fault injected",
-    "metric_notes": "This is a control run: all demo services were healthy, so known-case accuracy is expected to be near zero. tool_success_rate=0.974 and tool calls were real; the model abstained on healthy telemetry (unknown_rate=0.88). Use a fault-injected run for RCA capability."
+    "metric_notes": "This is a control run: all demo services were healthy, so known-case accuracy is expected to be near zero. tool_success_rate=0.974 and tool calls were real; the model abstained on healthy telemetry (unknown_rate=0.88). Use a fault-injected run for RCA capability.",
+    "agent_note": "This run used the agent before commit c94850b. 3/25 cases hit a max-step tool_call/tool_response pairing 400 from the LLM provider, fixed afterward; a post-fix 1-case smoke had 0 LLM errors and 9 successful steps."
   },
   "cases": [
     {
