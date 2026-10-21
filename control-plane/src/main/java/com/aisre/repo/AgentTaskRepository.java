@@ -4,6 +4,7 @@ import com.aisre.domain.AgentTask;
 import com.aisre.domain.AgentTaskStatus;
 import com.aisre.domain.MqStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -33,7 +34,12 @@ public interface AgentTaskRepository extends JpaRepository<AgentTask, Long> {
     @Query("SELECT t FROM AgentTask t WHERE t.status = com.aisre.domain.AgentTaskStatus.QUEUED "
             + "AND (t.notBefore IS NULL OR t.notBefore <= :now) "
             + "ORDER BY t.createdAt ASC")
-    List<AgentTask> findClaimableQueued(@Param("now") Instant now);
+    List<AgentTask> findClaimableQueued(@Param("now") Instant now, Pageable pageable);
+
+    /** 队列深度以 DB 为事实源；分页拉取后仍能报告真实积压量。 */
+    @Query("SELECT count(t) FROM AgentTask t WHERE t.status = com.aisre.domain.AgentTaskStatus.QUEUED "
+            + "AND (t.notBefore IS NULL OR t.notBefore <= :now)")
+    long countClaimableQueued(@Param("now") Instant now);
 
     /**
      * 文档 6.7 fencing：锁住任务行用于「校验身份+世代 → 落结果」的原子衔接。

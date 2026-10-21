@@ -4,6 +4,10 @@ import com.aisre.domain.Incident;
 import com.aisre.domain.IncidentStatus;
 import com.aisre.repo.IncidentRepository;
 import com.aisre.state.IncidentStateMachine;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,12 +30,20 @@ public class IncidentService {
         this.eventService = eventService;
     }
 
-    public List<Incident> list(IncidentStatus status) {
-        if (status == null) {
-            // P2-CP-20: 派生查询替代 findAll + 内存排序
-            return incidentRepository.findAllByOrderByStartedAtDesc();
-        }
-        return incidentRepository.findByStatusOrderByStartedAtDesc(status);
+    /**
+     * 分页列表：排序下推到 DB，避免应用层全表扫描。
+     * page/size 由控制器做边界收敛（page>=0，1<=size<=500）。
+     */
+    public IncidentPage list(IncidentStatus status, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size,
+                Sort.by(Sort.Direction.DESC, "startedAt"));
+        Page<Incident> result = status == null
+                ? incidentRepository.findAll(pageable)
+                : incidentRepository.findByStatus(status, pageable);
+        return new IncidentPage(result.getContent(), result.getTotalElements(), page, size);
+    }
+
+    public record IncidentPage(List<Incident> items, long total, int page, int size) {
     }
 
     public Incident get(Long id) {

@@ -4,6 +4,7 @@ import com.aisre.domain.AgentTask;
 import com.aisre.repo.AgentTaskRepository;
 import com.aisre.service.AgentTaskService;
 import com.aisre.service.AgentTaskService.FencingRejectedException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
@@ -35,8 +37,18 @@ public class AgentTaskController {
      * 重诊任务带退避时间，未到期不派发。
      */
     @GetMapping("/pending")
-    public List<AgentTask> pending() {
-        return agentTaskRepository.findClaimableQueued(Instant.now());
+    public List<AgentTask> pending(@RequestParam(defaultValue = "50") int limit) {
+        // 有界批量：积压时不让一次轮询把整张任务表拉回 Agent；
+        // claim 仍是原子抢占，多副本并发领取不会重复执行。
+        int safeLimit = Math.min(Math.max(1, limit), 500);
+        return agentTaskRepository.findClaimableQueued(
+                Instant.now(), PageRequest.of(0, safeLimit));
+    }
+
+    /** 队列深度（DB 事实源），供 Agent 的 aisre_tasks_pending 指标使用。 */
+    @GetMapping("/pending/count")
+    public Map<String, Long> pendingCount() {
+        return Map.of("count", agentTaskRepository.countClaimableQueued(Instant.now()));
     }
 
     /**

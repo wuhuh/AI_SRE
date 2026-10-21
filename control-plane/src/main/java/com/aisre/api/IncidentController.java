@@ -17,6 +17,7 @@ import com.aisre.service.AgentTaskService;
 import com.aisre.service.IncidentDetailService;
 import com.aisre.service.IncidentReportService;
 import com.aisre.service.IncidentService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,9 +50,26 @@ public class IncidentController {
         this.incidentReportService = incidentReportService;
     }
 
+    /**
+     * 分页列表：保持响应体仍是数组（兼容现有前端/集成测试），
+     * 分页元数据走响应头：X-Total-Count / X-Page / X-Page-Size。
+     * page>=0，size 收敛到 [1, 500]。
+     */
     @GetMapping
-    public List<IncidentResponse> list(@RequestParam(required = false) IncidentStatus status) {
-        return incidentService.list(status).stream().map(IncidentResponse::from).toList();
+    public ResponseEntity<List<IncidentResponse>> list(
+            @RequestParam(required = false) IncidentStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "200") int size) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 500);
+        IncidentService.IncidentPage result = incidentService.list(status, safePage, safeSize);
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Total-Count", String.valueOf(result.total()));
+        headers.add("X-Page", String.valueOf(result.page()));
+        headers.add("X-Page-Size", String.valueOf(result.size()));
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(result.items().stream().map(IncidentResponse::from).toList());
     }
 
     @GetMapping("/{id}")
