@@ -196,7 +196,11 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
             try:
                 import time as _time
                 _t0 = _time.monotonic()
-                result = runner.run_diagnosis(incident_id, alert)
+                # 每次任务一个 checkpoint key：重诊（新 task/round）绝不能复用
+                # 上一轮已完成的 diagnosis，否则自动重诊环会原地返回旧结论。
+                result = runner.run_diagnosis(
+                    incident_id, alert,
+                    run_key=f"task-{task_id}" if task_id is not None else None)
                 DIAGNOSIS_DURATION.observe(_time.monotonic() - _t0)
                 DIAGNOSES_TOTAL.labels(status=result.diagnosis.status).inc()
                 submit_diagnosis(cp_url, incident_id, result.diagnosis, task_id=task_id,

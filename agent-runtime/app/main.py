@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import threading
+import uuid
 
 # uvicorn 只配自己的 logger，root 仍是 WARNING——诊断关键路径的 INFO 会丢
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"),
@@ -32,6 +33,9 @@ app = FastAPI(title="AI SRE Agent Runtime", version="0.1.0")
 class DiagnoseRequest(BaseModel):
     incident_id: int
     alert: dict[str, Any]
+    # 可选：带任务 id 时复用该任务的 checkpoint（崩溃续跑）；
+    # 不带时按每次请求生成唯一 manual key，避免手动重跑读到上一次结果。
+    task_id: int | None = None
 
 
 class VerifyRequest(BaseModel):
@@ -164,7 +168,9 @@ def health() -> dict[str, str]:
 @app.post("/api/v1/agent/diagnose")
 def diagnose(req: DiagnoseRequest) -> dict[str, Any]:
     runner = _build_runner()
-    result = runner.run_diagnosis(req.incident_id, req.alert)
+    run_key = (f"task-{req.task_id}" if req.task_id is not None
+               else f"manual-{uuid.uuid4().hex}")
+    result = runner.run_diagnosis(req.incident_id, req.alert, run_key=run_key)
     threading.Thread(target=_submit_diagnosis, args=(req.incident_id, result.diagnosis), daemon=True).start()
     return {
         "incident_id": req.incident_id,

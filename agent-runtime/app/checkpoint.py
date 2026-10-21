@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 from app.models import AgentState, Evidence, ToolCall
@@ -42,31 +43,41 @@ def _state_from_dict(data: dict) -> AgentState:
         error=data.get("error"),
         llm_input_tokens=data.get("llm_input_tokens", 0),
         llm_output_tokens=data.get("llm_output_tokens", 0),
+        llm_messages=data.get("llm_messages", []),
     )
 
 
 class CheckpointStore:
-    def save(self, incident_id: int, state: AgentState) -> None:
+    # key 可以是 incident_id，也可以是 task-/round- 级别的隔离键：
+    # 同一 incident 的多轮诊断必须使用不同 key，否则第二轮会直接读到第一轮结果。
+    def save(self, key: int | str, state: AgentState) -> None:
         raise NotImplementedError
 
-    def load(self, incident_id: int) -> AgentState | None:
+    def load(self, key: int | str) -> AgentState | None:
         raise NotImplementedError
 
 
 class FileCheckpointStore(CheckpointStore):
+    _SAFE_KEY = re.compile(r"[^A-Za-z0-9_.-]")
+
     def __init__(self, base_dir: str | os.PathLike[str] | None = None):
         self.base_dir = Path(base_dir or os.getenv("CHECKPOINT_DIR", "checkpoints"))
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
-    def save(self, incident_id: int, state: AgentState) -> None:
+    def _path(self, key: int | str) -> Path:
+        # Windows 文件名不能含 ':'，task/round 组合键统一转义；普通 incident_id 保持原名。
+        safe = self._SAFE_KEY.sub("_", str(key))
+        return self.base_dir / f"{safe}.json"
+
+    def save(self, key: int | str, state: AgentState) -> None:
         # P0-09: tmp + os.replace 原子写 —— 崩溃不会留下半截 JSON
-        path = self.base_dir / f"{incident_id}.json"
+        path = self._path(key)
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(state.to_dict(), ensure_ascii=False), encoding="utf-8")
         os.replace(tmp, path)
 
-    def load(self, incident_id: int) -> AgentState | None:
-        path = self.base_dir / f"{incident_id}.json"
+    def load(self, key: int | str) -> AgentState | None:
+        path = self._path(key)
         if not path.exists():
             return None
         try:

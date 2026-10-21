@@ -28,16 +28,25 @@ class AgentRunner:
                                           max_steps=max_steps, max_duration_seconds=max_duration_seconds)
         self.verification = VerificationAgent(llm, registry)
         self.checkpoint_store = checkpoint_store
+        # 当前这次诊断的 checkpoint key（task-/manual- 级别）。
+        # 同一 incident 的重诊必须换 key，否则第二轮会读到第一轮已完成结果。
+        self._checkpoint_key: str | None = None
         if checkpoint_store:
             # P0-09: 每步落盘 —— 崩溃后可从最近一步续跑
-            self.diagnostic.on_step = lambda s: checkpoint_store.save(s.incident_id, s)
+            self.diagnostic.on_step = lambda s: checkpoint_store.save(
+                self._checkpoint_key or s.incident_id, s)
 
-    def run_diagnosis(self, incident_id: int, alert: dict) -> AgentRunResult:
+    def run_diagnosis(self, incident_id: int, alert: dict,
+                      run_key: str | None = None) -> AgentRunResult:
         start = time.perf_counter()
         resumed = False
         state = None
+        # 未显式给 key 时保持旧行为（incident_id），兼容既有调用与测试；
+        # consumer 必须传 task-<id>，手动入口传每次唯一的 manual-<uuid>。
+        checkpoint_key = run_key or str(incident_id)
+        self._checkpoint_key = checkpoint_key
         if self.checkpoint_store:
-            saved = self.checkpoint_store.load(incident_id)
+            saved = self.checkpoint_store.load(checkpoint_key)
             if saved is not None:
                 if saved.diagnosis is not None:
                     # P0-09: 已完成的诊断直接返回 —— 幂等，不再重复消耗 LLM
@@ -56,7 +65,7 @@ class AgentRunner:
         diagnosis = self.diagnostic.run(state)
         state.status = "DIAGNOSIS_COMPLETE"
         if self.checkpoint_store:
-            self.checkpoint_store.save(incident_id, state)
+            self.checkpoint_store.save(checkpoint_key, state)
         duration_ms = int((time.perf_counter() - start) * 1000)
         return AgentRunResult(state=state, diagnosis=diagnosis, verification=None,
                               duration_ms=duration_ms, resumed=resumed)
@@ -65,6 +74,6 @@ class AgentRunner:
         start = time.perf_counter()
         verification = self.verification.run(state)
         if self.checkpoint_store:
-            self.checkpoint_store.save(state.incident_id, state)
+            self.checkpoint_store.save(self._checkpoint_key or state.incident_id, state)
         duration_ms = int((time.perf_counter() - start) * 1000)
         return AgentRunResult(state=state, diagnosis=state.diagnosis, verification=verification, duration_ms=duration_ms)

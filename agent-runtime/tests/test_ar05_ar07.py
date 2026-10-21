@@ -13,7 +13,7 @@ class _StubRunner:
     def __init__(self, diagnosis):
         self.diagnosis = diagnosis
 
-    def run_diagnosis(self, incident_id, alert):
+    def run_diagnosis(self, incident_id, alert, run_key=None):
         return type("R", (), {"diagnosis": self.diagnosis})()
 
 
