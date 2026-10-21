@@ -161,6 +161,21 @@ class NativeToolCallingTest(unittest.TestCase):
         rag = next(e for e in result.evidence if e.source == "rag")
         self.assertEqual(rag.query, "redis pool")
 
+    def test_malformed_json_salvages_root_cause(self):
+        # DeepSeek 偶发在 evidence 字符串里输出未转义引号；整段 JSON 解析失败，
+        # 但 rootCause/alternatives 完整时不应直接降级为 unknown。
+        raw = ('{"rootCause": "slow_sql", "alternatives": ["cpu_saturation"], '
+               '"evidence": ["bad "quote""], "recommendedActions": []}')
+        llm = ScriptedLLM([LLMResult(raw)])
+        state = AgentState(incident_id=6, alert=ALERT)
+        state.plan = []
+
+        result = DiagnosticAgent(llm, ToolRegistry()).run(state)
+
+        self.assertEqual(result.root_cause, "slow_sql")
+        self.assertEqual(result.status, "ROOT_CAUSE_FOUND")
+        self.assertIn("cpu_saturation", result.candidate_root_causes)
+
     def test_tool_calls_at_step_limit_still_get_tool_responses(self):
         # OpenAI 协议要求每个 tool_call 都有 tool 响应；max_steps 截断时
         # 未执行的调用也必须回一条 SKIPPED，否则下一次请求会 400。

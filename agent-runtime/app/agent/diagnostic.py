@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 
 from app.context import DATA_NOT_INSTRUCTIONS, build_context, wrap_evidence
@@ -302,23 +303,53 @@ class DiagnosticAgent:
             }))
 
     def _parse_decision(self, state: AgentState, result: LLMResult) -> dict:
+        raw = result.content or ""
         try:
-            decision = json.loads(result.content)
+            decision = json.loads(raw)
             if not isinstance(decision, dict):
                 raise ValueError("decision must be a JSON object")
             # P0-07 排障：决策结果必须可见（LLM 回了什么、是否走降级）
             logger.info("llm decision: incident=%s root=%s nextTool=%s raw=%s",
                         state.incident_id, decision.get("rootCause"),
-                        decision.get("nextTool"), result.content[:800])
+                        decision.get("nextTool"), raw[:800])
             return decision
         except Exception as exc:
-            logger.warning("llm decision parse failed: incident=%s error=%s", state.incident_id, exc)
+            salvaged = self._salvage_decision(raw)
+            if salvaged is not None:
+                logger.warning("llm decision salvaged: incident=%s error=%s root=%s",
+                               state.incident_id, exc, salvaged.get("rootCause"))
+                return salvaged
+            logger.warning("llm decision parse failed: incident=%s error=%s raw=%s",
+                           state.incident_id, exc, raw[:500])
             return {
                 "rootCause": "unknown",
                 "confidence": 0.0,
                 "evidence": [],
                 "recommendedActions": [],
             }
+
+    @staticmethod
+    def _salvage_decision(raw: str) -> dict | None:
+        """从截断/非法 JSON 中抢救 rootCause 和 alternatives。
+
+        DeepSeek 偶发在 evidence 字符串里输出未转义引号，整段 JSON 解析失败；
+        但 rootCause 通常在前面且完整。丢掉损坏的 evidence 也比重诊直接降级为
+        unknown 更有价值；evidence 仍由工具结果保留在 AgentState 里。
+        """
+        match = re.search(r'"rootCause"\s*:\s*"([^"]+)"', raw)
+        if not match:
+            return None
+        alternatives: list[str] = []
+        alt_match = re.search(r'"alternatives"\s*:\s*\[(.*?)\]', raw, re.S)
+        if alt_match:
+            alternatives = re.findall(r'"([^"]+)"', alt_match.group(1))
+        return {
+            "rootCause": match.group(1),
+            "alternatives": alternatives[:2],
+            "confidence": 0.3,
+            "evidence": [],
+            "recommendedActions": [],
+        }
 
     def _remember_assistant_message(self, state: AgentState, result: LLMResult) -> None:
         if state.llm_messages:
