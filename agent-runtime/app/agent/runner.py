@@ -22,10 +22,12 @@ class AgentRunResult:
 
 class AgentRunner:
     def __init__(self, llm: LLMProvider, registry: ToolRegistry, retriever=None, checkpoint_store=None,
-                 max_steps: int = MAX_STEPS, max_duration_seconds: float = 15.0):
+                 max_steps: int = MAX_STEPS, max_duration_seconds: float = 15.0,
+                 open_set: bool = False):
         # P0-03: 预算可调 —— 慢 LLM/慢工具下默认 15s 会把大部分诊断打成超时降级
         self.diagnostic = DiagnosticAgent(llm, registry, retriever,
-                                          max_steps=max_steps, max_duration_seconds=max_duration_seconds)
+                                          max_steps=max_steps, max_duration_seconds=max_duration_seconds,
+                                          open_set=open_set)
         self.verification = VerificationAgent(llm, registry)
         self.checkpoint_store = checkpoint_store
         # 当前这次诊断的 checkpoint key（task-/manual- 级别）。

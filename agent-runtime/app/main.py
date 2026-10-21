@@ -37,6 +37,10 @@ class DiagnoseRequest(BaseModel):
     # 可选：带任务 id 时复用该任务的 checkpoint（崩溃续跑）；
     # 不带时按每次请求生成唯一 manual key，避免手动重跑读到上一次结果。
     task_id: int | None = None
+    # 开放诊断评测：prompt 不提供候选标签；生产默认 false，保持 CP 闭集契约。
+    open_set: bool = False
+    # 评测/压测默认不应把结果回写 CP（开放 label 会被闭集契约拒绝）。
+    submit_result: bool = True
 
 
 class VerifyRequest(BaseModel):
@@ -79,7 +83,7 @@ def _get_retriever() -> HybridRetriever:
     return _RETRIEVER
 
 
-def _build_runner() -> AgentRunner:
+def _build_runner(open_set: bool = False) -> AgentRunner:
     if os.getenv("LLM_PROVIDER", "mock") == "openai":
         # P1-AR-04: 重试边界——429 尊重 Retry-After（封顶），5xx 短退避，4xx 直接上抛
         llm = RetryLLMProvider(
@@ -99,7 +103,7 @@ def _build_runner() -> AgentRunner:
     except ValueError:
         budget, max_steps = 15.0, 12
     return AgentRunner(llm=llm, registry=registry, retriever=retriever, checkpoint_store=checkpoint_store,
-                       max_steps=max_steps, max_duration_seconds=budget)
+                       max_steps=max_steps, max_duration_seconds=budget, open_set=open_set)
 
 
 # P2-FI-08: 平台自监控（同端口挂载 /metrics，无需新开管理端口）
@@ -209,11 +213,13 @@ def health() -> dict[str, str]:
 
 @app.post("/api/v1/agent/diagnose")
 def diagnose(req: DiagnoseRequest) -> dict[str, Any]:
-    runner = _build_runner()
+    runner = _build_runner(open_set=req.open_set)
     run_key = (f"task-{req.task_id}" if req.task_id is not None
                else f"manual-{uuid.uuid4().hex}")
     result = runner.run_diagnosis(req.incident_id, req.alert, run_key=run_key)
-    threading.Thread(target=_submit_diagnosis, args=(req.incident_id, result.diagnosis), daemon=True).start()
+    if req.submit_result:
+        threading.Thread(target=_submit_diagnosis, args=(req.incident_id, result.diagnosis),
+                         daemon=True).start()
     return {
         "incident_id": req.incident_id,
         "diagnosis": asdict(result.diagnosis),

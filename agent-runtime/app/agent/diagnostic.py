@@ -69,12 +69,16 @@ def prom_query_for(alert: dict) -> str:
 
 class DiagnosticAgent:
     def __init__(self, llm: LLMProvider, registry: ToolRegistry, retriever=None,
-                 max_steps: int = MAX_STEPS, max_duration_seconds: float = 15.0):
+                 max_steps: int = MAX_STEPS, max_duration_seconds: float = 15.0,
+                 open_set: bool = False):
         self.llm = llm
         self.registry = registry
         self.retriever = retriever
         self.max_steps = max_steps
         self.max_duration_seconds = max_duration_seconds
+        # 开放诊断：prompt 不提供候选标签，模型自由输出 label 或 unknown。
+        # 生产默认 closed（CP 的 RcaLabels 契约）；评测可显式开启。
+        self.open_set = open_set
         # P0-09: runner 注入的每步回调（落 checkpoint）；诊断循环每执行一步调用一次
         self.on_step = None
 
@@ -237,6 +241,17 @@ class DiagnosticAgent:
         return ", ".join(s["function"]["name"] for s in self._tool_specs())
 
     def _diagnosis_instruction(self) -> str:
+        if self.open_set:
+            # 开放诊断：不泄漏候选标签空间。模型必须自己生成 label 或拒绝。
+            return (
+                "Based on the collected evidence, either return a final diagnosis JSON "
+                '({"rootCause": "<label>", "alternatives": ["<label>", "<label>"], '
+                '"confidence": 0.0, "evidence": [], "recommendedActions": []}) '
+                'or request one more tool ({"nextTool": "tool_name"}). Do not explain.\n'
+                "rootCause must be a concise snake_case label describing the most likely "
+                "root cause, or 'unknown' if the evidence is insufficient to decide.\n"
+                '"alternatives" lists up to 2 other plausible labels (may be empty).'
+            )
         labels = ", ".join(RCA_CANDIDATE_LABELS)
         return (
             "Based on the collected evidence, either return a final diagnosis JSON "
@@ -468,7 +483,12 @@ class DiagnosticAgent:
         # 走与 unknown 相同的降级路径（文档 8.5：同时清理没有依据的动作建议）。
         normalized_root = normalize_label(root_cause)
         valid_labels = {normalize_label(x) for x in RCA_CANDIDATE_LABELS}
-        invalid_label = not timed_out and normalized_root != "unknown" and normalized_root not in valid_labels
+        # 开放诊断不校验闭集：模型可以输出训练集之外的合理 label。
+        invalid_label = (not self.open_set and not timed_out
+                         and normalized_root != "unknown"
+                         and normalized_root not in valid_labels)
+        if self.open_set and not normalized_root:
+            root_cause = "unknown"
         if invalid_label:
             logger.warning("model returned non-contract root label %r — treating as unknown", root_cause)
             root_cause = "unknown"
