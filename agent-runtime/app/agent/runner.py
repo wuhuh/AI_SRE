@@ -70,10 +70,14 @@ class AgentRunner:
         return AgentRunResult(state=state, diagnosis=diagnosis, verification=None,
                               duration_ms=duration_ms, resumed=resumed)
 
-    def run_verification(self, state: AgentState) -> AgentRunResult:
+    def run_verification(self, state: AgentState,
+                         run_key: str | None = None) -> AgentRunResult:
         start = time.perf_counter()
+        # 验证任务也按 task key 落盘；没有 key 时退回 incident_id，
+        # 避免复用上一个诊断任务的 _checkpoint_key。
+        self._checkpoint_key = run_key or str(state.incident_id)
         verification = self.verification.run(state)
         if self.checkpoint_store:
-            self.checkpoint_store.save(self._checkpoint_key or state.incident_id, state)
+            self.checkpoint_store.save(self._checkpoint_key, state)
         duration_ms = int((time.perf_counter() - start) * 1000)
         return AgentRunResult(state=state, diagnosis=state.diagnosis, verification=verification, duration_ms=duration_ms)

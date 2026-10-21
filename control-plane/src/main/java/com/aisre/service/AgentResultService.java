@@ -301,7 +301,7 @@ public class AgentResultService {
         }
 
         agentStepRepository.save(new AgentStep(
-                0L,
+                request.taskId() == null ? 0L : request.taskId(),
                 incidentId,
                 2,
                 "VERIFICATION",

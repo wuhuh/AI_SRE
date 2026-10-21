@@ -10,4 +10,11 @@ DIAGNOSIS_DURATION = Histogram(
 DIAGNOSES_TOTAL = Counter(
     "aisre_diagnoses_total", "诊断完成计数", ["status"]
 )
+VERIFICATION_DURATION = Histogram(
+    "aisre_verification_duration_seconds", "恢复验证耗时（含观察窗）",
+    buckets=(1, 5, 10, 30, 60, 90, 120, 180, 300),
+)
+VERIFICATIONS_TOTAL = Counter(
+    "aisre_verifications_total", "恢复验证完成计数", ["status"]
+)
 TASKS_PENDING = Gauge("aisre_tasks_pending", "待认领任务数")

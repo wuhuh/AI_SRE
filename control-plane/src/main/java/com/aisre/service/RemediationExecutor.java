@@ -34,7 +34,7 @@ public class RemediationExecutor {
     private final AuditService auditService;
     private final String toolServerUrl;
     private final String approvalToken;
-    private final String agentRuntimeUrl;
+    private final AgentTaskService agentTaskService;
     private final HttpClient httpClient = HttpClient.newBuilder()
             // 默认 HTTP_2 会对 uvicorn 发 h2c 升级，POST body 被丢弃（422 body null）——锁 1.1
             .version(HttpClient.Version.HTTP_1_1)
@@ -46,13 +46,13 @@ public class RemediationExecutor {
                                AuditService auditService,
                                @Value("${aisre.tool-server.url:http://tool-server:8081}") String toolServerUrl,
                                @Value("${AISRE_TOOL_SERVER_TOKEN:local-dev-token}") String approvalToken,
-                               @Value("${aisre.agent-runtime.url:http://agent-runtime:8080}") String agentRuntimeUrl) {
+                               AgentTaskService agentTaskService) {
         this.remediationActionRepository = remediationActionRepository;
         this.incidentRepository = incidentRepository;
         this.auditService = auditService;
         this.toolServerUrl = toolServerUrl;
         this.approvalToken = approvalToken;
-        this.agentRuntimeUrl = agentRuntimeUrl;
+        this.agentTaskService = agentTaskService;
     }
 
     public RemediationAction execute(Long incidentId, Approval approval) {
@@ -142,7 +142,9 @@ public class RemediationExecutor {
                     && IncidentStateMachineSafe.canTransition(incident.getStatus(), IncidentStatus.VERIFYING)) {
                 incident.setStatus(IncidentStatus.VERIFYING);
                 incidentRepository.save(incident);
-                triggerVerification(incident);
+                // 文档 11.3：验证是持久任务，不再同步等待 Agent 的观察窗。
+                // 任务行与 Incident 状态在同一事务提交；Agent 领取后自行等待 + 采 SLI。
+                agentTaskService.createVerificationTask(incidentId, remediation.getId());
             } else if ("UNKNOWN".equals(outcome)) {
                 // 文档 7.6：UNKNOWN = 无法确认是否执行 → 待对账，不盲目重复。
                 // Incident 移出 REMEDIATING 落 FAILED（人工决定是否重发/升级），
@@ -323,24 +325,6 @@ public class RemediationExecutor {
 
     private static int intOr(JsonNode node, String field, int fallback) {
         return node != null && node.has(field) && node.get(field).isInt() ? node.get(field).asInt() : fallback;
-    }
-
-    private void triggerVerification(Incident incident) {
-        try {
-            String summary = incident.getSummary() == null ? "" : incident.getSummary().replace("\"", "\\\"");
-            String body = """
-                    {"incident_id": %d, "alert": {"service": "%s", "severity": "%s", "summary": "%s"}}
-                    """.formatted(incident.getId(), incident.getService(), incident.getSeverity(), summary);
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(agentRuntimeUrl.replaceAll("/+$", "") + "/api/v1/agent/verify"))
-                    .timeout(Duration.ofSeconds(30))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .build();
-            httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        } catch (Exception e) {
-            // Verification is best-effort; the incident remains in VERIFYING for manual retry.
-        }
     }
 
     // small helper to avoid direct dependency on state machine class in this context

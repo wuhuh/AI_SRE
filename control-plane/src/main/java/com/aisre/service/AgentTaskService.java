@@ -203,6 +203,28 @@ public class AgentTaskService {
         return java.util.Optional.of(saved);
     }
 
+    /**
+     * 把恢复验证变成可领取、可重试的持久任务，而不是 CP 同步等待 Agent 的
+     * 60s 观察窗。幂等键绑定 remediation 行：同一修复动作最多生成一个验证任务。
+     *
+     * @return 新创建的任务；空表示该 remediation 已有验证任务（重复回调/重放）
+     */
+    @Transactional
+    public java.util.Optional<AgentTask> createVerificationTask(Long incidentId, Long remediationId) {
+        String key = "verify-" + incidentId + "-" + remediationId;
+        if (agentTaskRepository.findByIdempotencyKey(key).isPresent()) {
+            log.info("verification task {} already exists, skip", key);
+            return java.util.Optional.empty();
+        }
+        AgentTask task = new AgentTask(incidentId, AgentTask.TaskType.VERIFICATION,
+                AgentTaskStatus.QUEUED, key, Instant.now());
+        AgentTask saved = agentTaskRepository.save(task);
+        log.info("verification task {} created for incident {} (remediation {})",
+                saved.getId(), incidentId, remediationId);
+        auditService.record(incidentId, "system", "VERIFICATION_TASK_CREATED", key);
+        return java.util.Optional.of(saved);
+    }
+
     @Scheduled(fixedDelayString = "${aisre.task.lease-reclaim-interval-ms:60000}")
     @Transactional
     public void reclaimExpiredLeases() {

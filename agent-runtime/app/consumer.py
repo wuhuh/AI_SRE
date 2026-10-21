@@ -18,6 +18,7 @@ from typing import Any
 from app.agent.runner import AgentRunner
 from app.idempotency import FileIdempotencyStore
 from app.masking import mask_sensitive
+from app.models import AgentState
 
 
 def _request_json(method: str, url: str, payload: dict | None = None, timeout: float = 10,
@@ -102,6 +103,41 @@ def submit_diagnosis(cp_url: str, incident_id: int, diagnosis, task_id: int | No
     raise RuntimeError(f"diagnosis submit failed after {max_retries + 1} attempts: {last_exc}")
 
 
+def submit_verification(cp_url: str, incident_id: int, verification,
+                        task_id: int | None = None) -> None:
+    """验证回调：与诊断回调同一条重试/脱敏边界。"""
+    evidence = [{
+        "source": e.source,
+        "key": e.key,
+        "content": mask_sensitive(e.content or ""),
+        "query": getattr(e, "query", None),
+        "timeRange": getattr(e, "time_range", None),
+    } for e in (verification.evidence or [])]
+    payload = {
+        "status": verification.status,
+        "detail": mask_sensitive(verification.detail or ""),
+        "evidence": evidence,
+    }
+    if task_id is not None:
+        payload["taskId"] = task_id
+    # P1-AR-05 同语义：提交失败必须让调用方感知，任务才能进入 FAILED/重试，
+    # 不能「验证没落库但任务被 complete」。
+    max_retries = int(os.getenv("SUBMIT_MAX_RETRIES", "3"))
+    delay = float(os.getenv("SUBMIT_RETRY_DELAY_SECONDS", "0.5"))
+    last_exc: Exception | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            _request_json("POST", f"{cp_url}/api/v1/incidents/{incident_id}/verification",
+                          payload, timeout=10, headers=agent_headers())
+            return
+        except Exception as exc:  # noqa: BLE001 - retry boundary
+            last_exc = exc
+            if attempt < max_retries:
+                time.sleep(delay)
+    raise RuntimeError(
+        f"verification submit failed after {max_retries + 1} attempts: {last_exc}")
+
+
 def _worker_id() -> str:
     import socket
     return f"{socket.gethostname()}-{os.getpid()}"
@@ -161,7 +197,10 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
                           headers=agent_headers()) or []
     processed = 0
     worker = _worker_id()
-    from app.metrics import DIAGNOSES_TOTAL, DIAGNOSIS_DURATION, TASKS_PENDING
+    from app.metrics import (
+        DIAGNOSES_TOTAL, DIAGNOSIS_DURATION, TASKS_PENDING,
+        VERIFICATIONS_TOTAL, VERIFICATION_DURATION,
+    )
     # 红线 18：aisre_tasks_pending 此前全仓库从未 .set()，恒为 0——
     # Grafana「任务积压」面板是死的。轮询已经拿到了待认领清单，直接落这个数。
     TASKS_PENDING.set(len(tasks))
@@ -204,15 +243,30 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
             try:
                 import time as _time
                 _t0 = _time.monotonic()
-                # 每次任务一个 checkpoint key：重诊（新 task/round）绝不能复用
-                # 上一轮已完成的 diagnosis，否则自动重诊环会原地返回旧结论。
-                result = runner.run_diagnosis(
-                    incident_id, alert,
-                    run_key=f"task-{task_id}" if task_id is not None else None)
-                DIAGNOSIS_DURATION.observe(_time.monotonic() - _t0)
-                DIAGNOSES_TOTAL.labels(status=result.diagnosis.status).inc()
-                submit_diagnosis(cp_url, incident_id, result.diagnosis, task_id=task_id,
-                                 worker=worker, claim_epoch=claim_epoch)
+                task_type = str(task.get("type", "DIAGNOSIS")).upper()
+                if task_type == "VERIFICATION":
+                    # 文档 11.3：验证任务由消费者领取，观察窗 + SLI 采样都在 Agent 内完成；
+                    # CP 不再同步等待 60s，也不会把长 HTTP 调用包在事务里。
+                    state = AgentState(incident_id=incident_id, alert=alert)
+                    result = runner.run_verification(
+                        state,
+                        run_key=f"verify-{task_id}" if task_id is not None else None)
+                    VERIFICATION_DURATION.observe(_time.monotonic() - _t0)
+                    if result.verification is None:
+                        raise RuntimeError("verification produced no result")
+                    VERIFICATIONS_TOTAL.labels(status=result.verification.status).inc()
+                    submit_verification(cp_url, incident_id, result.verification,
+                                        task_id=task_id)
+                else:
+                    # 每次任务一个 checkpoint key：重诊（新 task/round）绝不能复用
+                    # 上一轮已完成的 diagnosis，否则自动重诊环会原地返回旧结论。
+                    result = runner.run_diagnosis(
+                        incident_id, alert,
+                        run_key=f"task-{task_id}" if task_id is not None else None)
+                    DIAGNOSIS_DURATION.observe(_time.monotonic() - _t0)
+                    DIAGNOSES_TOTAL.labels(status=result.diagnosis.status).inc()
+                    submit_diagnosis(cp_url, incident_id, result.diagnosis, task_id=task_id,
+                                     worker=worker, claim_epoch=claim_epoch)
                 if task_id is not None:
                     # 文档 6.7：终态写入带 worker + epoch，旧世代写不进终态
                     _request_json("POST", f"{cp_url}/api/v1/tasks/{task_id}/complete",
