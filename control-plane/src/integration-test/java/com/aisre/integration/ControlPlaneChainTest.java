@@ -239,7 +239,7 @@ class ControlPlaneChainTest {
 
         // HIGH 风险动作 → WAITING_APPROVAL，无自动执行
         String diagnosis = """
-                {"rootCause": "capacity_shortage", "confidence": 0.8,
+                {"rootCause": "cpu_saturation", "confidence": 0.8,
                  "recommendedActions": ["scale_deployment"],
                  "evidence": [{"source": "prometheus", "key": "cpu", "content": "0.95"}]}
                 """;
