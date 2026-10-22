@@ -199,6 +199,8 @@ jobs:
             curl -s -X POST http://localhost:8000/api/orders \
               -H 'Content-Type: application/json' -d '{}' >/dev/null || true
           done
+          # 给 Prometheus 至少两个 scrape interval（5s）落盘，再开始注入故障
+          sleep 10
       - name: Start Agent Runtime
         working-directory: agent-runtime
         env:
@@ -315,6 +317,8 @@ jobs:
             curl -s -X POST http://localhost:8000/api/orders \
               -H 'Content-Type: application/json' -d '{}' >/dev/null || true
           done
+          # 给 Prometheus 至少两个 scrape interval（5s）落盘，再开始注入故障
+          sleep 10
       - name: Start Agent Runtime
         working-directory: agent-runtime
         env:
