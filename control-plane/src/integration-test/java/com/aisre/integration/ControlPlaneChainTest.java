@@ -191,7 +191,7 @@ class ControlPlaneChainTest {
         mockBackends.enqueue(new MockResponse().setResponseCode(200).setBody("{\"ok\":true}"));
 
         String diagnosis = """
-                {"taskId": 1, "rootCause": "redis_connection_pool_exhausted", "confidence": 0.9,
+                {"rootCause": "redis_connection_pool_exhausted", "confidence": 0.9,
                  "recommendedActions": ["restart_pod"],
                  "evidence": [{"source": "prometheus", "key": "redis_blocked_clients", "content": "blocked=2"}],
                  "toolCalls": [{"toolName": "redis", "status": "SUCCESS", "argumentsJson": "{}", "resultSummary": "blocked=2", "durationMs": 5}]}
@@ -239,7 +239,7 @@ class ControlPlaneChainTest {
 
         // HIGH 风险动作 → WAITING_APPROVAL，无自动执行
         String diagnosis = """
-                {"taskId": 2, "rootCause": "capacity_shortage", "confidence": 0.8,
+                {"rootCause": "capacity_shortage", "confidence": 0.8,
                  "recommendedActions": ["scale_deployment"],
                  "evidence": [{"source": "prometheus", "key": "cpu", "content": "0.95"}]}
                 """;
@@ -299,7 +299,7 @@ class ControlPlaneChainTest {
                 id -> id != null, "incident for inventory-service should be created");
 
         assertEquals(200, post(base() + "/api/v1/incidents/" + incidentId + "/diagnosis",
-                "{\"taskId\": 3, \"rootCause\": \"memory_leak\", \"confidence\": 0.8, "
+                "{\"rootCause\": \"memory_leak\", \"confidence\": 0.8, "
                         + "\"recommendedActions\": [\"delete_pod\"], "
                         + "\"evidence\": [{\"source\": \"prometheus\", \"key\": \"mem\", \"content\": \"rising\"}]}",
                 agentHeaders()).getStatusCode().value());
