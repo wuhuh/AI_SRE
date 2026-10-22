@@ -344,8 +344,10 @@ class ControlPlaneChainTest {
             assertTrue(agentTaskService.claim(task.getId(), "it-worker-crash").isPresent(),
                     "round " + round + ": claim must succeed on QUEUED task");
             com.aisre.domain.AgentTask running = agentTaskRepository.findById(task.getId()).orElseThrow();
-            // worker 崩溃：claimedAt 回拨到租约窗口之外
+            // worker 崩溃：claimedAt 与显式租约 leaseUntil 都回拨到窗口之外
+            // （V12 起回收器优先按 leaseUntil 判过期，只改 claimedAt 不会触发回收）
             running.setClaimedAt(java.time.Instant.now().minusSeconds(3600));
+            running.setLeaseUntil(java.time.Instant.now().minusSeconds(60));
             agentTaskRepository.save(running);
             agentTaskService.reclaimExpiredLeases();
             com.aisre.domain.AgentTask after = agentTaskRepository.findById(task.getId()).orElseThrow();
