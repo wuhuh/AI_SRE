@@ -65,6 +65,21 @@ class RemediationPlanDigestTest {
     }
 
     @Test
+    void approvalDigestExcludesPerExecutionId() {
+        // 回归：execution_id 是执行时才知道的幂等键，不属于审批绑定的计划。
+        // 若把带 id 的 body 算进摘要，执行前比对必然失败，所有修复都会被拒绝。
+        String approved = RemediationExecutor.approvedPlanDigest(
+                "restart_pod", approval("restart_pod", "{}"), incident("order-service"));
+        String executedBody = RemediationExecutor.buildExecutionBody(
+                "restart_pod", approval("restart_pod", "{}"),
+                incident("order-service"), "rem-7").orElseThrow();
+        assertEquals(64, approved.length());
+        assertNotEquals(approved, RemediationExecutor.planDigest("restart_pod", executedBody));
+        assertEquals(approved, RemediationExecutor.approvedPlanDigest(
+                "restart_pod", approval("restart_pod", "{}"), incident("order-service")));
+    }
+
+    @Test
     void actionNameIsPartOfDigest() {
         String body = RemediationExecutor.buildExecutionBody(
                 "restart_pod", approval("restart_pod", "{}"),

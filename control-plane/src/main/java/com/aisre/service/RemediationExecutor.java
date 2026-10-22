@@ -87,14 +87,18 @@ public class RemediationExecutor {
             // 摘要比对。不一致 = 批准的对象/参数与实际执行的对象/参数不同
             // （教学反例：批准实例 A，执行时名称已复用为实例 B）→ fail-closed 拒绝。
             // planDigest 为 null 的是 V12 之前的旧审批，回退旧行为（不比对）。
+            // execution_id 是每次执行的幂等键，不属于被批准的计划：审批时按
+            // null 计算摘要，这里必须用同一规则重建，否则每次执行都会误判漂移。
+            String approvedDigest = approval.getPlanDigest() == null
+                    ? null : approvedPlanDigest(action, approval, incident);
             if (approval.getPlanDigest() != null
-                    && !approval.getPlanDigest().equals(planDigest(action, body.get()))) {
+                    && !approval.getPlanDigest().equals(approvedDigest)) {
                 remediation.setStatus("FAILED");
                 remediation.setResultSummary("refused: execution plan does not match approved plan (digest mismatch)");
                 remediation.setExecutedAt(Instant.now());
                 remediation = remediationActionRepository.save(remediation);
                 log.warn("plan digest mismatch for incident {}: approved={} actual={}",
-                        incidentId, approval.getPlanDigest(), planDigest(action, body.get()));
+                        incidentId, approval.getPlanDigest(), approvedDigest);
                 auditService.record(incidentId, "remediation-executor", "PLAN_DIGEST_MISMATCH",
                         "action=" + action);
                 failIncident(incident, "remediation refused: plan does not match approved plan");
@@ -201,6 +205,17 @@ public class RemediationExecutor {
         auditService.record(incident.getId(), "remediation-executor", "REMEDIATION_NOT_COMPLETED",
                 current + "->" + target + " " + reason);
         log.info("incident {} moved {} -> {} ({})", incident.getId(), current, target, reason);
+    }
+
+    /**
+     * 审批绑定的计划摘要：与执行请求体同构，但**不含** execution_id。
+     * execution_id 是每次执行的幂等键（rem-{id}），在审批创建时还不存在；
+     * 若把它算进摘要，执行前比对必然不匹配，所有修复都会被误判为计划漂移。
+     */
+    static String approvedPlanDigest(String action, Approval approval, Incident incident) {
+        return buildExecutionBody(action, approval, incident, null)
+                .map(body -> planDigest(action, body))
+                .orElse(null);
     }
 
     /**

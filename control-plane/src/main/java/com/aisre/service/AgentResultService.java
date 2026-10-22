@@ -390,9 +390,9 @@ public class AgentResultService {
     private Approval buildBoundApproval(Long incidentId, String action, String payload,
                                         Incident incident, ApprovalStatus status) {
         Approval approval = new Approval(incidentId, action, payload, status, "agent", Instant.now());
-        java.util.Optional<String> plan =
-                RemediationExecutor.buildExecutionBody(action, approval, incident, null);
-        plan.ifPresent(body -> approval.setPlanDigest(RemediationExecutor.planDigest(action, body)));
+        java.util.Optional.ofNullable(
+                        RemediationExecutor.approvedPlanDigest(action, approval, incident))
+                .ifPresent(approval::setPlanDigest);
         return approval;
     }
 
