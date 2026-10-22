@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import sys
 import unittest
+import urllib.error
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "runner"))
 
 from run_evaluation import (  # noqa: E402
     ALERT_PROFILES,
+    _is_retryable_exception,
+    _is_transient_diagnosis,
     build_alert,
     canonicalize_label,
+    evaluate,
     evidence_scores,
     score,
     score_open,
@@ -237,6 +242,110 @@ class SummarizeTest(unittest.TestCase):
         self.assertEqual(report["selective_top1_accuracy"], 0.3333)
         self.assertEqual(report["wrong_confident_rate"], 0.5)
         self.assertEqual(report["mode"], "open")
+
+
+def _diagnosis(root: str, tokens: int, status: str = "ROOT_CAUSE_FOUND") -> dict:
+    return {
+        "diagnosis": {
+            "root_cause": root,
+            "candidate_root_causes": [root] if root != "unknown" else [],
+            "confidence": 0.8,
+            "status": status,
+            "fallback_used": status == "UNKNOWN",
+            "tool_calls": [],
+            "evidence": [],
+            "llm_input_tokens": tokens,
+            "llm_output_tokens": 5,
+        }
+    }
+
+
+RETRY_CASE = {"id": "retry_case", "fault_type": "slow_sql", "service": "payment-service"}
+
+
+class EvaluationRetryTest(unittest.TestCase):
+    def test_retryable_exception_classification(self):
+        self.assertTrue(_is_retryable_exception(ConnectionResetError("reset")))
+        self.assertTrue(_is_retryable_exception(urllib.error.URLError("reset")))
+        self.assertTrue(_is_retryable_exception(
+            urllib.error.HTTPError("http://x", 503, "busy", {}, None)))
+        self.assertFalse(_is_retryable_exception(
+            urllib.error.HTTPError("http://x", 400, "bad request", {}, None)))
+        # 500 可能是代码 bug，不重试，避免掩盖问题
+        self.assertFalse(_is_retryable_exception(
+            urllib.error.HTTPError("http://x", 500, "bug", {}, None)))
+
+    def test_transient_diagnosis_is_zero_token_only(self):
+        self.assertTrue(_is_transient_diagnosis({"llm_input_tokens": 0, "status": "UNKNOWN"}))
+        self.assertFalse(_is_transient_diagnosis({
+            "llm_input_tokens": 10, "status": "UNKNOWN", "reason_code": "model_unknown"}))
+
+    def test_evaluate_retries_connection_reset(self):
+        with patch("run_evaluation.call_diagnose",
+                   side_effect=[ConnectionResetError("reset"), (_diagnosis("slow_sql", 10), 0.2)]) as call, \
+                patch("run_evaluation.time.sleep"):
+            rows = evaluate([RETRY_CASE], retries=1)
+
+        self.assertEqual(call.call_count, 2)
+        self.assertEqual(rows[0]["attempts"], 2)
+        self.assertTrue(rows[0]["retried"])
+        self.assertEqual(rows[0]["predicted"], "slow_sql")
+        self.assertTrue(rows[0]["top1"])
+
+    def test_evaluate_retries_zero_token_then_success(self):
+        with patch("run_evaluation.call_diagnose",
+                   side_effect=[(_diagnosis("unknown", 0, "UNKNOWN"), 0.1),
+                                (_diagnosis("slow_sql", 10), 0.2)]) as call, \
+                patch("run_evaluation.time.sleep"):
+            rows = evaluate([RETRY_CASE], retries=1)
+
+        self.assertEqual(call.call_count, 2)
+        self.assertEqual(rows[0]["attempts"], 2)
+        self.assertEqual(rows[0]["predicted"], "slow_sql")
+
+    def test_evaluate_does_not_retry_model_unknown(self):
+        with patch("run_evaluation.call_diagnose",
+                   return_value=(_diagnosis("unknown", 10, "UNKNOWN"), 0.1)) as call, \
+                patch("run_evaluation.time.sleep"):
+            rows = evaluate([RETRY_CASE], retries=2)
+
+        self.assertEqual(call.call_count, 1)
+        self.assertEqual(rows[0]["attempts"], 1)
+        self.assertFalse(rows[0]["retried"])
+
+    def test_evaluate_does_not_retry_http_400(self):
+        err = urllib.error.HTTPError("http://x", 400, "bad request", {}, None)
+        with patch("run_evaluation.call_diagnose", side_effect=err) as call, \
+                patch("run_evaluation.time.sleep"):
+            rows = evaluate([RETRY_CASE], retries=2)
+
+        self.assertEqual(call.call_count, 1)
+        self.assertEqual(rows[0]["status"], "HTTP_ERROR")
+        self.assertEqual(rows[0]["attempts"], 1)
+
+    def test_summarize_reports_attempt_metrics(self):
+        row = {
+            "expected": "slow_sql",
+            "predicted": "slow_sql",
+            "predicted_canonical": "slow_sql",
+            "top1": True,
+            "top3": True,
+            "status": "ROOT_CAUSE_FOUND",
+            "fallback_used": False,
+            "evidence_precision": None,
+            "evidence_recall": None,
+            "tool_calls": 0,
+            "tool_success": 0,
+            "llm_input_tokens": 10,
+            "llm_output_tokens": 5,
+            "latency_s": 0.2,
+            "attempts": 2,
+            "retried": True,
+        }
+        report = summarize([row])
+        self.assertEqual(report["retried_cases"], 1)
+        self.assertEqual(report["retry_successes"], 1)
+        self.assertEqual(report["total_attempts"], 2)
 
 
 if __name__ == "__main__":

@@ -21,6 +21,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
@@ -358,20 +359,75 @@ def call_diagnose(case: dict, agent_url: str = AGENT_URL,
     return data, time.perf_counter() - start
 
 
+RETRYABLE_HTTP_CODES = frozenset({408, 429, 502, 503, 504})
+
+
+def _retry_delay(attempt: int) -> float:
+    base = float(os.getenv("EVAL_RETRY_DELAY_SECONDS", "2"))
+    cap = float(os.getenv("EVAL_RETRY_MAX_DELAY_SECONDS", "15"))
+    return max(0.0, min(cap, base * (2 ** (attempt - 1))))
+
+
+def _is_retryable_exception(exc: Exception) -> bool:
+    """只重试环境抖动；4xx/500 是契约或代码 bug，重试会掩盖问题。"""
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code in RETRYABLE_HTTP_CODES
+    return isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionResetError))
+
+
+def _is_transient_diagnosis(diagnosis: dict) -> bool:
+    """0 token 表示 LLM 根本没跑成（连接/解析失败），不是模型主动拒答。
+
+    真实拒答即使 status=UNKNOWN 也有 token 消耗，不能重试，否则会污染
+    coverage / abstention 指标。
+    """
+    return int(diagnosis.get("llm_input_tokens") or 0) == 0
+
+
 def evaluate(cases: list[dict], agent_url: str = AGENT_URL,
-             open_set: bool = False) -> list[dict]:
+             open_set: bool = False, retries: int | None = None) -> list[dict]:
+    """逐 case 评测；只对瞬时失败重试，最终结果只计最后一次尝试。"""
+    extra = int(os.getenv("EVAL_RETRIES", "0")) if retries is None else retries
+    max_attempts = max(1, int(extra) + 1)
     rows = []
     for case in cases:
-        try:
-            data, latency = call_diagnose(case, agent_url, open_set=open_set)
-        except Exception as e:  # noqa: BLE001 - 单个 case 失败不炸全局，记为 error row
+        data = None
+        latency = 0.0
+        last_error = None
+        attempts = 0
+        for attempt in range(1, max_attempts + 1):
+            attempts = attempt
+            data = None
+            try:
+                candidate, candidate_latency = call_diagnose(
+                    case, agent_url, open_set=open_set)
+                diagnosis = candidate.get("diagnosis", {})
+                if attempt < max_attempts and _is_transient_diagnosis(diagnosis):
+                    last_error = (
+                        f"transient diagnosis: status={diagnosis.get('status')} "
+                        f"reason={diagnosis.get('reason_code')} tokens=0")
+                    print(f"[retry] case={case.get('id')} next={attempt + 1}/{max_attempts} "
+                          f"reason={last_error}", flush=True)
+                    time.sleep(_retry_delay(attempt))
+                    continue
+                data, latency = candidate, candidate_latency
+                break
+            except Exception as e:  # noqa: BLE001 - 单个 case 失败不炸全局
+                last_error = f"{type(e).__name__}: {e}"
+                if attempt >= max_attempts or not _is_retryable_exception(e):
+                    break
+                print(f"[retry] case={case.get('id')} next={attempt + 1}/{max_attempts} "
+                      f"reason={last_error}", flush=True)
+                time.sleep(_retry_delay(attempt))
+
+        if data is None:
             rows.append(
                 {
                     "case_id": case.get("id"),
                     "expected": case.get("fault_type"),
                     "predicted": "http_error",
                     "predicted_canonical": "http_error",
-                    "error": f"{type(e).__name__}: {e}",
+                    "error": last_error or "unknown error",
                     "candidates": [],
                     "confidence": None,
                     "status": "HTTP_ERROR",
@@ -385,6 +441,8 @@ def evaluate(cases: list[dict], agent_url: str = AGENT_URL,
                     "llm_input_tokens": 0,
                     "llm_output_tokens": 0,
                     "latency_s": 0.0,
+                    "attempts": attempts,
+                    "retried": attempts > 1,
                 }
             )
             continue
@@ -413,6 +471,8 @@ def evaluate(cases: list[dict], agent_url: str = AGENT_URL,
                 "llm_input_tokens": diagnosis.get("llm_input_tokens", 0),
                 "llm_output_tokens": diagnosis.get("llm_output_tokens", 0),
                 "latency_s": round(latency, 3),
+                "attempts": attempts,
+                "retried": attempts > 1,
             }
         )
     return rows
@@ -436,6 +496,12 @@ def summarize(rows: list[dict], open_set: bool = False) -> dict:
     http_errors = sum(1 for r in rows if r["status"] == "HTTP_ERROR")
     # LLM 传输/解析失败会表现为 0 token + unknown；必须与模型主动拒答分开报。
     llm_error_cases = sum(1 for r in scored if r.get("llm_input_tokens", 0) == 0)
+    retried = [r for r in rows if r.get("attempts", 1) > 1]
+    # 重试成功 = 最终拿到了有效 LLM 响应（tokens > 0），不代表答对。
+    retry_successes = sum(1 for r in retried
+                          if r["status"] != "HTTP_ERROR"
+                          and r.get("llm_input_tokens", 0) > 0)
+    total_attempts = sum(r.get("attempts", 1) for r in rows)
     recalls = [r["evidence_recall"] for r in rows if r["evidence_recall"] is not None]
     precisions = [r["evidence_precision"] for r in rows if r["evidence_precision"] is not None]
 
@@ -464,6 +530,9 @@ def summarize(rows: list[dict], open_set: bool = False) -> dict:
         "fallback_rate": round(fallback / n, 4),
         "llm_error_cases": llm_error_cases,
         "llm_error_rate": round(llm_error_cases / n, 4),
+        "retried_cases": len(retried),
+        "retry_successes": retry_successes,
+        "total_attempts": total_attempts,
         "evidence_precision_avg": round(sum(precisions) / len(precisions), 4) if precisions else None,
         "evidence_recall_avg": round(sum(recalls) / len(recalls), 4) if recalls else None,
         "tool_success_rate": round(successful_tools / total_tools, 4) if total_tools else None,
@@ -482,6 +551,8 @@ def main() -> int:
                         choices=["dev", "validation", "test", "open_test", "all"])
     parser.add_argument("--mode", default="closed", choices=["closed", "open"],
                         help="closed=prompt 给候选标签；open=不提供标签，允许 unknown")
+    parser.add_argument("--retries", type=int, default=None,
+                        help="每个 case 的额外重试次数（默认 EVAL_RETRIES，未设置=0）")
     parser.add_argument(
         "--provider", default=os.getenv("LLM_PROVIDER", "mock"), help="报告元数据：本次评测使用的 LLM provider"
     )
@@ -513,10 +584,12 @@ def main() -> int:
         cases = cases[: args.limit]
 
     open_set = args.mode == "open"
-    rows = evaluate(cases, args.agent_url, open_set=open_set)
+    retries = 0 if args.retries is None else max(0, args.retries)
+    rows = evaluate(cases, args.agent_url, open_set=open_set, retries=retries)
     report = summarize(rows, open_set=open_set)
     report["provider"] = args.provider
     report["split"] = args.splits
+    report["retries"] = retries
     report["input_mode"] = "neutral_symptom_alerts (no fault_type leakage)"
     report["scoring"] = (
         "open-set: free-form label canonicalized, unknown expected=abstention"
