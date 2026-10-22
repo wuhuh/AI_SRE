@@ -411,10 +411,12 @@ def main() -> int:
 
     env = os.environ.copy()
     env["RUN_E2E"] = "1"
-    env["CONTROL_PLANE_URL"] = f"http://localhost:{CP_PORT}"
-    env["AGENT_URL"] = f"http://localhost:{AR_PORT}"
-    env["PAYMENT_URL"] = f"http://localhost:{PAYMENT_PORT}"
-    env["INVENTORY_URL"] = f"http://localhost:{INVENTORY_PORT}"
+    # mock 服务只绑定 IPv4；用 localhost 时 Windows 会先试 ::1 再回退，
+    # 给每次请求平白加 ~2s，导致恢复耗时断言抖动。
+    env["CONTROL_PLANE_URL"] = f"http://127.0.0.1:{CP_PORT}"
+    env["AGENT_URL"] = f"http://127.0.0.1:{AR_PORT}"
+    env["PAYMENT_URL"] = f"http://127.0.0.1:{PAYMENT_PORT}"
+    env["INVENTORY_URL"] = f"http://127.0.0.1:{INVENTORY_PORT}"
 
     cmd = [sys.executable, "-m", "unittest", "tests.e2e.test_real_faults", "-v"]
     proc = subprocess.run(cmd, cwd=str(PROJECT_ROOT / "agent-runtime"), env=env)
