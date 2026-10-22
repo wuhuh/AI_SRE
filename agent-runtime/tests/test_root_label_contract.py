@@ -9,7 +9,6 @@ import unittest
 
 from app.agent.diagnostic import RCA_CANDIDATE_LABELS, DiagnosticAgent
 from app.llm.base import LLMProvider, LLMResult
-from app.llm.mock import MockLLMProvider
 from app.models import AgentState
 from app.tools.base import Tool, ToolSpec
 from app.tools.registry import ToolRegistry
@@ -65,8 +64,8 @@ class InvalidRootLabelTest(unittest.TestCase):
     def test_valid_label_is_adopted_with_reason_code_empty(self):
         valid = RCA_CANDIDATE_LABELS[0]
         agent = _agent(_llm(
-            '{"rootCause": "%s", "confidence": 0.8, "evidence": [], '
-            '"recommendedActions": []}' % valid))
+            f'{{"rootCause": "{valid}", "confidence": 0.8, "evidence": [], '
+            '"recommendedActions": []}'))
         state = _state()
         state.pending = ["query_prometheus"]
         result = agent.run(state)

@@ -23,13 +23,13 @@ class TTLCacheTest(unittest.TestCase):
         """红线 40 回归：写入后不再被读的 key 之前永久驻留，store 无界增长。"""
         cache = TTLCache(default_ttl_seconds=5, maxsize=10)
         for i in range(100):
-            cache.set("key-%d" % i, i)
+            cache.set(f"key-{i}", i)
         self.assertLessEqual(len(cache), 10)
 
     def test_evicts_oldest_first(self):
         cache = TTLCache(default_ttl_seconds=5, maxsize=3)
         for i in range(3):
-            cache.set("k%d" % i, i)
+            cache.set(f"k{i}", i)
         cache.set("k3", 3)
         # k0 是最早写入的，应被淘汰
         self.assertIsNone(cache.get("k0"))
@@ -38,7 +38,7 @@ class TTLCacheTest(unittest.TestCase):
     def test_moves_recently_used_to_safe_end(self):
         cache = TTLCache(default_ttl_seconds=5, maxsize=3)
         for i in range(3):
-            cache.set("k%d" % i, i)
+            cache.set(f"k{i}", i)
         cache.get("k0")  # 变成最近使用
         cache.set("k3", 3)
         self.assertEqual(cache.get("k0"), 0)
@@ -46,7 +46,7 @@ class TTLCacheTest(unittest.TestCase):
     def test_evictions_are_counted(self):
         cache = TTLCache(default_ttl_seconds=5, maxsize=2)
         for i in range(5):
-            cache.set("k%d" % i, i)
+            cache.set(f"k{i}", i)
         self.assertGreater(cache.stats.snapshot()["evictions"], 0)
 
     def test_rejects_non_positive_maxsize(self):

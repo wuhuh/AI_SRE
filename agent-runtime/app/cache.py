@@ -108,7 +108,7 @@ class CachedToolRegistry:
 
         # 红线 40：key 先哈希——原来直接把 sorted(arguments.items()) 拼进 key，
         # PromQL 全文进 key 使条目近乎永不命中，且单条 key 长达数百字符。
-        raw_key = "%s:%s:%s" % (name, principal, sorted(arguments.items()))
+        raw_key = f"{name}:{principal}:{sorted(arguments.items())}"
         key = _hash_key(raw_key)
         cached = self.cache.get(key)
         if cached is not None:

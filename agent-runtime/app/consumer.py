@@ -198,8 +198,11 @@ def consume_once(runner: AgentRunner, cp_url: str, idempotency_store=None) -> in
     processed = 0
     worker = _worker_id()
     from app.metrics import (
-        DIAGNOSES_TOTAL, DIAGNOSIS_DURATION, TASKS_PENDING,
-        VERIFICATIONS_TOTAL, VERIFICATION_DURATION,
+        DIAGNOSES_TOTAL,
+        DIAGNOSIS_DURATION,
+        TASKS_PENDING,
+        VERIFICATION_DURATION,
+        VERIFICATIONS_TOTAL,
     )
     # 红线 18：队列深度以 CP 的 DB 事实源为准。分页拉取后 len(tasks)
     # 只是本批上限，不能代表真实积压量；count 查询失败时退回本批长度。

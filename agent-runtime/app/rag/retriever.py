@@ -41,7 +41,7 @@ def default_embedding(text: str, dimensions: int = 256) -> list[float]:
     vec = [0.0] * dimensions
     tokens = default_tokenize(text)
     for i, token in enumerate(tokens):
-        digest = hashlib.sha256(f"{token}:{i % 7}".encode("utf-8")).digest()
+        digest = hashlib.sha256(f"{token}:{i % 7}".encode()).digest()
         idx = int.from_bytes(digest[:8], "big") % dimensions
         vec[idx] += 1.0
     norm = math.sqrt(sum(v * v for v in vec)) or 1.0

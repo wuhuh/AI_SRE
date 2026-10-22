@@ -41,11 +41,7 @@ def mask_sensitive(value: str) -> str:
     if not value:
         return value
     text = _SENSITIVE_KEY.sub(
-        lambda m: "%s=%s%s" % (
-            m.group(1),
-            (m.group(2) + " ") if m.group(2) else "",
-            _mask_value(m.group(3)),
-        ),
+        lambda m: f"{m.group(1)}={(m.group(2) + ' ') if m.group(2) else ''}{_mask_value(m.group(3))}",
         value,
     )
     return _BARE_SECRET.sub(lambda m: _mask_value(m.group(1)), text)
