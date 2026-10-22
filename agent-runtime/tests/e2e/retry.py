@@ -21,14 +21,19 @@ class TransientE2EError(RuntimeError):
 def is_transient_diagnosis(body: dict) -> bool:
     """判断一次 Agent 诊断响应是否只是“没跑成”，而不是模型主动拒答。"""
     diag = body.get("diagnosis") or {}
+    if not diag:
+        return True
     tokens = int(diag.get("llm_input_tokens") or 0)
     status = (diag.get("status") or "").upper()
     reason = (diag.get("reason_code") or "").lower()
-    if tokens == 0:
-        return True
     if status == "TIMEOUT":
         return True
-    return status == "UNKNOWN" and reason in TRANSIENT_REASON_CODES
+    if status == "UNKNOWN" and reason in TRANSIENT_REASON_CODES:
+        return True
+    # 0 token 只在「没有给出结论」时视为 provider 未真正返回；
+    # 契约 mock / 旧版本可能不带 token 字段，但有有效 root_cause 时不应重试。
+    answered = str(diag.get("root_cause") or "").strip().lower()
+    return tokens == 0 and status == "UNKNOWN" and answered in ("", "unknown")
 
 
 def is_retryable_exception(exc: Exception) -> bool:

@@ -59,6 +59,19 @@ class DiagnosisClassificationTest(unittest.TestCase):
             }
         }))
 
+    def test_contract_mock_without_token_fields_is_not_transient(self):
+        # 契约冒烟的 mock AR 只返回 root_cause/confidence，不带 status/token；
+        # 有有效结论就不能判成“没跑成”，否则会重试到超时并误报。
+        self.assertFalse(is_transient_diagnosis({
+            "diagnosis": {
+                "root_cause": "redis_connection_pool_exhausted",
+                "confidence": 0.95,
+            }
+        }))
+
+    def test_missing_diagnosis_body_is_transient(self):
+        self.assertTrue(is_transient_diagnosis({}))
+
 
 class RetryableExceptionTest(unittest.TestCase):
     def test_http_error_classification(self):
