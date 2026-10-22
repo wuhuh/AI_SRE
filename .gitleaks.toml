@@ -1,0 +1,12 @@
+# gitleaks 配置：在默认规则之上放行“测试夹具 / 文档占位符”。
+# 只豁免精确的已知假值，不做路径级全量放行。
+[extend]
+useDefault = true
+
+[allowlist]
+description = "masking fixtures/docstrings and k8s Secret REPLACE_WITH_* placeholders"
+regexTarget = "match"
+regexes = [
+  '''api_key=sk-1234567890''',
+  '''jwtSecret: REPLACE_WITH_JWT_SECRET_MIN_32_BYTES''',
+]
