@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    # 临时：诊断 java-integration 失败；定位后撤回。
+    branches: [ main, ai/agent-runtime-hardening ]
   pull_request:
   # P2-CI-02: nightly 真实集成（compose + E2E + k6 冒烟 + 评测冒烟）
   schedule:
@@ -62,8 +63,12 @@ jobs:
         if: failure()
         run: |
           cd control-plane
+          # Maven 的失败根因优先：编译错误 / 测试汇总 / 超时目标（比断言片段更直接）
+          grep -a "\[ERROR\]" build.log 2>/dev/null | tail -30 | while IFS= read -r line; do
+            echo "::error ::$line"
+          done
           if [ -d target/surefire-reports ]; then
-            grep -h -B1 -A4 "AssertionFailedError\|ERROR\!" target/surefire-reports/*.txt 2>/dev/null | head -20 | while IFS= read -r line; do
+            grep -h -B1 -A6 "<<< FAILURE\|<<< ERROR" target/surefire-reports/*.txt 2>/dev/null | head -40 | while IFS= read -r line; do
               echo "::error ::$line"
             done
           fi
@@ -150,7 +155,7 @@ jobs:
 
   # Phase 4: nightly mock 真实故障 E2E；无 secret，验证工具链 + 恢复闭环。
   real-fault-e2e-mock:
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.live_llm != 'true')
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/ai/agent-runtime-hardening') || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.live_llm != 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
