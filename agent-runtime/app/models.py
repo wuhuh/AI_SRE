@@ -47,8 +47,8 @@ class DiagnosisResult:
     # P0-03: 真实 token 计量（openai provider 返回 usage；mock 为固定值）
     llm_input_tokens: int = 0
     llm_output_tokens: int = 0
-    # 文档 8.5：UNKNOWN 的原因分类（timeout / invalid_label / model_unknown），
-    # 不把所有失败压成一条 unknown 文本
+    # 文档 8.5：UNKNOWN 的原因分类（timeout / invalid_label / model_unknown /
+    # llm_error / invalid_json），不把所有失败压成一条 unknown 文本
     reason_code: str = ""
 
 
@@ -82,6 +82,9 @@ class AgentState:
     # native function calling：多轮 LLM 消息（assistant tool_calls / tool results）
     # 随 checkpoint 持久化，崩溃续跑时不会丢失已执行工具的结果。
     llm_messages: list[dict[str, Any]] = field(default_factory=list)
+    # Phase 1：最近一次 LLM 调用的失败分类（llm_error / invalid_json），
+    # 供 _finalize 输出精确 reason_code，以及 CI 级重试只重试环境抖动。
+    llm_error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -93,3 +96,5 @@ class LLMResult:
     input_tokens: int = 0
     output_tokens: int = 0
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    # Phase 1：provider 层失败时由 DiagnosticAgent 打标；正常结果保持 None。
+    error: str | None = None

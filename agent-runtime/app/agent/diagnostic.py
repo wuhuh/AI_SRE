@@ -31,6 +31,11 @@ RCA_CANDIDATE_LABELS = (
     "thread_pool_exhausted",
 )
 
+# Phase 1：只有环境/输出解析抖动允许 CI 级重试。
+# model_unknown / invalid_label / timeout 都不在这里：它们是模型或配置结果，
+# 重试只会污染 coverage / accuracy 指标。
+RETRYABLE_REASON_CODES = frozenset({"llm_error", "invalid_json"})
+
 
 def normalize_label(value: str | None) -> str:
     return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
@@ -96,6 +101,8 @@ class DiagnosticAgent:
         # 崩溃续跑时从剩余步骤继续，已完成工具不重复执行
         pending = state.pending or list(state.plan)
         state.pending = pending
+        # 新一轮诊断重新观察 LLM 状态，避免 checkpoint 里的旧错误影响本轮分类。
+        state.llm_error = None
         logger.info("diagnosis start: incident=%s plan=%s resumed_pending=%s",
                     state.incident_id, state.plan, bool(state.pending))
         unresolved = 0  # 连续不可解析 nextTool 计数（P0-08 收敛守卫）
@@ -290,17 +297,19 @@ class DiagnosticAgent:
         """一次 LLM 调用：下发工具 schema，返回原始结果（tool_calls 由调用方消费）。"""
         try:
             result = self.llm.complete(self._messages(state), tools=self._tool_specs())
+            state.llm_error = result.error
             state.llm_input_tokens += result.input_tokens
             state.llm_output_tokens += result.output_tokens
             return result
         except Exception as exc:
             logger.warning("llm decision failed: incident=%s error=%s", state.incident_id, exc)
+            state.llm_error = "llm_error"
             return LLMResult(content=json.dumps({
                 "rootCause": "unknown",
                 "confidence": 0.0,
                 "evidence": [],
                 "recommendedActions": [],
-            }))
+            }), error="llm_error")
 
     def _parse_decision(self, state: AgentState, result: LLMResult) -> dict:
         raw = result.content or ""
@@ -309,6 +318,7 @@ class DiagnosticAgent:
             if not isinstance(decision, dict):
                 raise ValueError("decision must be a JSON object")
             # P0-07 排障：决策结果必须可见（LLM 回了什么、是否走降级）
+            state.llm_error = result.error
             logger.info("llm decision: incident=%s root=%s nextTool=%s raw=%s",
                         state.incident_id, decision.get("rootCause"),
                         decision.get("nextTool"), raw[:800])
@@ -316,9 +326,12 @@ class DiagnosticAgent:
         except Exception as exc:
             salvaged = self._salvage_decision(raw)
             if salvaged is not None:
+                # 抢救成功后主结论仍可用；保留 provider 级错误（如果有）。
+                state.llm_error = result.error
                 logger.warning("llm decision salvaged: incident=%s error=%s root=%s",
                                state.incident_id, exc, salvaged.get("rootCause"))
                 return salvaged
+            state.llm_error = result.error or "invalid_json"
             logger.warning("llm decision parse failed: incident=%s error=%s raw=%s",
                            state.incident_id, exc, raw[:500])
             return {
@@ -542,7 +555,9 @@ class DiagnosticAgent:
             recommended = []
             status = "UNKNOWN"
             if not reason_code:
-                reason_code = "model_unknown"
+                # llm_error / invalid_json 让 CI 重试只针对环境/解析抖动；
+                # 否则是模型主动 unknown（model_unknown），不重试。
+                reason_code = state.llm_error or "model_unknown"
         # P0-03: Top-3 = root_cause + alternatives（归一化、去重、去 unknown、封顶 3）
         candidates: list[str] = []
         if fallback_used:

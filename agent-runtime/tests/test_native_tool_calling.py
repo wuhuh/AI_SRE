@@ -174,6 +174,7 @@ class NativeToolCallingTest(unittest.TestCase):
 
         self.assertEqual(result.root_cause, "slow_sql")
         self.assertEqual(result.status, "ROOT_CAUSE_FOUND")
+        self.assertEqual(result.reason_code, "")
         self.assertIn("cpu_saturation", result.candidate_root_causes)
 
     def test_tool_calls_at_step_limit_still_get_tool_responses(self):
