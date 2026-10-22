@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    # 临时：允许 feature 分支 push 触发 mock E2E 验证；验证后撤回。
+    branches: [ main, ai/agent-runtime-hardening ]
   pull_request:
   # P2-CI-02: nightly 真实集成（compose + E2E + k6 冒烟 + 评测冒烟）
   schedule:
@@ -150,7 +151,7 @@ jobs:
 
   # Phase 4: nightly mock 真实故障 E2E；无 secret，验证工具链 + 恢复闭环。
   real-fault-e2e-mock:
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.live_llm != 'true')
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/ai/agent-runtime-hardening') || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.live_llm != 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
