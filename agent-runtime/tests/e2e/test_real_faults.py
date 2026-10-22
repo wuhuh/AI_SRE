@@ -18,7 +18,10 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+import uuid
 from pathlib import Path
+
+from tests.e2e.retry import TransientE2EError, is_transient_diagnosis, retry_transient
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -154,10 +157,29 @@ class RealFaultE2ETest(unittest.TestCase):
                     f"{label} not reachable at {url}. Please run `docker compose up -d --build`. Detail: {exc}"
                 ) from exc
 
+    def setUp(self):
+        self._attempt = 1
+        # 每个测试/每次 retry 前都恢复干净故障状态，避免上一轮残留。
+        self._reset_faults()
+
+    def _reset_faults(self) -> None:
+        for url, names in (
+                (PAYMENT_URL, ("redis_pool_exhausted",)),
+                (INVENTORY_URL, ("slow_sql", "cpu_saturation")),
+        ):
+            for name in names:
+                try:
+                    self._set_fault(url, name, False)
+                except Exception:
+                    pass
+
     def _set_fault(self, service_url: str, name: str, enabled: bool) -> None:
         request("POST", f"{service_url}/faults?name={name}&enabled={str(enabled).lower()}", timeout=5)
 
     def _send_alert(self, service: str, resource: str, summary: str) -> int:
+        # CP 的 alert fingerprint 含 resource；重试时用唯一后缀避免被 5 分钟去重压掉。
+        # 注意 CP 的 incident 聚合是按 service 的，活跃 incident 仍可能被复用。
+        resource = f"{resource}-a{getattr(self, '_attempt', 1)}-{uuid.uuid4().hex[:6]}"
         status, body = request("POST", f"{CP_URL}/api/v1/alerts/alertmanager", {
             "version": "4",
             "status": "firing",
@@ -189,6 +211,11 @@ class RealFaultE2ETest(unittest.TestCase):
         # 诊断端到端含真实工具链路（Prom/Tempo/Loki），30s 贴边易超——对齐 DIAG_BUDGET
         }, timeout=180, headers={"X-Agent-Token": AGENT_TOKEN})
         self.assertEqual(status, 200)
+        if is_transient_diagnosis(body):
+            diag = body.get("diagnosis", {})
+            raise TransientE2EError(
+                f"transient diagnosis: status={diag.get('status')} "
+                f"reason={diag.get('reason_code')} tokens={diag.get('llm_input_tokens')}")
         return body
 
     def _verify(self, incident_id: int, service: str) -> dict:
@@ -209,6 +236,7 @@ class RealFaultE2ETest(unittest.TestCase):
         _, body = request("GET", f"{CP_URL}/api/v1/incidents/{incident_id}")
         return body["status"]
 
+    @retry_transient
     def test_redis_connection_pool_exhausted_real_fault(self):
         log("send alert for redis_pool_exhausted")
         incident_id = self._send_alert("payment-service", "payment-e2e-redis", "payment-service redis connection pool exhausted")
@@ -244,6 +272,7 @@ class RealFaultE2ETest(unittest.TestCase):
             log("cleanup fault")
             self._set_fault(PAYMENT_URL, "redis_pool_exhausted", False)
 
+    @retry_transient
     def test_slow_sql_real_fault(self):
         log("send alert for slow_sql")
         incident_id = self._send_alert("inventory-service", "inventory-e2e-slow-sql", "inventory-service slow sql")
@@ -287,6 +316,7 @@ class RealFaultE2ETest(unittest.TestCase):
             log("cleanup fault")
             self._set_fault(INVENTORY_URL, "slow_sql", False)
 
+    @retry_transient
     def test_cpu_saturation_real_fault(self):
         log("send alert for cpu_saturation")
         incident_id = self._send_alert("inventory-service", "inventory-e2e-cpu-sat", "inventory-service cpu saturation")
